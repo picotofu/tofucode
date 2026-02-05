@@ -398,8 +398,13 @@ export function useChatWebSocket() {
           messages.value = [...messages.value, msg];
         } else if (!msg.sessionId) {
           // Legacy messages without sessionId (shouldn't happen with new code)
-          console.warn('[useWebSocket] Message without sessionId:', msg.type);
+          console.warn('[useChatWebSocket] Message without sessionId:', msg.type);
           messages.value = [...messages.value, msg];
+        } else if (msg.sessionId !== currentSession.value) {
+          // Log cross-session messages to help debug the issue
+          console.warn(
+            `[useChatWebSocket] Received message for different session. Message sessionId: ${msg.sessionId}, Current sessionId: ${currentSession.value}, Message type: ${msg.type}`,
+          );
         }
         break;
 
@@ -480,6 +485,9 @@ export function useChatWebSocket() {
   }
 
   function selectSession(sessionId, options = {}) {
+    // Set currentSession IMMEDIATELY to prevent race condition
+    // where streaming messages from other sessions arrive before server responds
+    currentSession.value = sessionId;
     messages.value = [];
     hasOlderMessages.value = false;
     summaryCount.value = 0;
@@ -517,6 +525,9 @@ export function useChatWebSocket() {
   }
 
   function newSession(options = {}) {
+    // Clear currentSession to prevent messages from other sessions
+    // The server will send back session_info with the new sessionId
+    currentSession.value = null;
     messages.value = [];
     send({ type: 'new_session', ...options });
   }

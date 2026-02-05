@@ -62,11 +62,22 @@ const manualExpandState = ref(new Map()); // Map<processId, boolean> for user-to
 const terminalMode = computed(() => currentMode.value === 'terminal');
 const filesMode = computed(() => currentMode.value === 'files');
 
-// Filtered files list based on search
+// Filtered files list based on search and dotfiles toggle
 const filteredFilesItems = computed(() => {
-  if (!filesFilter.value.trim()) return filesItems.value;
-  const search = filesFilter.value.toLowerCase();
-  return filesItems.value.filter((item) => item.name.toLowerCase().includes(search));
+  let items = filesItems.value;
+
+  // Filter dotfiles if toggle is off
+  if (!showDotfiles.value) {
+    items = items.filter((item) => !item.name.startsWith('.'));
+  }
+
+  // Apply search filter
+  if (filesFilter.value.trim()) {
+    const search = filesFilter.value.toLowerCase();
+    items = items.filter((item) => item.name.toLowerCase().includes(search));
+  }
+
+  return items;
 });
 
 // Files mode state
@@ -74,6 +85,7 @@ const filesCurrentPath = ref('');
 const filesItems = ref([]);
 const filesLoading = ref(false);
 const filesFilter = ref(''); // Filter text for file list
+const showDotfiles = ref(false); // Toggle to show/hide dotfiles
 const openedFile = ref(null); // { path, content, loading }
 const fileModals = ref({
   createFile: false,
@@ -651,33 +663,6 @@ const fileChangesText = computed(() => {
   if (changes.deleted > 0) parts.push(`-${changes.deleted}`);
 
   return parts.length > 0 ? parts.join(' ') : null;
-});
-
-// File activity indicator - tracks active file operations
-const FILE_TOOLS = ['Read', 'Write', 'Edit', 'Glob', 'Grep'];
-const activeFileTool = computed(() => {
-  if (!isRunning.value) return null;
-  // Find the last tool_use without a corresponding tool_result
-  for (let i = messages.value.length - 1; i >= 0; i--) {
-    const msg = messages.value[i];
-    if (msg.type === 'tool_use' && FILE_TOOLS.includes(msg.tool)) {
-      // Check if there's a tool_result after this
-      const hasResult = messages.value
-        .slice(i + 1)
-        .some((m) => m.type === 'tool_result' && m.toolUseId === msg.toolUseId);
-      if (!hasResult) {
-        return {
-          tool: msg.tool,
-          path:
-            msg.input?.file_path ||
-            msg.input?.path ||
-            msg.input?.pattern ||
-            null,
-        };
-      }
-    }
-  }
-  return null;
 });
 
 // Permission mode sync - watch for EnterPlanMode/ExitPlanMode tool usage
@@ -1353,28 +1338,60 @@ watch(openedFile, (file) => {
 
       <!-- Files filter input -->
       <div v-else-if="currentMode === 'files'" class="files-filter-form">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
-          <circle cx="11" cy="11" r="8"/>
-          <path d="m21 21-4.35-4.35"/>
-        </svg>
-        <input
-          v-model="filesFilter"
-          type="text"
-          class="files-filter-input"
-          placeholder="Filter files and folders..."
-        />
-        <button
-          v-if="filesFilter"
-          type="button"
-          class="clear-btn"
-          @click="filesFilter = ''"
-          title="Clear filter"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
+        <div class="files-filter-left">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
           </svg>
-        </button>
+          <input
+            v-model="filesFilter"
+            type="text"
+            class="files-filter-input"
+            placeholder="Filter files and folders..."
+          />
+          <button
+            v-if="filesFilter"
+            type="button"
+            class="clear-btn"
+            @click="filesFilter = ''"
+            title="Clear filter"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="files-toolbar">
+          <!-- Dotfiles toggle -->
+          <button
+            type="button"
+            class="files-toolbar-btn"
+            :class="{ active: showDotfiles }"
+            @click="showDotfiles = !showDotfiles"
+            title="Show dotfiles"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="1"/>
+              <circle cx="12" cy="5" r="1"/>
+              <circle cx="12" cy="19" r="1"/>
+            </svg>
+          </button>
+          <!-- Create file button -->
+          <button
+            type="button"
+            class="files-toolbar-btn"
+            @click="fileModals.createFile = true"
+            title="Create new file"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="12" y1="18" x2="12" y2="12"/>
+              <line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <!-- Toolbar (below input) -->
@@ -1395,15 +1412,6 @@ watch(openedFile, (file) => {
               <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
             </svg>
             No git
-          </span>
-          <!-- File activity indicator (chat mode only) -->
-          <span class="toolbar-item file-activity" v-if="!terminalMode && activeFileTool">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>
-            <span class="file-tool">{{ activeFileTool.tool }}</span>
-            <span class="file-path truncate" v-if="activeFileTool.path">{{ activeFileTool.path }}</span>
           </span>
         </div>
         <div class="toolbar-right">
@@ -2440,11 +2448,19 @@ watch(openedFile, (file) => {
 .files-filter-form {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   padding: 10px 12px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-secondary);
+}
+
+.files-filter-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
 
 .files-filter-form:focus-within {
@@ -2464,6 +2480,7 @@ watch(openedFile, (file) => {
   color: var(--text-primary);
   border: none;
   outline: none;
+  min-width: 0;
 }
 
 .files-filter-input::placeholder {
@@ -2484,6 +2501,39 @@ watch(openedFile, (file) => {
 
 .files-filter-form .clear-btn:hover {
   background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Files toolbar */
+.files-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border-color);
+  padding-left: 12px;
+}
+
+.files-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s, color 0.15s;
+}
+
+.files-toolbar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.files-toolbar-btn.active {
+  background: var(--bg-tertiary);
   color: var(--text-primary);
 }
 
