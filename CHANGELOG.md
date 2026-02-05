@@ -2,6 +2,18 @@
 
 All notable changes to Claude Web.
 
+## 2025-02-05 - Files Tab & UI Refinements
+
+### Files Tab Enhancements
+- Added dotfiles toggle button in files tab toolbar
+- Added create file button in files tab toolbar
+- Dotfiles (files starting with `.`) can now be hidden/shown with toggle
+- Restructured files filter form with left/right sections for better organization
+
+### UI Cleanup
+- Removed file activity indicator from chat toolbar (cleaner interface)
+- Changed modal accent colors to monochrome (light gray instead of blue)
+
 ## 2025-02-05 - Model Badges & MCP Integration
 
 ### Model Badges on Assistant Responses
