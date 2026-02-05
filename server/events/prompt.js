@@ -24,8 +24,8 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { config, slugToPath } from '../config.js';
 import { loadMcpServers } from '../lib/mcp.js';
-import { getSessionsList } from '../lib/sessions.js';
 import { getAllTitles } from '../lib/session-titles.js';
+import { getSessionsList } from '../lib/sessions.js';
 import { addTaskResult, getOrCreateTask, tasks } from '../lib/tasks.js';
 import {
   broadcast,
@@ -302,8 +302,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
             isNew: isNewSession,
           });
 
-          // If this is a new session, broadcast updated sessions list immediately
-          // getSessionsList() now scans for JSONL files, so it will pick up the new session
+          // If this is a new session, broadcast updates
           if (isNewSession) {
             try {
               const sessions = getSessionsList(projectSlug);
@@ -312,8 +311,10 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
                 ...s,
                 title: titles[s.sessionId] || null,
               }));
+              // Include projectSlug so clients can filter
               broadcast({
                 type: 'sessions_list',
+                projectSlug,
                 sessions: enrichedSessions,
               });
             } catch (err) {

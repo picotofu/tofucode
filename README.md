@@ -74,7 +74,15 @@ npx cc-web --no-auth
 PORT=8080 npx cc-web
 HOST=127.0.0.1 npx cc-web
 AUTH_DISABLED=true npx cc-web
+DEBUG=true npx cc-web  # Enable debug logging to debug.log
 ```
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | Server port | 3000 |
+| `HOST` | Host to bind to | 0.0.0.0 |
+| `AUTH_DISABLED` | Disable authentication | false |
+| `DEBUG` | Enable debug logging to `debug.log` with timestamps | false |
 
 ---
 

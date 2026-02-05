@@ -1,12 +1,14 @@
+import { logger } from './lib/logger.js';
+
 // Catch unhandled errors
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err.message);
-  console.error(err.stack);
+  logger.error('Uncaught Exception:', err.message);
+  logger.error(err.stack);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise);
-  console.error('Reason:', reason);
+  logger.error('Unhandled Rejection at:', promise);
+  logger.error('Reason:', reason);
 });
 
 // Graceful shutdown handler - defined after server is created
@@ -15,19 +17,19 @@ let httpServer = null; // Will be set after server creation
 
 async function gracefulShutdown(signal) {
   if (isShuttingDown) {
-    console.log('Force shutdown...');
+    logger.log('Force shutdown...');
     process.exit(1);
   }
 
   isShuttingDown = true;
-  console.log(`\n${signal} received, shutting down gracefully...`);
+  logger.log(`\n${signal} received, shutting down gracefully...`);
 
   try {
     // Cancel all running tasks
     const { tasks } = await import('./lib/tasks.js');
     for (const [sessionId, task] of tasks) {
       if (task.status === 'running' && task.abortController) {
-        console.log(`Cancelling task for session ${sessionId}`);
+        logger.log(`Cancelling task for session ${sessionId}`);
         task.abortController.abort();
       }
     }
@@ -35,17 +37,17 @@ async function gracefulShutdown(signal) {
     // Close HTTP server
     if (httpServer) {
       httpServer.close(() => {
-        console.log('HTTP server closed');
+        logger.log('HTTP server closed');
       });
     }
 
     // Give a moment for cleanup then exit
     setTimeout(() => {
-      console.log('Shutdown complete');
+      logger.log('Shutdown complete');
       process.exit(0);
     }, 500);
   } catch (err) {
-    console.error('Error during shutdown:', err);
+    logger.error('Error during shutdown:', err);
     process.exit(1);
   }
 }
@@ -249,7 +251,7 @@ function sleep(ms) {
 
 async function startServer() {
   if (isUpgradeRetry) {
-    console.log(
+    logger.log(
       `🔄 Upgrade mode: Will retry port binding up to ${maxRetries} times`,
     );
 
@@ -263,12 +265,12 @@ async function startServer() {
           });
         });
 
-        console.log(`✅ Bound to port ${config.port} on attempt ${attempt}`);
+        logger.log(`✅ Bound to port ${config.port} on attempt ${attempt}`);
         onServerReady();
         return;
       } catch (err) {
         if (err.code === 'EADDRINUSE') {
-          console.log(
+          logger.log(
             `⏳ Port ${config.port} in use, retry ${attempt}/${maxRetries}...`,
           );
           await sleep(retryInterval);
@@ -278,7 +280,7 @@ async function startServer() {
       }
     }
 
-    console.error(
+    logger.error(
       `❌ Failed to bind to port ${config.port} after ${maxRetries} attempts`,
     );
     process.exit(1);
@@ -289,17 +291,20 @@ async function startServer() {
 }
 
 function onServerReady() {
-  console.log(`Server running on http://localhost:${config.port}`);
-  console.log(`WebSocket available at ws://localhost:${config.port}/ws`);
+  logger.log(`Server running on http://localhost:${config.port}`);
+  logger.log(`WebSocket available at ws://localhost:${config.port}/ws`);
   if (isAuthDisabled()) {
-    console.log('⚠️  Authentication is DISABLED');
+    logger.log('⚠️  Authentication is DISABLED');
   } else if (!isAuthSetup()) {
-    console.log(
+    logger.log(
       '🔐 First time setup required - visit the web UI to set password',
     );
   }
   if (isUpgradeRetry) {
-    console.log('🎉 Upgrade restart complete!');
+    logger.log('🎉 Upgrade restart complete!');
+  }
+  if (process.env.DEBUG === 'true') {
+    logger.log('🐛 DEBUG mode enabled - logging to debug.log');
   }
 }
 

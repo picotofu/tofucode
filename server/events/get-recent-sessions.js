@@ -47,6 +47,8 @@ export function handler(ws, message) {
 
     const entries = readdirSync(config.projectsDir, { withFileTypes: true });
     const allSessions = [];
+    // Track all session IDs globally to prevent duplicates across projects
+    const globalSessionIds = new Set();
 
     for (const entry of entries) {
       if (entry.isDirectory()) {
@@ -57,7 +59,7 @@ export function handler(ws, message) {
         const projectPath = slugToPath(projectSlug);
         const titles = getAllTitles(projectSlug);
 
-        // Track sessions we've already added
+        // Track sessions we've already added for this project
         const sessionIds = new Set();
 
         // First, load from index if it exists
@@ -67,6 +69,12 @@ export function handler(ws, message) {
 
             for (const session of data.entries || []) {
               sessionIds.add(session.sessionId);
+
+              // Skip if already added from another project (shouldn't happen normally)
+              if (globalSessionIds.has(session.sessionId)) {
+                continue;
+              }
+              globalSessionIds.add(session.sessionId);
 
               // Use JSONL file mtime for accurate modification time
               // (sessions-index.json's modified field is stale)
@@ -106,48 +114,58 @@ export function handler(ws, message) {
           for (const file of files) {
             if (file.endsWith('.jsonl') && !file.startsWith('agent-')) {
               const sessionId = file.replace('.jsonl', '');
-              if (!sessionIds.has(sessionId)) {
-                const jsonlPath = join(sessionsDir, file);
-                try {
-                  const stats = statSync(jsonlPath);
-                  // Read first line to get the first prompt
-                  let firstPrompt = 'New session';
-                  try {
-                    const content = readFileSync(jsonlPath, 'utf-8');
-                    const firstLine = content.split('\n')[0];
-                    if (firstLine) {
-                      const jsonEntry = JSON.parse(firstLine);
-                      if (jsonEntry.type === 'user' && jsonEntry.message?.content) {
-                        const contentText =
-                          typeof jsonEntry.message.content === 'string'
-                            ? jsonEntry.message.content
-                            : Array.isArray(jsonEntry.message.content)
-                              ? jsonEntry.message.content
-                                  .filter((b) => b.type === 'text')
-                                  .map((b) => b.text)
-                                  .join(' ')
-                              : 'New session';
-                        firstPrompt = contentText.substring(0, 100);
-                      }
-                    }
-                  } catch {
-                    // Couldn't read first prompt, use default
-                  }
+              // Skip if in project index or already added globally
+              if (
+                sessionIds.has(sessionId) ||
+                globalSessionIds.has(sessionId)
+              ) {
+                continue;
+              }
+              globalSessionIds.add(sessionId);
 
-                  allSessions.push({
-                    sessionId,
-                    projectSlug,
-                    projectName,
-                    projectPath,
-                    firstPrompt,
-                    messageCount: 0,
-                    created: stats.birthtime.toISOString(),
-                    modified: stats.mtime.toISOString(),
-                    title: titles[sessionId] || null,
-                  });
-                } catch (err) {
-                  console.error(`Failed to stat ${file}:`, err.message);
+              const jsonlPath = join(sessionsDir, file);
+              try {
+                const stats = statSync(jsonlPath);
+                // Read first line to get the first prompt
+                let firstPrompt = 'New session';
+                try {
+                  const content = readFileSync(jsonlPath, 'utf-8');
+                  const firstLine = content.split('\n')[0];
+                  if (firstLine) {
+                    const jsonEntry = JSON.parse(firstLine);
+                    if (
+                      jsonEntry.type === 'user' &&
+                      jsonEntry.message?.content
+                    ) {
+                      const contentText =
+                        typeof jsonEntry.message.content === 'string'
+                          ? jsonEntry.message.content
+                          : Array.isArray(jsonEntry.message.content)
+                            ? jsonEntry.message.content
+                                .filter((b) => b.type === 'text')
+                                .map((b) => b.text)
+                                .join(' ')
+                            : 'New session';
+                      firstPrompt = contentText.substring(0, 100);
+                    }
+                  }
+                } catch {
+                  // Couldn't read first prompt, use default
                 }
+
+                allSessions.push({
+                  sessionId,
+                  projectSlug,
+                  projectName,
+                  projectPath,
+                  firstPrompt,
+                  messageCount: 0,
+                  created: stats.birthtime.toISOString(),
+                  modified: stats.mtime.toISOString(),
+                  title: titles[sessionId] || null,
+                });
+              } catch (err) {
+                console.error(`Failed to stat ${file}:`, err.message);
               }
             }
           }

@@ -67,6 +67,7 @@ npm run check
 - Dev server runs via nodemon in manual restart mode (no file watching) for resilience
 - Press `rs` + Enter in the nodemon terminal to manually restart after code changes
 - Server logs stream to `dev.log` - check for errors there
+- **NEVER restart the server automatically** - always prompt the user to do it
 - Backend must remain resilient for testing; user manages server lifecycle
 
 ### Code Style

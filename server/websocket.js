@@ -6,6 +6,7 @@
  */
 
 import { handlers } from './events/index.js';
+import { logger } from './lib/logger.js';
 import { clients, send, unwatchAllSessions } from './lib/ws.js';
 
 /**
@@ -14,7 +15,7 @@ import { clients, send, unwatchAllSessions } from './lib/ws.js';
  */
 export function handleWebSocket(ws) {
   clients.add(ws);
-  console.log(`Client connected (${clients.size})`);
+  logger.log(`Client connected (${clients.size})`);
 
   // Per-connection context
   const context = {
@@ -32,22 +33,22 @@ export function handleWebSocket(ws) {
       if (handler) {
         await handler(ws, message, context);
       } else {
-        console.log('Unknown message type:', message.type);
+        logger.log('Unknown message type:', message.type);
       }
     } catch (err) {
-      console.error('Message handling error:', err);
+      logger.error('Message handling error:', err);
       send(ws, { type: 'error', message: err.message });
     }
   });
 
   ws.on('close', () => {
     clients.delete(ws);
-    console.log(`Client disconnected (${clients.size})`);
+    logger.log(`Client disconnected (${clients.size})`);
     unwatchAllSessions(ws);
   });
 
   ws.on('error', (err) => {
-    console.error('WebSocket error:', err);
+    logger.error('WebSocket error:', err);
     clients.delete(ws);
     unwatchAllSessions(ws);
   });

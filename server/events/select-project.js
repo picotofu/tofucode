@@ -23,6 +23,7 @@
 
 import { getProjectDisplayName, slugToPath } from '../config.js';
 import { getProjectsList } from '../lib/projects.js';
+import { getAllTitles } from '../lib/session-titles.js';
 import { getSessionsList } from '../lib/sessions.js';
 import { send, unwatchSession } from '../lib/ws.js';
 
@@ -49,10 +50,18 @@ export function handler(ws, message, context) {
     path: slugToPath(projectSlug),
   };
 
+  // Get sessions and enrich with custom titles
+  const sessions = getSessionsList(projectSlug);
+  const titles = getAllTitles(projectSlug);
+  const enrichedSessions = sessions.map((session) => ({
+    ...session,
+    title: titles[session.sessionId] || null,
+  }));
+
   send(ws, {
     type: 'project_selected',
     path: projectSlug,
     project: projectInfo,
-    sessions: getSessionsList(projectSlug),
+    sessions: enrichedSessions,
   });
 }

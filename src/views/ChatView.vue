@@ -1411,7 +1411,7 @@ watch(openedFile, (file) => {
             {{ fileChangesText }} files
           </span>
           <!-- Model selector (chat mode only) -->
-          <div v-if="!terminalMode" class="model-tabs">
+          <div v-if="!terminalMode && !filesMode" class="model-tabs">
             <button
               class="model-tab"
               :class="{ active: modelSelection === 'haiku' }"
@@ -1446,7 +1446,7 @@ watch(openedFile, (file) => {
             </button>
           </div>
           <!-- Permission tabs (chat mode only) -->
-          <div v-if="!terminalMode" class="permission-tabs">
+          <div v-if="!terminalMode && !filesMode" class="permission-tabs">
             <button
               class="permission-tab"
               :class="{ active: permissionMode === 'default' }"

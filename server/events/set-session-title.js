@@ -9,7 +9,7 @@
  */
 
 import { setTitle } from '../lib/session-titles.js';
-import { send } from '../lib/ws.js';
+import { broadcast, send } from '../lib/ws.js';
 
 export function handler(ws, message, context) {
   const { sessionId, title } = message;
@@ -26,7 +26,8 @@ export function handler(ws, message, context) {
 
   const success = setTitle(context.currentProjectPath, sessionId, title);
 
-  send(ws, {
+  // Broadcast to all clients so UI updates everywhere
+  broadcast({
     type: 'session_title_updated',
     sessionId,
     title: title || null,
