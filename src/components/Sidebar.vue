@@ -20,34 +20,66 @@ const {
   projects,
   recentSessions,
   sessionStatuses,
+  currentVersion,
+  updateAvailable,
   getProjects,
   getRecentSessions,
+  dismissUpdate,
   send,
 } = useWebSocket();
 
-// POC: Restart functionality
-// This validates the inverted spawn strategy works
-// TODO: Expand to full upgrade button with version check
-// See: docs/FEATURE_UPDATE_VERSION.md Section 8.3
-const isRestarting = ref(false);
+// Upgrade/Restart functionality
+const isUpgrading = ref(false);
+const upgradeMessage = ref('');
 
-// Reset restart state when reconnected
+// Reset upgrade state when reconnected
 watch(connected, (isConnected) => {
-  if (isConnected && isRestarting.value) {
-    isRestarting.value = false;
+  if (isConnected && isUpgrading.value) {
+    isUpgrading.value = false;
+    upgradeMessage.value = '';
   }
 });
 
+function handleUpgrade() {
+  if (isUpgrading.value) return;
+
+  const version = updateAvailable.value?.latestVersion || 'latest';
+
+  const confirmed = confirm(
+    `Upgrade cc-web to v${version}?\n\nThis will:\n1. Download and install the update\n2. Restart the server\n3. Automatically reconnect\n\nThis may take 30-60 seconds.`,
+  );
+
+  if (confirmed) {
+    isUpgrading.value = true;
+    upgradeMessage.value = 'Upgrading...';
+    send({ type: 'upgrade', version });
+  }
+}
+
 function handleRestart() {
-  if (isRestarting.value) return;
+  if (isUpgrading.value) return;
 
   const confirmed = confirm(
     'Restart the server?\n\nThis will briefly disconnect all clients. They will automatically reconnect.',
   );
 
   if (confirmed) {
-    isRestarting.value = true;
+    isUpgrading.value = true;
+    upgradeMessage.value = 'Restarting...';
     send({ type: 'restart' });
+  }
+}
+
+function handleUpdateClick() {
+  if (updateAvailable.value) {
+    window.open(updateAvailable.value.updateUrl, '_blank');
+  }
+}
+
+function handleDismissUpdate(e) {
+  e.stopPropagation();
+  if (updateAvailable.value) {
+    dismissUpdate(updateAvailable.value.latestVersion);
   }
 }
 
@@ -133,13 +165,55 @@ function handleOverlayClick() {
   <aside class="sidebar" :class="{ open }">
     <div class="sidebar-header">
       <router-link :to="{ name: 'projects' }" class="sidebar-title" @click="closeOnMobile">cc-web</router-link>
+
+      <!-- Version display -->
+      <div class="version-info">
+        <span v-if="currentVersion" class="current-version">
+          v{{ currentVersion }}
+        </span>
+
+        <!-- Update badge -->
+        <button
+          v-if="updateAvailable"
+          class="update-badge"
+          @click="handleUpdateClick"
+          :title="`Update to v${updateAvailable.latestVersion}`"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span>Update</span>
+          <button class="dismiss-btn" @click="handleDismissUpdate">×</button>
+        </button>
+      </div>
+
+      <!-- Upgrade button (shown when update available) -->
       <button
+        v-if="updateAvailable"
+        class="upgrade-btn"
+        @click="handleUpgrade"
+        :disabled="isUpgrading"
+        :title="isUpgrading ? upgradeMessage : `Upgrade to v${updateAvailable.latestVersion}`"
+      >
+        <svg v-if="!isUpgrading" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 19V5M5 12l7-7 7 7"/>
+        </svg>
+        <svg v-else width="14" height="14" viewBox="0 0 24 24" class="spin">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+        </svg>
+      </button>
+
+      <!-- Restart button (shown when no update available) -->
+      <button
+        v-else
         class="restart-btn"
         @click="handleRestart"
-        :disabled="isRestarting"
-        title="Restart server (POC)"
+        :disabled="isUpgrading"
+        :title="isUpgrading ? upgradeMessage : 'Restart server'"
       >
-        <svg v-if="!isRestarting" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg v-if="!isUpgrading" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M23 4v6h-6"/>
           <path d="M1 20v-6h6"/>
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
@@ -338,6 +412,66 @@ function handleOverlayClick() {
   color: var(--text-secondary);
 }
 
+.version-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+}
+
+.current-version {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+  font-family: var(--font-mono);
+}
+
+.update-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.update-badge:hover {
+  background: rgba(217, 119, 6, 0.15);
+  border-color: rgba(217, 119, 6, 0.4);
+}
+
+.update-badge svg {
+  flex-shrink: 0;
+}
+
+.dismiss-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  line-height: 1;
+  color: inherit;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.dismiss-btn:hover {
+  color: #b45309;
+}
+
 .restart-btn {
   margin-left: auto;
   display: flex;
@@ -366,6 +500,37 @@ function handleOverlayClick() {
 }
 
 .restart-btn .spin {
+  animation: spin 1s linear infinite;
+}
+
+.upgrade-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  border-radius: var(--radius-sm);
+  color: #d97706;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.upgrade-btn:hover:not(:disabled) {
+  background: rgba(217, 119, 6, 0.15);
+  color: #b45309;
+  border-color: rgba(217, 119, 6, 0.4);
+}
+
+.upgrade-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.upgrade-btn .spin {
   animation: spin 1s linear infinite;
 }
 

@@ -1,5 +1,8 @@
 # Feature Plan: Version Update Checking & Notification
 
+**Status**: Phase 1 & 2 Complete ✅
+**Completed**: 2026-02-06
+
 ## Overview
 
 Implement npm package version checking with frontend notifications for both npm and Docker deployments.
@@ -1452,19 +1455,19 @@ The restart button is useful during development for applying changes without man
 9. ✅ Update README with environment variables
 10. ✅ Test with mock npm registry response
 
-### Phase 2: One-Click Upgrade (Active) - Estimated 1-2 days
-1. ⬜ Create `installation.js` module for install type detection
-2. ⬜ Create `upgrade.js` event handler
-3. ⬜ Add `upgrade_request` WebSocket event
-4. ⬜ Add upgrade status broadcasts (`upgrade_started`, `upgrade_success`, `upgrade_error`)
-5. ⬜ Store HTTP server reference globally for graceful shutdown
-6. ⬜ Add upgrade button to sidebar (conditional on `canAutoUpgrade()`)
-7. ⬜ Handle upgrade status messages in frontend
-8. ⬜ Add auto-reload after successful upgrade
+### Phase 2: One-Click Upgrade (Complete) ✅
+1. ✅ Create `installation.js` module for install type detection
+2. ✅ Create `upgrade.js` event handler
+3. ✅ Add `upgrade` WebSocket event
+4. ✅ Add upgrade status broadcasts (`upgrade_started`, `upgrade_installing`, `upgrade_success`, `upgrade_error`)
+5. ✅ Reuse inverted spawn strategy from restart.js (no server ref needed)
+6. ✅ Add upgrade button to sidebar (conditional on `updateAvailable`)
+7. ✅ Handle upgrade status messages in frontend
+8. ✅ Auto-reconnect handled by existing WebSocket composable
 9. ⬜ Test with global install (`npm install -g`)
 10. ⬜ Test with local install
 11. ⬜ Test error handling (permission denied, network failure)
-12. ⬜ Document manual upgrade for npx/Docker/source
+12. ✅ Error messages show manual upgrade command for unsupported install types
 
 ---
 

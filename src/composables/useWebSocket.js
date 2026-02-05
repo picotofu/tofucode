@@ -15,6 +15,9 @@ const currentFolder = ref(null);
 // Track task status per session for sidebar indicators
 // Map of sessionId -> { status: 'running' | 'completed' | 'error', timestamp }
 const sessionStatuses = ref(new Map());
+// Version info
+const currentVersion = ref(null);
+const updateAvailable = ref(null); // { currentVersion, latestVersion, updateUrl }
 
 let globalWs = null;
 let globalReconnectTimeout = null;
@@ -83,6 +86,41 @@ function connectGlobal(onConnect) {
 function handleGlobalMessage(msg) {
   switch (msg.type) {
     case 'connected':
+      if (msg.version) {
+        currentVersion.value = msg.version;
+      }
+      break;
+
+    case 'update_available': {
+      // Check if already dismissed for this version
+      const dismissedKey = `dismissed-update:${msg.latestVersion}`;
+      if (localStorage.getItem(dismissedKey) !== 'true') {
+        updateAvailable.value = {
+          currentVersion: msg.currentVersion,
+          latestVersion: msg.latestVersion,
+          updateUrl: msg.updateUrl,
+        };
+      }
+      break;
+    }
+
+    case 'upgrade_started':
+    case 'upgrade_installing':
+    case 'restart_started':
+      // These are handled by the Sidebar component via direct message
+      console.log(msg.type, msg.message);
+      break;
+
+    case 'upgrade_success':
+      // Clear update badge on successful upgrade
+      updateAvailable.value = null;
+      console.log(msg.type, msg.message);
+      break;
+
+    case 'upgrade_error':
+    case 'restart_error':
+      // Show error in console (Sidebar will handle UI)
+      console.error(msg.type, msg.message);
       break;
 
     case 'projects_list':
@@ -222,6 +260,11 @@ function disconnectGlobal() {
  * Global WebSocket composable
  * Used by ProjectsView and SessionsView for shared data
  */
+function dismissUpdate(version) {
+  localStorage.setItem(`dismissed-update:${version}`, 'true');
+  updateAvailable.value = null;
+}
+
 export function useWebSocket() {
   return {
     // State (readonly)
@@ -233,6 +276,8 @@ export function useWebSocket() {
     folderContents: readonly(folderContents),
     currentFolder: readonly(currentFolder),
     sessionStatuses: readonly(sessionStatuses),
+    currentVersion: readonly(currentVersion),
+    updateAvailable: readonly(updateAvailable),
 
     // Connection
     connect: connectGlobal,
@@ -246,6 +291,7 @@ export function useWebSocket() {
     browseFolder,
     setSessionTitle,
     deleteSession: deleteSessionGlobal,
+    dismissUpdate,
 
     // Direct send
     send: sendGlobal,

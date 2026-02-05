@@ -7,7 +7,23 @@
 
 import { handlers } from './events/index.js';
 import { logger } from './lib/logger.js';
+import { getCurrentVersion, getLatestVersion } from './lib/version-checker.js';
 import { clients, send, unwatchAllSessions } from './lib/ws.js';
+
+/**
+ * Check if there's a newer version available
+ */
+function isNewerVersion(latest, current) {
+  if (!latest || !current) return false;
+  const [lMajor = 0, lMinor = 0, lPatch = 0] = latest.split('.').map(Number);
+  const [cMajor = 0, cMinor = 0, cPatch = 0] = current.split('.').map(Number);
+  if (lMajor > cMajor) return true;
+  if (lMajor < cMajor) return false;
+  if (lMinor > cMinor) return true;
+  if (lMinor < cMinor) return false;
+  if (lPatch > cPatch) return true;
+  return false;
+}
 
 /**
  * Handle new WebSocket connection
@@ -23,7 +39,23 @@ export function handleWebSocket(ws) {
     currentSessionId: null,
   };
 
-  send(ws, { type: 'connected' });
+  // Send connection info with version
+  send(ws, {
+    type: 'connected',
+    version: getCurrentVersion(),
+  });
+
+  // Send update notification if available
+  const currentVersion = getCurrentVersion();
+  const latestVersion = getLatestVersion();
+  if (latestVersion && isNewerVersion(latestVersion, currentVersion)) {
+    send(ws, {
+      type: 'update_available',
+      currentVersion,
+      latestVersion,
+      updateUrl: 'https://www.npmjs.com/package/cc-web',
+    });
+  }
 
   ws.on('message', async (data) => {
     try {

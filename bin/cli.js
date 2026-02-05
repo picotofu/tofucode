@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'child_process';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -10,6 +10,14 @@ const rootDir = join(__dirname, '..');
 
 // Parse command line arguments
 const args = process.argv.slice(2);
+
+// Handle --version flag
+if (args.includes('--version') || args.includes('-v')) {
+  const pkgPath = join(rootDir, 'package.json');
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+  console.log(`cc-web v${pkg.version}`);
+  process.exit(0);
+}
 const options = {
   port: 3000,
   host: '0.0.0.0',
@@ -26,15 +34,16 @@ for (let i = 0; i < args.length; i++) {
     options.auth = false;
   } else if (arg === '--help') {
     console.log(`
-claude-web - Web UI for Claude Code
+cc-web - Web UI for Claude Code
 
 Usage:
-  claude-web [options]
+  cc-web [options]
 
 Options:
   -p, --port <port>   Port to listen on (default: 3000)
   -h, --host <host>   Host to bind to (default: 0.0.0.0)
   --no-auth           Disable password authentication
+  -v, --version       Show version number
   --help              Show this help message
 
 Environment Variables:
@@ -43,9 +52,10 @@ Environment Variables:
   AUTH_DISABLED       Set to 'true' to disable auth
 
 Examples:
-  claude-web                    # Start on http://0.0.0.0:3000
-  claude-web -p 8080            # Start on port 8080
-  claude-web --no-auth          # Disable authentication
+  cc-web                    # Start on http://0.0.0.0:3000
+  cc-web -p 8080            # Start on port 8080
+  cc-web --no-auth          # Disable authentication
+  cc-web --version          # Show version
 `);
     process.exit(0);
   }
@@ -74,7 +84,7 @@ if (!options.auth) {
 }
 
 // Start the server
-console.log(`Starting claude-web on http://${options.host}:${options.port}`);
+console.log(`Starting cc-web on http://${options.host}:${options.port}`);
 if (!options.auth) {
   console.log('Authentication disabled');
 }

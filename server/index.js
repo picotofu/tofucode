@@ -55,7 +55,7 @@ async function gracefulShutdown(signal) {
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,11 +72,18 @@ import {
   setupPassword,
   validateSession,
 } from './lib/auth.js';
+import {
+  getCurrentVersion,
+  initVersionChecker,
+} from './lib/version-checker.js';
 import { handleWebSocket } from './websocket.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '..');
+
+// Load package.json for version
+const pkg = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8'));
 
 const app = express();
 const server = createServer(app);
@@ -84,6 +91,9 @@ const wss = new WebSocketServer({ noServer: true });
 
 // Set reference for graceful shutdown
 httpServer = server;
+
+// Initialize version checker
+initVersionChecker(pkg.version);
 
 // Parse JSON and cookies
 app.use(express.json());
@@ -102,7 +112,11 @@ const SECURE_COOKIE = process.env.SECURE_COOKIE === 'true';
 
 // Health check
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    version: getCurrentVersion(),
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Auth status - check if setup is needed
@@ -291,7 +305,9 @@ async function startServer() {
 }
 
 function onServerReady() {
-  logger.log(`Server running on http://localhost:${config.port}`);
+  logger.log(
+    `cc-web v${getCurrentVersion()} running on http://localhost:${config.port}`,
+  );
   logger.log(`WebSocket available at ws://localhost:${config.port}/ws`);
   if (isAuthDisabled()) {
     logger.log('⚠️  Authentication is DISABLED');
