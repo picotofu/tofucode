@@ -153,6 +153,22 @@ function handleGlobalMessage(msg) {
         sessionStatuses.value = newStatuses;
       }
       break;
+
+    case 'session_deleted':
+      // Remove session from lists
+      if (msg.sessionId) {
+        sessions.value = sessions.value.filter(
+          (s) => s.sessionId !== msg.sessionId,
+        );
+        recentSessions.value = recentSessions.value.filter(
+          (s) => s.sessionId !== msg.sessionId,
+        );
+        // Clear status indicator if exists
+        const newStatuses = new Map(sessionStatuses.value);
+        newStatuses.delete(msg.sessionId);
+        sessionStatuses.value = newStatuses;
+      }
+      break;
   }
 }
 
@@ -185,6 +201,10 @@ function browseFolder(path) {
 
 function setSessionTitle(sessionId, title) {
   sendGlobal({ type: 'set_session_title', sessionId, title });
+}
+
+function deleteSessionGlobal(sessionId) {
+  sendGlobal({ type: 'delete_session', sessionId });
 }
 
 function disconnectGlobal() {
@@ -225,6 +245,7 @@ export function useWebSocket() {
     getRecentSessions,
     browseFolder,
     setSessionTitle,
+    deleteSession: deleteSessionGlobal,
 
     // Direct send
     send: sendGlobal,

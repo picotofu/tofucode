@@ -24,6 +24,8 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { config, slugToPath } from '../config.js';
 import { loadMcpServers } from '../lib/mcp.js';
+import { getSessionsList } from '../lib/sessions.js';
+import { getAllTitles } from '../lib/session-titles.js';
 import { addTaskResult, getOrCreateTask, tasks } from '../lib/tasks.js';
 import {
   broadcast,
@@ -286,7 +288,8 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
       if (message.type === 'system' && message.subtype === 'init') {
         const newSessionId = message.session_id;
         if (newSessionId) {
-          if (!taskSessionId) {
+          const isNewSession = !taskSessionId;
+          if (isNewSession) {
             taskSessionId = newSessionId;
             tasks.set(taskSessionId, task);
             // Register this client as watching the new session
@@ -296,8 +299,27 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
             type: 'session_info',
             sessionId: newSessionId,
             projectPath,
-            isNew: !sessionId,
+            isNew: isNewSession,
           });
+
+          // If this is a new session, broadcast updated sessions list immediately
+          // getSessionsList() now scans for JSONL files, so it will pick up the new session
+          if (isNewSession) {
+            try {
+              const sessions = getSessionsList(projectSlug);
+              const titles = getAllTitles(projectSlug);
+              const enrichedSessions = sessions.map((s) => ({
+                ...s,
+                title: titles[s.sessionId] || null,
+              }));
+              broadcast({
+                type: 'sessions_list',
+                sessions: enrichedSessions,
+              });
+            } catch (err) {
+              console.error('Failed to broadcast updated sessions list:', err);
+            }
+          }
         }
       }
 

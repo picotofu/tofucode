@@ -2,13 +2,22 @@
  * Session utilities - list sessions, load history from JSONL
  */
 
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
+import {
+  createReadStream,
+  existsSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { getSessionsDir } from '../config.js';
 
 /**
  * Get sessions list for a project
+ * Merges sessions from sessions-index.json with JSONL files in the directory
+ * to catch newly created sessions that haven't been indexed yet
+ *
  * @param {string} projectSlug - Project slug (e.g., -home-ts-projects-foo)
  * @returns {Array<{sessionId: string, firstPrompt: string, messageCount: number, created: string, modified: string}>}
  */
@@ -17,15 +26,11 @@ export function getSessionsList(projectSlug) {
     const sessionsDir = getSessionsDir(projectSlug);
     const indexPath = join(sessionsDir, 'sessions-index.json');
 
-    if (!existsSync(indexPath)) {
-      return [];
-    }
-
-    const data = JSON.parse(readFileSync(indexPath, 'utf-8'));
-    return (data.entries || [])
-      .map((entry) => {
-        // Use JSONL file mtime for accurate modification time
-        // (sessions-index.json's modified field is stale)
+    // Start with indexed sessions
+    const sessionsMap = new Map();
+    if (existsSync(indexPath)) {
+      const data = JSON.parse(readFileSync(indexPath, 'utf-8'));
+      for (const entry of data.entries || []) {
         const jsonlPath = join(sessionsDir, `${entry.sessionId}.jsonl`);
         let modified = entry.modified;
         if (existsSync(jsonlPath)) {
@@ -36,15 +41,70 @@ export function getSessionsList(projectSlug) {
             // Fall back to index modified if stat fails
           }
         }
-        return {
+        sessionsMap.set(entry.sessionId, {
           sessionId: entry.sessionId,
           firstPrompt: entry.firstPrompt?.substring(0, 100) || 'No prompt',
           messageCount: entry.messageCount || 0,
           created: entry.created,
           modified,
-        };
-      })
-      .sort((a, b) => new Date(b.modified) - new Date(a.modified));
+        });
+      }
+    }
+
+    // Scan directory for JSONL files not in the index
+    // This catches newly created sessions before SDK updates the index
+    if (existsSync(sessionsDir)) {
+      const files = readdirSync(sessionsDir);
+      for (const file of files) {
+        if (file.endsWith('.jsonl') && !file.startsWith('agent-')) {
+          const sessionId = file.replace('.jsonl', '');
+          if (!sessionsMap.has(sessionId)) {
+            const jsonlPath = join(sessionsDir, file);
+            try {
+              const stats = statSync(jsonlPath);
+              // Read first line to get the first prompt
+              let firstPrompt = 'New session';
+              try {
+                const content = readFileSync(jsonlPath, 'utf-8');
+                const firstLine = content.split('\n')[0];
+                if (firstLine) {
+                  const entry = JSON.parse(firstLine);
+                  if (entry.type === 'user' && entry.message?.content) {
+                    const contentText =
+                      typeof entry.message.content === 'string'
+                        ? entry.message.content
+                        : Array.isArray(entry.message.content)
+                          ? entry.message.content
+                              .filter((b) => b.type === 'text')
+                              .map((b) => b.text)
+                              .join(' ')
+                          : 'New session';
+                    firstPrompt = contentText.substring(0, 100);
+                  }
+                }
+              } catch {
+                // Couldn't read first prompt, use default
+              }
+
+              sessionsMap.set(sessionId, {
+                sessionId,
+                firstPrompt,
+                messageCount: 0, // Can't easily count without parsing entire file
+                created: stats.birthtime.toISOString(),
+                modified: stats.mtime.toISOString(),
+              });
+            } catch (err) {
+              console.error(`Failed to stat ${file}:`, err.message);
+            }
+          }
+        }
+      }
+    }
+
+    // Convert to array and sort by modification time
+    return Array.from(sessionsMap.values()).sort(
+      (a, b) => new Date(b.modified) - new Date(a.modified),
+    );
   } catch (err) {
     console.error('Failed to load sessions:', err.message);
     return [];

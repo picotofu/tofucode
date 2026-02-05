@@ -7,6 +7,7 @@
 
 import { handler as browseFolder } from './browse-folder.js';
 import { handler as cancelTask } from './cancel-task.js';
+import { handler as deleteSession } from './delete-session.js';
 import {
   handleFilesBrowse,
   handleFilesCreate,
@@ -42,6 +43,7 @@ export const handlers = {
   get_recent_sessions: getRecentSessions,
   select_session: selectSession,
   new_session: newSession,
+  delete_session: deleteSession,
   prompt: prompt,
   get_project_status: getProjectStatus,
   get_session_title: getSessionTitle,

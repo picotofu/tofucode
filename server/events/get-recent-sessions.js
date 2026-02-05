@@ -53,15 +53,21 @@ export function handler(ws, message) {
         const projectSlug = entry.name;
         const sessionsDir = join(config.projectsDir, projectSlug);
         const indexPath = join(sessionsDir, 'sessions-index.json');
+        const projectName = getProjectDisplayName(projectSlug);
+        const projectPath = slugToPath(projectSlug);
+        const titles = getAllTitles(projectSlug);
 
+        // Track sessions we've already added
+        const sessionIds = new Set();
+
+        // First, load from index if it exists
         if (existsSync(indexPath)) {
           try {
             const data = JSON.parse(readFileSync(indexPath, 'utf-8'));
-            const projectName = getProjectDisplayName(projectSlug);
-            const projectPath = slugToPath(projectSlug);
-            const titles = getAllTitles(projectSlug);
 
             for (const session of data.entries || []) {
+              sessionIds.add(session.sessionId);
+
               // Use JSONL file mtime for accurate modification time
               // (sessions-index.json's modified field is stale)
               const jsonlPath = join(sessionsDir, `${session.sessionId}.jsonl`);
@@ -89,8 +95,64 @@ export function handler(ws, message) {
               });
             }
           } catch {
-            // Skip projects with malformed index
+            // Skip projects with malformed index, but continue to scan directory
           }
+        }
+
+        // Second, scan directory for JSONL files not in the index
+        // This catches newly created sessions before SDK updates the index
+        try {
+          const files = readdirSync(sessionsDir);
+          for (const file of files) {
+            if (file.endsWith('.jsonl') && !file.startsWith('agent-')) {
+              const sessionId = file.replace('.jsonl', '');
+              if (!sessionIds.has(sessionId)) {
+                const jsonlPath = join(sessionsDir, file);
+                try {
+                  const stats = statSync(jsonlPath);
+                  // Read first line to get the first prompt
+                  let firstPrompt = 'New session';
+                  try {
+                    const content = readFileSync(jsonlPath, 'utf-8');
+                    const firstLine = content.split('\n')[0];
+                    if (firstLine) {
+                      const jsonEntry = JSON.parse(firstLine);
+                      if (jsonEntry.type === 'user' && jsonEntry.message?.content) {
+                        const contentText =
+                          typeof jsonEntry.message.content === 'string'
+                            ? jsonEntry.message.content
+                            : Array.isArray(jsonEntry.message.content)
+                              ? jsonEntry.message.content
+                                  .filter((b) => b.type === 'text')
+                                  .map((b) => b.text)
+                                  .join(' ')
+                              : 'New session';
+                        firstPrompt = contentText.substring(0, 100);
+                      }
+                    }
+                  } catch {
+                    // Couldn't read first prompt, use default
+                  }
+
+                  allSessions.push({
+                    sessionId,
+                    projectSlug,
+                    projectName,
+                    projectPath,
+                    firstPrompt,
+                    messageCount: 0,
+                    created: stats.birthtime.toISOString(),
+                    modified: stats.mtime.toISOString(),
+                    title: titles[sessionId] || null,
+                  });
+                } catch (err) {
+                  console.error(`Failed to stat ${file}:`, err.message);
+                }
+              }
+            }
+          }
+        } catch {
+          // Failed to read directory, skip
         }
       }
     }

@@ -13,6 +13,7 @@ const {
   connect,
   selectProject,
   setSessionTitle,
+  deleteSession,
 } = useWebSocket();
 
 // Get sidebar from App.vue
@@ -102,6 +103,13 @@ function cancelEditingTitle() {
 function getDisplayTitle(session) {
   return session.title || session.firstPrompt;
 }
+
+function handleDeleteSession(sessionId, event) {
+  event.stopPropagation();
+  if (confirm('Are you sure you want to delete this session?')) {
+    deleteSession(sessionId);
+  }
+}
 </script>
 
 <template>
@@ -185,6 +193,15 @@ function getDisplayTitle(session) {
               <span>{{ session.messageCount }} messages</span>
             </p>
           </div>
+          <button
+            class="delete-session-btn"
+            @click="handleDeleteSession(session.sessionId, $event)"
+            title="Delete session"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+          </button>
           <div class="session-arrow">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 18l6-6-6-6"/>
@@ -218,6 +235,7 @@ function getDisplayTitle(session) {
 }
 
 .session-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -331,6 +349,28 @@ function getDisplayTitle(session) {
 
 .separator {
   margin: 0 6px;
+}
+
+.delete-session-btn {
+  position: absolute;
+  right: 40px;
+  opacity: 0;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--bg-primary);
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.session-item:hover .delete-session-btn {
+  opacity: 1;
+}
+
+.delete-session-btn:hover {
+  background: #ef4444;
+  color: white;
 }
 
 .session-arrow {
