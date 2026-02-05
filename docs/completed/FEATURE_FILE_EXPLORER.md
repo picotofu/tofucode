@@ -416,6 +416,17 @@ All events follow the pattern: `files:action` (request) → `files:action:result
 - **Error handling**: User-friendly alert dialogs for operation failures
 - **Keyboard shortcuts**: Cmd+S to save, Escape to close (when no unsaved changes)
 
+### Recent Enhancements (2026-02-05)
+
+- **Explorer header reorganization**: Moved below mode tabs (in footer area) for better layout
+- **Inline breadcrumb navigation**: Clickable path segments for quick navigation
+- **Quick navigation buttons**: "Go up" and "Go to project root" buttons
+- **Inline path editing**: Click breadcrumb path to edit directly (no modal)
+- **Mobile-friendly**: Horizontally scrollable breadcrumb for long paths
+- **Dotfiles toggle**: Moved alongside create file/folder buttons in header
+- **File editor redesign**: Cleaner icon-only header (filename + save + close)
+- **Improved button contrast**: Better legibility for action buttons
+
 ### Not Implemented (Future Enhancements)
 
 - Syntax highlighting for code files (could add highlight.js or Prism)
