@@ -132,7 +132,7 @@ function handleOverlayClick() {
 <template>
   <aside class="sidebar" :class="{ open }">
     <div class="sidebar-header">
-      <router-link :to="{ name: 'projects' }" class="sidebar-title" @click="closeOnMobile">claude-web</router-link>
+      <router-link :to="{ name: 'projects' }" class="sidebar-title" @click="closeOnMobile">cc-web</router-link>
       <button
         class="restart-btn"
         @click="handleRestart"

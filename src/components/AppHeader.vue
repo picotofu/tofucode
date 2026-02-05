@@ -66,7 +66,7 @@ function handleBack() {
           <p class="header-subtitle truncate" v-if="subtitle">{{ subtitle }}</p>
         </div>
         <div class="header-logo" v-else>
-          claude-code-web
+          cc-web
         </div>
       </slot>
     </div>

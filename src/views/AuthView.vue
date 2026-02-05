@@ -71,7 +71,7 @@ onMounted(async () => {
     <div class="auth-view">
       <div class="auth-card">
       <div class="auth-header">
-        <h1 class="auth-title">claude-web</h1>
+        <h1 class="auth-title">cc-web</h1>
         <p class="auth-subtitle" v-if="isSetupMode">Create a password to secure your instance</p>
         <p class="auth-subtitle" v-else>Enter your password to continue</p>
       </div>
