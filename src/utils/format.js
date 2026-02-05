@@ -36,6 +36,18 @@ export function truncate(str, len) {
 }
 
 /**
+ * Get a short version of a path (last 2-3 segments)
+ * @param {string} path - Full path
+ * @returns {string} Shortened path
+ */
+export function getShortPath(path) {
+  if (!path) return '';
+  const segments = path.split('/').filter(Boolean);
+  if (segments.length <= 2) return segments.join('/');
+  return segments.slice(-2).join('/');
+}
+
+/**
  * Tool display configuration
  * Maps tool names to their display properties
  */

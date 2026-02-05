@@ -83,6 +83,7 @@ export async function handler(ws, message, context) {
 
   send(ws, {
     type: 'session_history',
+    sessionId: sessionId,
     messages: history,
     hasOlderMessages,
     summaryCount,

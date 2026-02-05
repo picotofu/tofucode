@@ -335,11 +335,13 @@ export function useChatWebSocket() {
         break;
 
       case 'session_selected':
-        currentSession.value = msg.sessionId;
-        sessionActiveElsewhere.value = msg.isActiveElsewhere || false;
-        // Clear messages when session changes to prevent cross-session contamination
-        // (session_history will populate with correct messages immediately after)
-        messages.value = [];
+        // Only update if this matches our expected session (prevents race condition)
+        // currentSession is already set by selectSession() before the request
+        if (msg.sessionId === currentSession.value) {
+          sessionActiveElsewhere.value = msg.isActiveElsewhere || false;
+          // Don't clear messages here - selectSession() already did it
+          // Clearing again creates a race window for cross-session messages
+        }
         // Note: Don't clear terminalProcesses here - it causes a race condition
         // because listProcesses() is called before selectSession(), so the processes
         // load first and then get cleared. Terminal processes are project-scoped
@@ -351,13 +353,23 @@ export function useChatWebSocket() {
         break;
 
       case 'session_history':
-        messages.value = msg.messages;
-        hasOlderMessages.value = msg.hasOlderMessages || false;
-        summaryCount.value = msg.summaryCount || 0;
+        // Only accept history if it matches current session (prevents race condition)
+        if (!msg.sessionId || msg.sessionId === currentSession.value) {
+          messages.value = msg.messages;
+          hasOlderMessages.value = msg.hasOlderMessages || false;
+          summaryCount.value = msg.summaryCount || 0;
+        } else {
+          console.warn(
+            `[useChatWebSocket] Ignoring session_history for different session. History sessionId: ${msg.sessionId}, Current sessionId: ${currentSession.value}`,
+          );
+        }
         break;
 
       case 'task_status':
-        taskStatus.value = msg.status;
+        // Only update task status if it's for the current session
+        if (!msg.sessionId || msg.sessionId === currentSession.value) {
+          taskStatus.value = msg.status;
+        }
         // Refresh global sessions list when task completes to update timestamps
         if (msg.status === 'completed' || msg.status === 'error') {
           getRecentSessions();
@@ -398,7 +410,10 @@ export function useChatWebSocket() {
           messages.value = [...messages.value, msg];
         } else if (!msg.sessionId) {
           // Legacy messages without sessionId (shouldn't happen with new code)
-          console.warn('[useChatWebSocket] Message without sessionId:', msg.type);
+          console.warn(
+            '[useChatWebSocket] Message without sessionId:',
+            msg.type,
+          );
           messages.value = [...messages.value, msg];
         } else if (msg.sessionId !== currentSession.value) {
           // Log cross-session messages to help debug the issue

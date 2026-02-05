@@ -22,6 +22,7 @@ const emit = defineEmits([
   'clear',
   'toggle-expand',
   'update:activeTab',
+  'replay',
 ]);
 
 const historyContentRef = ref(null);
@@ -236,6 +237,17 @@ async function copyOutput(proc, e) {
                 <span class="terminal-duration">{{ formatDuration(proc.startedAt, proc.endedAt) }}</span>
               </template>
             </span>
+            <button
+              v-if="proc.status !== 'running'"
+              class="replay-btn"
+              @click.stop="$emit('replay', proc.command, proc.cwd)"
+              title="Run this command again"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+              </svg>
+            </button>
             <button
               v-if="proc.output.length > 0 && (proc.status === 'running' || isExpanded(proc.id))"
               class="copy-btn"
@@ -454,6 +466,24 @@ async function copyOutput(proc, e) {
   flex-shrink: 0;
   color: var(--text-muted);
   font-size: 10px;
+}
+
+.replay-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  transition: background 0.15s, color 0.15s;
+}
+
+.replay-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .kill-btn {

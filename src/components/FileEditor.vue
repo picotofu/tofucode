@@ -167,40 +167,31 @@ onUnmounted(() => {
   <div class="file-editor">
     <!-- Editor header -->
     <div class="editor-header">
-      <div class="editor-info">
-        <button class="back-btn" @click="handleClose" title="Back to explorer">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-        </button>
-        <span class="file-name">{{ fileName }}</span>
-        <span v-if="isDirty" class="dirty-indicator" title="Unsaved changes">*</span>
-      </div>
+      <span class="file-name">{{ fileName }}</span>
+      <span v-if="isDirty" class="dirty-indicator" title="Unsaved changes">*</span>
+      <div class="spacer"></div>
       <div class="editor-actions">
         <button
-          v-if="isDirty"
-          class="action-btn revert"
-          @click="handleRevert"
-          title="Revert changes"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="1 4 1 10 7 10"/>
-            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-          </svg>
-          Revert
-        </button>
-        <button
-          class="action-btn save"
+          class="action-btn"
           @click="handleSave"
           :disabled="!isDirty || isSaving"
           title="Save (Cmd+S)"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
             <polyline points="17 21 17 13 7 13 7 21"/>
             <polyline points="7 3 7 8 15 8"/>
           </svg>
-          {{ isSaving ? 'Saving...' : 'Save' }}
+        </button>
+        <button
+          class="action-btn"
+          @click="handleClose"
+          title="Close"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
         </button>
       </div>
     </div>
@@ -245,35 +236,9 @@ onUnmounted(() => {
 .editor-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border-color);
-}
-
-.editor-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
-}
-
-.back-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  color: var(--text-secondary);
-  background: transparent;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s, color 0.15s;
-  flex-shrink: 0;
-}
-
-.back-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
 }
 
 .file-name {
@@ -283,6 +248,7 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .dirty-indicator {
@@ -291,45 +257,38 @@ onUnmounted(() => {
   font-weight: bold;
   line-height: 1;
   flex-shrink: 0;
+  margin-left: -8px;
+}
+
+.spacer {
+  flex: 1;
+  min-width: 0;
 }
 
 .editor-actions {
   display: flex;
-  gap: 8px;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .action-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
+  justify-content: center;
+  padding: 6px;
+  color: var(--text-secondary);
+  background: transparent;
   border-radius: var(--radius-sm);
   transition: background 0.15s, color 0.15s, opacity 0.15s;
 }
 
-.action-btn.revert {
-  color: var(--text-secondary);
-  background: var(--bg-tertiary);
-}
-
-.action-btn.revert:hover {
+.action-btn:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text-primary);
 }
 
-.action-btn.save {
-  color: #fff;
-  background: var(--accent-color);
-}
-
-.action-btn.save:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.action-btn.save:disabled {
-  opacity: 0.5;
+.action-btn:disabled {
+  opacity: 0.3;
   cursor: not-allowed;
 }
 

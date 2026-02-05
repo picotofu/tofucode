@@ -175,21 +175,32 @@ function handleOverlayClick() {
           :key="session.sessionId"
           class="sidebar-item"
           :class="{ active: currentSession === session.sessionId }"
-          @click="selectSession(session)"
         >
-          <div class="item-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-          </div>
-          <div class="item-content">
-            <p class="item-title truncate">{{ session.title || session.firstPrompt }}</p>
-            <p class="item-meta">
-              <span class="item-project">{{ session.projectName }}</span>
-              <span class="separator">·</span>
-              <span>{{ formatRelativeTime(session.modified) }}</span>
-            </p>
-          </div>
+          <router-link
+            :to="{
+              name: 'chat',
+              params: {
+                project: session.projectSlug,
+                session: session.sessionId,
+              },
+            }"
+            class="sidebar-link"
+            @click="closeOnMobile"
+          >
+            <div class="item-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <div class="item-content">
+              <p class="item-title truncate">{{ session.title || session.firstPrompt }}</p>
+              <p class="item-meta">
+                <span class="item-project">{{ session.projectName }}</span>
+                <span class="separator">·</span>
+                <span>{{ formatRelativeTime(session.modified) }}</span>
+              </p>
+            </div>
+          </router-link>
           <!-- Task status indicator -->
           <div
             v-if="sessionStatuses.get(session.sessionId)"
@@ -246,19 +257,25 @@ function handleOverlayClick() {
           class="sidebar-item project-item"
           :class="{ active: currentProject === project.slug }"
         >
-          <div class="item-icon" @click="selectProject(project)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-            </svg>
-          </div>
-          <div class="item-content" @click="selectProject(project)">
-            <p class="item-title truncate">{{ project.name }}</p>
-            <p class="item-meta">
-              <span>{{ project.sessionCount }} sessions</span>
-              <span class="separator">·</span>
-              <span>{{ formatRelativeTime(project.lastModified) }}</span>
-            </p>
-          </div>
+          <router-link
+            :to="{ name: 'sessions', params: { project: project.slug } }"
+            class="sidebar-link"
+            @click="closeOnMobile"
+          >
+            <div class="item-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <div class="item-content">
+              <p class="item-title truncate">{{ project.name }}</p>
+              <p class="item-meta">
+                <span>{{ project.sessionCount }} sessions</span>
+                <span class="separator">·</span>
+                <span>{{ formatRelativeTime(project.lastModified) }}</span>
+              </p>
+            </div>
+          </router-link>
           <button
             class="quick-new-btn"
             @click.stop="startNewSession(project.slug)"
@@ -398,12 +415,10 @@ function handleOverlayClick() {
 }
 
 .sidebar-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
   border-radius: var(--radius-md);
-  cursor: pointer;
   transition: background 0.15s;
 }
 
@@ -413,6 +428,17 @@ function handleOverlayClick() {
 
 .sidebar-item.active {
   background: var(--bg-tertiary);
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  color: inherit;
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
 }
 
 .item-icon {
@@ -455,9 +481,20 @@ function handleOverlayClick() {
   margin: 0 4px;
 }
 
+.project-item {
+  display: flex;
+  align-items: center;
+}
+
+.project-item .sidebar-link {
+  flex: 1;
+  min-width: 0;
+}
+
 .project-item .quick-new-btn {
   opacity: 0;
   padding: 4px 8px;
+  margin-right: 10px;
   border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 500;
@@ -491,7 +528,7 @@ function handleOverlayClick() {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-  margin-left: auto;
+  margin-right: 10px;
 }
 
 .session-status-indicator.running {

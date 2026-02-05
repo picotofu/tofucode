@@ -62,7 +62,6 @@ const modelDisplayName = computed(() => {
     sonnet: 'Sonnet',
     opus: 'Opus',
     haiku: 'Haiku',
-    opusplan: 'Opus Plan',
   };
   return modelMap[assistantModel.value] || assistantModel.value;
 });

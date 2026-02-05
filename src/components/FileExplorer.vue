@@ -7,14 +7,7 @@ const props = defineProps({
   loading: Boolean,
 });
 
-const emit = defineEmits([
-  'navigate',
-  'select-file',
-  'create-file',
-  'create-folder',
-  'rename',
-  'delete',
-]);
+const emit = defineEmits(['navigate', 'select-file', 'rename', 'delete']);
 
 const contextMenu = ref({
   visible: false,
@@ -31,15 +24,6 @@ const sortedItems = computed(() => {
     if (!a.isDirectory && b.isDirectory) return 1;
     return a.name.localeCompare(b.name);
   });
-});
-
-const breadcrumbs = computed(() => {
-  if (!props.currentPath) return [];
-  const parts = props.currentPath.split('/').filter(Boolean);
-  return parts.map((part, index) => ({
-    name: part,
-    path: `/${parts.slice(0, index + 1).join('/')}`,
-  }));
 });
 
 function handleItemClick(item) {
@@ -78,16 +62,6 @@ function handleContextAction(action) {
   }
 }
 
-function goUp() {
-  if (!props.currentPath || props.currentPath === '/') return;
-  const parentPath = props.currentPath.split('/').slice(0, -1).join('/') || '/';
-  emit('navigate', parentPath);
-}
-
-function navigateToBreadcrumb(path) {
-  emit('navigate', path);
-}
-
 // Lifecycle - properly cleanup event listeners
 onMounted(() => {
   document.addEventListener('click', closeContextMenu);
@@ -100,59 +74,6 @@ onUnmounted(() => {
 
 <template>
   <div class="file-explorer">
-    <!-- Header with breadcrumb navigation -->
-    <div class="explorer-header">
-      <div class="breadcrumb">
-        <button
-          class="breadcrumb-btn up"
-          @click="goUp"
-          :disabled="!currentPath || currentPath === '/'"
-          title="Go up"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-        </button>
-        <button class="breadcrumb-btn root" @click="emit('navigate', '/')" title="Root folder">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-          </svg>
-        </button>
-        <span class="breadcrumb-path">
-          <template v-if="breadcrumbs.length === 0">/</template>
-          <template v-else>
-            <span
-              v-for="(crumb, index) in breadcrumbs"
-              :key="index"
-              class="breadcrumb-item"
-            >
-              <span class="breadcrumb-separator">/</span>
-              <button class="breadcrumb-link" @click="navigateToBreadcrumb(crumb.path)">
-                {{ crumb.name }}
-              </button>
-            </span>
-          </template>
-        </span>
-      </div>
-      <div class="explorer-actions">
-        <button class="action-btn" @click="emit('create-file')" title="New file">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="12" y1="18" x2="12" y2="12"/>
-            <line x1="9" y1="15" x2="15" y2="15"/>
-          </svg>
-        </button>
-        <button class="action-btn" @click="emit('create-folder')" title="New folder">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-            <line x1="12" y1="11" x2="12" y2="17"/>
-            <line x1="9" y1="14" x2="15" y2="14"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-
     <!-- File list -->
     <div class="explorer-content">
       <div v-if="loading" class="explorer-loading">Loading...</div>
@@ -221,93 +142,6 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100%;
   background: var(--bg-primary);
-}
-
-.explorer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.breadcrumb-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  color: var(--text-secondary);
-  background: transparent;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s, color 0.15s;
-}
-
-.breadcrumb-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.breadcrumb-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.breadcrumb-path {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  overflow: hidden;
-}
-
-.breadcrumb-separator {
-  color: var(--text-muted);
-  margin: 0 4px;
-}
-
-.breadcrumb-link {
-  color: var(--text-secondary);
-  background: transparent;
-  padding: 4px 6px;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s, color 0.15s;
-  white-space: nowrap;
-}
-
-.breadcrumb-link:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.explorer-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  color: var(--text-secondary);
-  background: transparent;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s, color 0.15s;
-}
-
-.action-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
 }
 
 .explorer-content {

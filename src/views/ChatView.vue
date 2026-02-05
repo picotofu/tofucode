@@ -14,6 +14,7 @@ import FileEditor from '../components/FileEditor.vue';
 import FileExplorer from '../components/FileExplorer.vue';
 import TerminalOutput from '../components/TerminalOutput.vue';
 import { useChatWebSocket } from '../composables/useWebSocket';
+import { getShortPath } from '../utils/format.js';
 
 // Get sidebar from App.vue
 const sidebar = inject('sidebar');
@@ -56,6 +57,7 @@ const currentMode = ref('chat');
 const terminalSubTab = ref('history'); // 'active' | 'history'
 const terminalInput = ref('');
 const terminalInputRef = ref(null);
+const pathEditInputRef = ref(null);
 const manualExpandState = ref(new Map()); // Map<processId, boolean> for user-toggled items
 
 // Computed for backwards compatibility
@@ -95,6 +97,8 @@ const fileModals = ref({
   rename: null,
   renameNewName: '',
   delete: null,
+  editPath: false,
+  editPathValue: '',
 });
 
 // Flag to prevent auto-save during session transitions
@@ -289,7 +293,7 @@ const textareaEl = ref(null);
 const editorEl = ref(null); // TinyMDE container
 const editorInstance = ref(null); // TinyMDE instance
 const permissionMode = ref('default');
-const modelSelection = ref('sonnet'); // 'sonnet' | 'opus' | 'haiku' | 'opusplan'
+const modelSelection = ref('sonnet'); // 'sonnet' | 'opus' | 'haiku'
 const userScrolledUp = ref(false);
 const textareaMaxHeight = ref(200); // Default max height, can be adjusted by resize handle
 const isResizing = ref(false);
@@ -397,7 +401,7 @@ const MODEL_STORAGE_KEY = 'claude-web:model';
 
 function loadModelSelection() {
   const stored = localStorage.getItem(MODEL_STORAGE_KEY);
-  if (stored && ['sonnet', 'opus', 'haiku', 'opusplan'].includes(stored)) {
+  if (stored && ['sonnet', 'opus', 'haiku'].includes(stored)) {
     modelSelection.value = stored;
   }
 }
@@ -832,6 +836,11 @@ function handleTerminalClear(processId) {
   clearTerminal(processId);
 }
 
+function handleTerminalReplay(command, cwd) {
+  // Execute the command again as if user ran it
+  execCommand(command, cwd);
+}
+
 function toggleHistoryExpand(processId) {
   const currentlyExpanded = expandedHistory.value.has(processId);
   const newMap = new Map(manualExpandState.value);
@@ -844,7 +853,24 @@ const runningProcessCount = computed(
   () => terminalProcesses.value.filter((p) => p.status === 'running').length,
 );
 
+// Files mode computed
+const filesBreadcrumbs = computed(() => {
+  if (!filesCurrentPath.value) return [];
+  const parts = filesCurrentPath.value.split('/').filter(Boolean);
+  return parts.map((part, index) => ({
+    name: part,
+    path: `/${parts.slice(0, index + 1).join('/')}`,
+  }));
+});
+
 // Files mode functions
+function goUpDirectory() {
+  if (!filesCurrentPath.value || filesCurrentPath.value === '/') return;
+  const parentPath =
+    filesCurrentPath.value.split('/').slice(0, -1).join('/') || '/';
+  handleFilesNavigate(parentPath);
+}
+
 function handleFilesNavigate(path) {
   filesCurrentPath.value = path;
   filesLoading.value = true;
@@ -892,6 +918,21 @@ function handleRename(item) {
 
 function handleDelete(item) {
   fileModals.value.delete = item;
+}
+
+function handleEditPath() {
+  // Open inline path editing
+  fileModals.value.editPath = true;
+  fileModals.value.editPathValue = filesCurrentPath.value;
+  nextTick(() => {
+    pathEditInputRef.value?.focus();
+    pathEditInputRef.value?.select();
+  });
+}
+
+function cancelEditPath() {
+  fileModals.value.editPath = false;
+  fileModals.value.editPathValue = '';
 }
 
 // Modal confirmation functions
@@ -959,6 +1000,15 @@ function confirmDelete() {
   fileModals.value.delete = null;
 }
 
+function confirmEditPath() {
+  const newPath = fileModals.value.editPathValue.trim();
+  if (!newPath) return;
+
+  handleFilesNavigate(newPath);
+  fileModals.value.editPath = false;
+  fileModals.value.editPathValue = '';
+}
+
 // File message handlers
 function handleFileMessage(msg) {
   switch (msg.type) {
@@ -1006,12 +1056,17 @@ watch(currentMode, (mode) => {
   }
 });
 
-// Initialize files mode on page load when projectStatus becomes available
+// Initialize files mode when projectStatus updates
+// This handles: initial load, session changes, and project changes
 watch(
-  () => projectStatus.value.cwd,
-  (cwd) => {
-    if (cwd && currentMode.value === 'files' && !filesCurrentPath.value) {
-      handleFilesNavigate(cwd);
+  projectStatus,
+  (status) => {
+    if (
+      status.cwd &&
+      currentMode.value === 'files' &&
+      !filesCurrentPath.value
+    ) {
+      handleFilesNavigate(status.cwd);
 
       // Restore opened file from URL if specified
       const query = route.query;
@@ -1023,7 +1078,59 @@ watch(
       }
     }
   },
-  { immediate: true },
+  { immediate: true, deep: true },
+);
+
+// Clear files state when session changes (files mode is per-session, not per-project like terminal)
+watch(currentSession, () => {
+  // Clear all files state immediately
+  filesCurrentPath.value = '';
+  filesItems.value = [];
+  filesLoading.value = false;
+  openedFile.value = null;
+  filesFilter.value = '';
+
+  // Don't reinitialize here - the projectStatus.cwd watcher will handle it
+  // once the new project status arrives from the server
+});
+
+// Update page title when session title or project changes
+watch(
+  [sessionTitle, projectStatus, messages],
+  () => {
+    // Get project name (last segment of path)
+    const path = projectStatus.value.cwd;
+    const projectName = path ? path.split('/').filter(Boolean).pop() : '';
+
+    // Get session title or first prompt as fallback
+    const title = sessionTitle.value;
+    let sessionDisplay = title;
+
+    // If no custom title, use first prompt (truncated)
+    if (!sessionDisplay && messages.value.length > 0) {
+      const firstUserMsg = messages.value.find(
+        (m) => m.type === 'text' && m.role === 'user',
+      );
+      if (firstUserMsg?.text) {
+        // Truncate first prompt to ~50 chars
+        const text = firstUserMsg.text.trim();
+        sessionDisplay =
+          text.length > 50 ? `${text.substring(0, 50)}...` : text;
+      }
+    }
+
+    // Format: cc-web - project-name / session-title-or-prompt
+    if (projectName && sessionDisplay) {
+      document.title = `cc-web - ${projectName} / ${sessionDisplay}`;
+    } else if (projectName) {
+      document.title = `cc-web - ${projectName}`;
+    } else if (sessionDisplay) {
+      document.title = `cc-web / ${sessionDisplay}`;
+    } else {
+      document.title = 'cc-web';
+    }
+  },
+  { deep: true, immediate: true },
 );
 
 // URL state management - sync mode, terminal tab, and opened file to URL
@@ -1059,7 +1166,7 @@ watch(terminalSubTab, (tab) => {
 watch(openedFile, (file) => {
   if (currentMode.value === 'files') {
     const query = { ...route.query };
-    if (file && file.path) {
+    if (file?.path) {
       query.file = file.path;
     } else {
       delete query.file;
@@ -1178,6 +1285,7 @@ watch(openedFile, (file) => {
         @clear="handleTerminalClear"
         @toggle-expand="toggleHistoryExpand"
         @update:active-tab="terminalSubTab = $event"
+        @replay="handleTerminalReplay"
       />
     </main>
 
@@ -1198,8 +1306,6 @@ watch(openedFile, (file) => {
         :loading="filesLoading"
         @navigate="handleFilesNavigate"
         @select-file="handleFileSelect"
-        @create-file="handleCreateFile"
-        @create-folder="handleCreateFolder"
         @rename="handleRename"
         @delete="handleDelete"
       />
@@ -1282,6 +1388,98 @@ watch(openedFile, (file) => {
         </div>
       </div>
 
+      <!-- Files explorer header (below mode tabs, only in files mode) -->
+      <div v-if="currentMode === 'files'" class="files-explorer-header">
+        <div class="files-breadcrumb">
+          <button
+            class="breadcrumb-btn"
+            @click="goUpDirectory"
+            :disabled="!filesCurrentPath || filesCurrentPath === '/'"
+            title="Go up"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+          </button>
+          <button
+            class="breadcrumb-btn"
+            @click="projectStatus.cwd && handleFilesNavigate(projectStatus.cwd)"
+            :disabled="!projectStatus.cwd || filesCurrentPath === projectStatus.cwd"
+            title="Go to project root"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+          </button>
+          <!-- Path editing inline input -->
+          <form v-if="fileModals.editPath" class="breadcrumb-edit-form" @submit.prevent="confirmEditPath">
+            <input
+              ref="pathEditInputRef"
+              type="text"
+              v-model="fileModals.editPathValue"
+              class="breadcrumb-edit-input"
+              placeholder="/path/to/folder"
+              @keydown.escape.prevent="cancelEditPath"
+              @blur="cancelEditPath"
+            />
+          </form>
+          <!-- Path display with breadcrumbs -->
+          <div v-else class="breadcrumb-scroll" @click="handleEditPath">
+            <span class="breadcrumb-path">
+              <template v-if="!filesCurrentPath || filesCurrentPath === '/'">/</template>
+              <template v-else>
+                <span
+                  v-for="(crumb, index) in filesBreadcrumbs"
+                  :key="index"
+                  class="breadcrumb-item"
+                >
+                  <span class="breadcrumb-separator">/</span>
+                  <button class="breadcrumb-link" @click.stop="handleFilesNavigate(crumb.path)">
+                    {{ crumb.name }}
+                  </button>
+                </span>
+              </template>
+            </span>
+          </div>
+          <button v-if="!fileModals.editPath" class="breadcrumb-btn" @click="handleEditPath" title="Edit path">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+        </div>
+        <div class="files-actions">
+          <button
+            class="action-btn"
+            :class="{ active: showDotfiles }"
+            @click="showDotfiles = !showDotfiles"
+            title="Show dotfiles"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="1"/>
+              <circle cx="12" cy="5" r="1"/>
+              <circle cx="12" cy="19" r="1"/>
+            </svg>
+          </button>
+          <button class="action-btn" @click="fileModals.createFile = true" title="New file">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="12" y1="18" x2="12" y2="12"/>
+              <line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>
+          </button>
+          <button class="action-btn" @click="fileModals.createFolder = true" title="New folder">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              <line x1="12" y1="11" x2="12" y2="17"/>
+              <line x1="9" y1="14" x2="15" y2="14"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
       <!-- Resize handle -->
       <div
         class="resize-handle"
@@ -1338,60 +1536,28 @@ watch(openedFile, (file) => {
 
       <!-- Files filter input -->
       <div v-else-if="currentMode === 'files'" class="files-filter-form">
-        <div class="files-filter-left">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
-            <circle cx="11" cy="11" r="8"/>
-            <path d="m21 21-4.35-4.35"/>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input
+          v-model="filesFilter"
+          type="text"
+          class="files-filter-input"
+          placeholder="Filter files and folders..."
+        />
+        <button
+          v-if="filesFilter"
+          type="button"
+          class="clear-btn"
+          @click="filesFilter = ''"
+          title="Clear filter"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
-          <input
-            v-model="filesFilter"
-            type="text"
-            class="files-filter-input"
-            placeholder="Filter files and folders..."
-          />
-          <button
-            v-if="filesFilter"
-            type="button"
-            class="clear-btn"
-            @click="filesFilter = ''"
-            title="Clear filter"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-        <div class="files-toolbar">
-          <!-- Dotfiles toggle -->
-          <button
-            type="button"
-            class="files-toolbar-btn"
-            :class="{ active: showDotfiles }"
-            @click="showDotfiles = !showDotfiles"
-            title="Show dotfiles"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="1"/>
-              <circle cx="12" cy="5" r="1"/>
-              <circle cx="12" cy="19" r="1"/>
-            </svg>
-          </button>
-          <!-- Create file button -->
-          <button
-            type="button"
-            class="files-toolbar-btn"
-            @click="fileModals.createFile = true"
-            title="Create new file"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="12" y1="18" x2="12" y2="12"/>
-              <line x1="9" y1="15" x2="15" y2="15"/>
-            </svg>
-          </button>
-        </div>
+        </button>
       </div>
 
       <!-- Toolbar (below input) -->
@@ -1405,6 +1571,7 @@ watch(openedFile, (file) => {
               <path d="M18 9a9 9 0 0 1-9 9"/>
             </svg>
             {{ projectStatus.gitBranch }}
+            <span class="git-changes" v-if="fileChangesText">{{ fileChangesText }}</span>
           </span>
           <span class="toolbar-item no-git" v-else-if="projectStatus.cwd">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1415,9 +1582,6 @@ watch(openedFile, (file) => {
           </span>
         </div>
         <div class="toolbar-right">
-          <span class="toolbar-item changes" v-if="fileChangesText">
-            {{ fileChangesText }} files
-          </span>
           <!-- Model selector (chat mode only) -->
           <div v-if="!terminalMode && !filesMode" class="model-tabs">
             <button
@@ -1443,14 +1607,6 @@ watch(openedFile, (file) => {
               title="Opus - Most capable"
             >
               O
-            </button>
-            <button
-              class="model-tab"
-              :class="{ active: modelSelection === 'opusplan' }"
-              @click="modelSelection = 'opusplan'"
-              title="Opus Plan - Extended thinking for complex tasks"
-            >
-              P
             </button>
           </div>
           <!-- Permission tabs (chat mode only) -->
@@ -1580,6 +1736,7 @@ watch(openedFile, (file) => {
           </div>
         </div>
       </div>
+
     </Teleport>
   </div>
 </template>
@@ -2048,6 +2205,13 @@ watch(openedFile, (file) => {
   color: var(--text-secondary);
 }
 
+.toolbar-item.branch .git-changes {
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--warning-color);
+}
+
 .toolbar-item.no-git {
   color: var(--text-muted);
   font-style: italic;
@@ -2077,12 +2241,6 @@ watch(openedFile, (file) => {
   50% {
     opacity: 0.6;
   }
-}
-
-
-.toolbar-item.changes {
-  font-family: var(--font-mono);
-  color: var(--warning-color);
 }
 
 /* Model tabs */
@@ -2242,6 +2400,155 @@ watch(openedFile, (file) => {
   color: var(--bg-primary);
   border-radius: 10px;
   font-weight: 600;
+}
+
+/* Files explorer header (below mode tabs) */
+.files-explorer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-primary);
+}
+
+.files-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.files-explorer-header .breadcrumb-scroll {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) transparent;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+
+.files-explorer-header .breadcrumb-scroll:hover {
+  background: var(--bg-hover);
+}
+
+.breadcrumb-edit-form {
+  flex: 1;
+  min-width: 0;
+}
+
+.breadcrumb-edit-input {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  background: var(--bg-primary);
+  border: 1px solid var(--text-muted);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.breadcrumb-edit-input:focus {
+  border-color: var(--text-primary);
+}
+
+.files-explorer-header .breadcrumb-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.files-explorer-header .breadcrumb-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.files-explorer-header .breadcrumb-scroll::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 2px;
+}
+
+.files-explorer-header .breadcrumb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  color: var(--text-secondary);
+  background: transparent;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.files-explorer-header .breadcrumb-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.files-explorer-header .breadcrumb-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.files-explorer-header .breadcrumb-path {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.files-explorer-header .breadcrumb-separator {
+  color: var(--text-muted);
+  margin: 0 4px;
+}
+
+.files-explorer-header .breadcrumb-link {
+  color: var(--text-secondary);
+  background: transparent;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.files-explorer-header .breadcrumb-link:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.files-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.files-explorer-header .action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  color: var(--text-secondary);
+  background: transparent;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s, color 0.15s;
+}
+
+.files-explorer-header .action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.files-explorer-header .action-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 /* Task status indicator in mode tabs bar */
@@ -2448,19 +2755,11 @@ watch(openedFile, (file) => {
 .files-filter-form {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-secondary);
-}
-
-.files-filter-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
 }
 
 .files-filter-form:focus-within {
@@ -2501,39 +2800,6 @@ watch(openedFile, (file) => {
 
 .files-filter-form .clear-btn:hover {
   background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-/* Files toolbar */
-.files-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--border-color);
-  padding-left: 12px;
-}
-
-.files-toolbar-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--text-muted);
-  background: transparent;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s, color 0.15s;
-}
-
-.files-toolbar-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.files-toolbar-btn.active {
-  background: var(--bg-tertiary);
   color: var(--text-primary);
 }
 
@@ -2680,12 +2946,12 @@ watch(openedFile, (file) => {
 }
 
 .modal-btn.confirm {
-  background: var(--accent-color);
-  color: #fff;
+  background: var(--text-primary);
+  color: var(--bg-primary);
 }
 
 .modal-btn.confirm:hover {
-  background: var(--accent-hover);
+  opacity: 0.9;
 }
 
 .modal-btn.danger {

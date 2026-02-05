@@ -146,6 +146,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
   console.log(
     `Starting prompt in ${projectPath} with permissionMode: ${queryOptions.permissionMode}, model: ${queryOptions.model || 'default'}`,
   );
+  console.log('Received model from client:', options.model);
   console.log('Query options:', JSON.stringify(queryOptions, null, 2));
 
   // Initialize task
@@ -331,6 +332,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
         let modelName = null;
         if (message.message?.model) {
           const fullModel = message.message.model;
+          console.log('API returned model:', fullModel);
           if (fullModel.includes('opus')) {
             modelName = 'opus';
           } else if (fullModel.includes('haiku')) {
@@ -338,6 +340,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
           } else if (fullModel.includes('sonnet')) {
             modelName = 'sonnet';
           }
+          console.log('Extracted model name:', modelName);
         }
 
         for (const block of content) {

@@ -105,11 +105,17 @@ function cancelEditingPath() {
       <section class="quick-access" v-if="quickSessions.length > 0">
         <h2 class="section-title">Recent Sessions</h2>
         <div class="quick-cards">
-          <div
+          <router-link
             v-for="session in quickSessions"
             :key="session.sessionId"
+            :to="{
+              name: 'chat',
+              params: {
+                project: session.projectSlug,
+                session: session.sessionId,
+              },
+            }"
             class="quick-card"
-            @click="selectRecentSession(session)"
           >
             <div class="quick-card-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -118,7 +124,7 @@ function cancelEditingPath() {
             </div>
             <p class="quick-card-title truncate">{{ session.title || session.firstPrompt }}</p>
             <p class="quick-card-meta truncate">{{ session.projectName }}</p>
-          </div>
+          </router-link>
         </div>
       </section>
 
@@ -238,6 +244,8 @@ function cancelEditingPath() {
   border-radius: var(--radius-lg);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  color: inherit;
+  text-decoration: none;
 }
 
 .quick-card:hover {

@@ -146,14 +146,23 @@ function handleDeleteSession(sessionId, event) {
           v-for="session in sessions"
           :key="session.sessionId"
           class="session-item"
-          @click="selectSession(session.sessionId)"
         >
-          <div class="session-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-          </div>
-          <div class="session-content">
+          <router-link
+            :to="{
+              name: 'chat',
+              params: {
+                project: projectSlug,
+                session: session.sessionId,
+              },
+            }"
+            class="session-link"
+          >
+            <div class="session-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <div class="session-content">
             <!-- Editing title -->
             <form
               v-if="editingSessionId === session.sessionId"
@@ -185,28 +194,28 @@ function handleDeleteSession(sessionId, event) {
                 </svg>
               </button>
             </div>
+            <p v-if="session.title" class="session-subtitle truncate">{{ session.firstPrompt }}</p>
             <p class="session-meta">
-              <span v-if="session.title" class="session-original-prompt truncate-short">{{ session.firstPrompt }}</span>
-              <span v-if="session.title" class="separator">·</span>
               <span>{{ formatTime(session.modified) }}</span>
               <span class="separator">·</span>
               <span>{{ session.messageCount }} messages</span>
             </p>
           </div>
+            <div class="session-arrow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </div>
+          </router-link>
           <button
             class="delete-session-btn"
-            @click="handleDeleteSession(session.sessionId, $event)"
+            @click.stop="handleDeleteSession(session.sessionId, $event)"
             title="Delete session"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
             </svg>
           </button>
-          <div class="session-arrow">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 18l6-6-6-6"/>
-            </svg>
-          </div>
         </li>
       </ul>
 
@@ -238,11 +247,8 @@ function handleDeleteSession(sessionId, event) {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
   margin: 0 -12px;
   border-radius: var(--radius-md);
-  cursor: pointer;
   transition: background 0.15s;
 }
 
@@ -250,9 +256,27 @@ function handleDeleteSession(sessionId, event) {
   background: var(--bg-hover);
 }
 
+.session-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
 .session-item.new-session {
   border-bottom: 1px solid var(--border-color);
   margin-bottom: 8px;
+  cursor: pointer;
+  padding: 12px;
+}
+
+.session-item.new-session {
+  gap: 12px;
 }
 
 .session-icon {
@@ -329,32 +353,28 @@ function handleDeleteSession(sessionId, event) {
   border-color: var(--text-secondary);
 }
 
-.session-original-prompt {
+.session-subtitle {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
-  max-width: 150px;
-}
-
-.truncate-short {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin-bottom: 4px;
 }
 
 .session-meta {
+  display: flex;
+  align-items: center;
   font-size: 13px;
   color: var(--text-secondary);
 }
 
 .separator {
   margin: 0 6px;
+  flex-shrink: 0;
 }
 
 .delete-session-btn {
-  position: absolute;
-  right: 40px;
   opacity: 0;
+  margin: 0 8px;
   padding: 8px;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
