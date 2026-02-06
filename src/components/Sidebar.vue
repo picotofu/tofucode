@@ -20,23 +20,40 @@ const {
   projects,
   recentSessions,
   sessionStatuses,
+  currentVersion,
+  updateAvailable,
   getProjects,
   getRecentSessions,
+  dismissUpdate,
   send,
 } = useWebSocket();
 
-// POC: Restart functionality
-// This validates the inverted spawn strategy works
-// TODO: Expand to full upgrade button with version check
-// See: docs/FEATURE_UPDATE_VERSION.md Section 8.3
+// Upgrade/Restart state
+const isUpgrading = ref(false);
 const isRestarting = ref(false);
 
-// Reset restart state when reconnected
+// Reset states when reconnected
 watch(connected, (isConnected) => {
-  if (isConnected && isRestarting.value) {
+  if (isConnected) {
+    isUpgrading.value = false;
     isRestarting.value = false;
   }
 });
+
+function handleUpgrade() {
+  if (isUpgrading.value) return;
+
+  const version = updateAvailable.value?.latestVersion || 'latest';
+
+  const confirmed = confirm(
+    `Upgrade cc-web to v${version}?\n\nThis will:\n1. Download and install the update\n2. Restart the server\n3. Automatically reconnect\n\nThis may take 30-60 seconds.`,
+  );
+
+  if (confirmed) {
+    isUpgrading.value = true;
+    send({ type: 'upgrade', version });
+  }
+}
 
 function handleRestart() {
   if (isRestarting.value) return;
@@ -48,6 +65,19 @@ function handleRestart() {
   if (confirmed) {
     isRestarting.value = true;
     send({ type: 'restart' });
+  }
+}
+
+function handleUpdateClick() {
+  if (updateAvailable.value) {
+    window.open(updateAvailable.value.updateUrl, '_blank');
+  }
+}
+
+function handleDismissUpdate(e) {
+  e.stopPropagation();
+  if (updateAvailable.value) {
+    dismissUpdate(updateAvailable.value.latestVersion);
   }
 }
 
@@ -132,12 +162,55 @@ function handleOverlayClick() {
 <template>
   <aside class="sidebar" :class="{ open }">
     <div class="sidebar-header">
-      <router-link :to="{ name: 'projects' }" class="sidebar-title" @click="closeOnMobile">cc-web</router-link>
+      <router-link :to="{ name: 'projects' }" class="sidebar-title" @click="closeOnMobile">
+        <svg class="sidebar-logo" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M 4 14 Q 4 11 6 10 Q 6 8 8 8 Q 9 6 12 6 Q 15 6 16 8 Q 18 8 18 10 Q 20 11 20 14 Q 20 16 18 16 H 6 Q 4 16 4 14 Z"/>
+          <g opacity="0.7">
+            <line x1="12" y1="11" x2="12" y2="8"/>
+            <line x1="12" y1="11" x2="15" y2="9"/>
+            <line x1="12" y1="11" x2="16" y2="12"/>
+            <line x1="12" y1="11" x2="14" y2="14"/>
+            <line x1="12" y1="11" x2="12" y2="15"/>
+            <line x1="12" y1="11" x2="10" y2="14"/>
+            <line x1="12" y1="11" x2="8" y2="12"/>
+            <line x1="12" y1="11" x2="9" y2="9"/>
+            <circle cx="12" cy="11" r="1"/>
+          </g>
+        </svg>
+        <span>cc-web</span>
+      </router-link>
+
+      <!-- Version display -->
+      <span v-if="currentVersion" class="current-version">
+        v{{ currentVersion }}
+      </span>
+
+      <!-- Upgrade button (shown when update available) -->
+      <div v-if="updateAvailable" class="upgrade-btn-wrapper">
+        <button
+          class="upgrade-btn"
+          @click="handleUpgrade"
+          :disabled="isUpgrading"
+          :title="`Upgrade to v${updateAvailable.latestVersion}`"
+        >
+          <svg v-if="!isUpgrading" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 19V5M5 12l7-7 7 7"/>
+          </svg>
+          <svg v-else width="12" height="12" viewBox="0 0 24 24" class="spin">
+            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+          </svg>
+          <span>v{{ updateAvailable.latestVersion }}</span>
+        </button>
+        <button class="dismiss-btn" @click="handleDismissUpdate" title="Dismiss">×</button>
+      </div>
+
+      <!-- Restart button (shown when no update available) -->
       <button
+        v-if="!updateAvailable"
         class="restart-btn"
         @click="handleRestart"
         :disabled="isRestarting"
-        title="Restart server (POC)"
+        title="Restart server"
       >
         <svg v-if="!isRestarting" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M23 4v6h-6"/>
@@ -195,7 +268,13 @@ function handleOverlayClick() {
             <div class="item-content">
               <p class="item-title truncate">{{ session.title || session.firstPrompt }}</p>
               <p class="item-meta">
-                <span class="item-project">{{ session.projectName }}</span>
+                <router-link
+                  :to="{ name: 'sessions', params: { project: session.projectSlug } }"
+                  class="item-project"
+                  @click.stop="closeOnMobile"
+                >
+                  {{ session.projectName }}
+                </router-link>
                 <span class="separator">·</span>
                 <span>{{ formatRelativeTime(session.modified) }}</span>
               </p>
@@ -318,6 +397,7 @@ function handleOverlayClick() {
 .sidebar-header {
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 10px 16px;
   min-height: 57px;
   box-sizing: border-box;
@@ -325,12 +405,16 @@ function handleOverlayClick() {
 }
 
 .sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 600;
   font-size: 15px;
   letter-spacing: -0.01em;
   color: var(--text-primary);
   text-decoration: none;
   transition: color 0.15s;
+  flex-grow: 1;
   line-height: 36px;
 }
 
@@ -338,8 +422,77 @@ function handleOverlayClick() {
   color: var(--text-secondary);
 }
 
+.sidebar-logo {
+  flex-shrink: 0;
+}
+
+.current-version {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+  font-family: var(--font-mono);
+}
+
+.upgrade-btn-wrapper {
+  position: relative;
+}
+
+.upgrade-btn-wrapper .upgrade-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  border-radius: var(--radius-sm);
+  color: #d97706;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.upgrade-btn-wrapper .upgrade-btn:hover:not(:disabled) {
+  background: rgba(217, 119, 6, 0.15);
+  border-color: rgba(217, 119, 6, 0.4);
+}
+
+.upgrade-btn-wrapper .upgrade-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.upgrade-btn-wrapper .upgrade-btn .spin {
+  animation: spin 1s linear infinite;
+}
+
+.upgrade-btn-wrapper .dismiss-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: var(--bg-secondary);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+  color: #d97706;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.upgrade-btn-wrapper .dismiss-btn:hover {
+  background: rgba(217, 119, 6, 0.15);
+  color: #b45309;
+  border-color: rgba(217, 119, 6, 0.4);
+}
+
 .restart-btn {
-  margin-left: auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -475,6 +628,14 @@ function handleOverlayClick() {
 
 .item-project {
   font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.item-project:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
 }
 
 .separator {

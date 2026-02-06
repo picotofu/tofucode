@@ -70,6 +70,9 @@ async function restartWithInvertedSpawn() {
 
   console.log(`Current process: ${process.pid}`);
   console.log(`Spawning: ${nodeExecutable} ${args.join(' ')}`);
+  console.log(
+    `Current UPGRADE_RETRY_INTERVAL: ${process.env.UPGRADE_RETRY_INTERVAL || '(not set)'}`,
+  );
 
   // 1. Spawn NEW process with same args + retry flag
   const child = spawn(nodeExecutable, args, {
@@ -78,10 +81,14 @@ async function restartWithInvertedSpawn() {
     env: {
       ...process.env,
       UPGRADE_RETRY_BIND: 'true',
-      UPGRADE_MAX_RETRIES: '20',
-      UPGRADE_RETRY_INTERVAL: '500',
+      UPGRADE_MAX_RETRIES: process.env.UPGRADE_MAX_RETRIES || '20',
+      UPGRADE_RETRY_INTERVAL: process.env.UPGRADE_RETRY_INTERVAL || '1000',
     },
   });
+
+  console.log(
+    `Spawned with UPGRADE_RETRY_INTERVAL: ${process.env.UPGRADE_RETRY_INTERVAL || '1000'}`,
+  );
 
   child.unref();
 

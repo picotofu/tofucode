@@ -2,7 +2,7 @@ import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const DEBUG = process.env.DEBUG === 'true';
-const LOG_FILE = join(process.cwd(), 'debug.log');
+const LOG_FILE = join(process.cwd(), 'cc-web.log');
 
 /**
  * Format timestamp for log entries
@@ -27,7 +27,7 @@ function writeToFile(level, ...args) {
     appendFileSync(LOG_FILE, logLine, 'utf8');
   } catch (error) {
     // Fail silently to avoid breaking the app if logging fails
-    console.error('Failed to write to debug log:', error);
+    console.error('Failed to write to log file:', error);
   }
 }
 

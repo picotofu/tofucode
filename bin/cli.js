@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'child_process';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -10,10 +10,19 @@ const rootDir = join(__dirname, '..');
 
 // Parse command line arguments
 const args = process.argv.slice(2);
+
+// Handle --version flag early
+if (args.includes('--version') || args.includes('-v')) {
+  const pkgPath = join(rootDir, 'package.json');
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+  console.log(`cc-web v${pkg.version}`);
+  process.exit(0);
+}
 const options = {
   port: 3000,
   host: '0.0.0.0',
   auth: true,
+  daemon: false,
 };
 
 for (let i = 0; i < args.length; i++) {
@@ -24,17 +33,21 @@ for (let i = 0; i < args.length; i++) {
     options.host = args[++i];
   } else if (arg === '--no-auth') {
     options.auth = false;
+  } else if (arg === '--daemon' || arg === '-d') {
+    options.daemon = true;
   } else if (arg === '--help') {
     console.log(`
-claude-web - Web UI for Claude Code
+cc-web - Web UI for Claude Code
 
 Usage:
-  claude-web [options]
+  cc-web [options]
 
 Options:
   -p, --port <port>   Port to listen on (default: 3000)
   -h, --host <host>   Host to bind to (default: 0.0.0.0)
   --no-auth           Disable password authentication
+  -d, --daemon        Run as background daemon
+  -v, --version       Show version number
   --help              Show this help message
 
 Environment Variables:
@@ -43,9 +56,10 @@ Environment Variables:
   AUTH_DISABLED       Set to 'true' to disable auth
 
 Examples:
-  claude-web                    # Start on http://0.0.0.0:3000
-  claude-web -p 8080            # Start on port 8080
-  claude-web --no-auth          # Disable authentication
+  cc-web                    # Start on http://0.0.0.0:3000
+  cc-web -p 8080            # Start on port 8080
+  cc-web --no-auth          # Disable authentication
+  cc-web -d                 # Run as background daemon
 `);
     process.exit(0);
   }
@@ -74,33 +88,59 @@ if (!options.auth) {
 }
 
 // Start the server
-console.log(`Starting claude-web on http://${options.host}:${options.port}`);
+console.log(`Starting cc-web on http://${options.host}:${options.port}`);
 if (!options.auth) {
   console.log('Authentication disabled');
 }
 console.log('');
 
 const serverPath = join(rootDir, 'server', 'index.js');
-const server = spawn('node', [serverPath], {
-  cwd: rootDir,
-  env,
-  stdio: 'inherit',
-});
 
-server.on('error', (err) => {
-  console.error('Failed to start server:', err.message);
-  process.exit(1);
-});
+if (options.daemon) {
+  // Daemon mode: detached process
+  const logPath = join(process.cwd(), 'cc-web.log');
+  const { openSync, closeSync } = await import('fs');
+  const out = openSync(logPath, 'a');
+  const err = openSync(logPath, 'a');
 
-server.on('exit', (code) => {
-  process.exit(code || 0);
-});
+  const server = spawn('node', [serverPath], {
+    cwd: rootDir,
+    env,
+    detached: true,
+    stdio: ['ignore', out, err],
+  });
 
-// Handle termination signals
-process.on('SIGINT', () => {
-  server.kill('SIGINT');
-});
+  server.unref();
+  closeSync(out);
+  closeSync(err);
 
-process.on('SIGTERM', () => {
-  server.kill('SIGTERM');
-});
+  console.log(`cc-web started as daemon (PID: ${server.pid})`);
+  console.log(`Logs: ${logPath}`);
+  console.log(`To stop: kill ${server.pid}`);
+  process.exit(0);
+} else {
+  // Foreground mode: inherit stdio
+  const server = spawn('node', [serverPath], {
+    cwd: rootDir,
+    env,
+    stdio: 'inherit',
+  });
+
+  server.on('error', (err) => {
+    console.error('Failed to start server:', err.message);
+    process.exit(1);
+  });
+
+  server.on('exit', (code) => {
+    process.exit(code || 0);
+  });
+
+  // Handle termination signals
+  process.on('SIGINT', () => {
+    server.kill('SIGINT');
+  });
+
+  process.on('SIGTERM', () => {
+    server.kill('SIGTERM');
+  });
+}

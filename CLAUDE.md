@@ -78,6 +78,12 @@ npm run check
 - **Always run `npm run check` after implementation** - this runs Biome for linting, formatting, and import ordering
 - After code changes, rebuild frontend with `npm run build`
 
+### Environment Variables
+
+- **All new environment variables must be documented in `.env.example`**
+- Include clear comments explaining purpose, default values, and valid options
+- Mark optional variables with `#` prefix (commented out)
+
 ### WebSocket Architecture
 
 - **Global WebSocket** (`useWebSocket`): Shared state for project/session lists

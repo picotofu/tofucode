@@ -16,6 +16,10 @@ const currentFolder = ref(null);
 // Map of sessionId -> { status: 'running' | 'completed' | 'error', timestamp }
 const sessionStatuses = ref(new Map());
 
+// Version info
+const currentVersion = ref(null);
+const updateAvailable = ref(null); // { currentVersion, latestVersion, updateUrl }
+
 let globalWs = null;
 let globalReconnectTimeout = null;
 
@@ -83,6 +87,42 @@ function connectGlobal(onConnect) {
 function handleGlobalMessage(msg) {
   switch (msg.type) {
     case 'connected':
+      if (msg.version) {
+        currentVersion.value = msg.version;
+      }
+      break;
+
+    case 'update_available':
+      // Check if already dismissed for this version
+      if (msg.latestVersion) {
+        const dismissedKey = `dismissed-update:${msg.latestVersion}`;
+        if (localStorage.getItem(dismissedKey) !== 'true') {
+          updateAvailable.value = {
+            currentVersion: msg.currentVersion,
+            latestVersion: msg.latestVersion,
+            updateUrl: msg.updateUrl,
+          };
+        }
+      }
+      break;
+
+    case 'upgrade_started':
+    case 'upgrade_installing':
+    case 'restart_started':
+      // These are informational - Sidebar handles the UI state
+      console.log(msg.type, msg.message);
+      break;
+
+    case 'upgrade_success':
+      // Clear update badge on successful upgrade
+      updateAvailable.value = null;
+      console.log(msg.type, msg.message);
+      break;
+
+    case 'upgrade_error':
+    case 'restart_error':
+      // Show error in console (Sidebar handles UI)
+      console.error(msg.type, msg.message);
       break;
 
     case 'projects_list':
@@ -207,6 +247,11 @@ function deleteSessionGlobal(sessionId) {
   sendGlobal({ type: 'delete_session', sessionId });
 }
 
+function dismissUpdate(version) {
+  localStorage.setItem(`dismissed-update:${version}`, 'true');
+  updateAvailable.value = null;
+}
+
 function disconnectGlobal() {
   if (globalReconnectTimeout) {
     clearTimeout(globalReconnectTimeout);
@@ -233,6 +278,8 @@ export function useWebSocket() {
     folderContents: readonly(folderContents),
     currentFolder: readonly(currentFolder),
     sessionStatuses: readonly(sessionStatuses),
+    currentVersion: readonly(currentVersion),
+    updateAvailable: readonly(updateAvailable),
 
     // Connection
     connect: connectGlobal,
@@ -246,6 +293,7 @@ export function useWebSocket() {
     browseFolder,
     setSessionTitle,
     deleteSession: deleteSessionGlobal,
+    dismissUpdate,
 
     // Direct send
     send: sendGlobal,
@@ -367,7 +415,7 @@ export function useChatWebSocket() {
 
       case 'task_status':
         // Only update task status if it's for the current session
-        if (!msg.sessionId || msg.sessionId === currentSession.value) {
+        if (msg.sessionId === currentSession.value) {
           taskStatus.value = msg.status;
         }
         // Refresh global sessions list when task completes to update timestamps
