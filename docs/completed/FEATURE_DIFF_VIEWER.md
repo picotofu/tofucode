@@ -1,10 +1,15 @@
-# Feature Plan: Diff Viewer
+# Feature: Diff Viewer ✅
+
+**Status:** Completed
+**Completed:** 2026-02-06
 
 ## Overview
 
-Implement diff viewing capabilities in two areas:
+Implemented diff viewing capabilities in two areas:
 1. **Edit Tool Diff**: Show inline diff when Claude performs Edit operations in chat history
 2. **Git Diff Modal**: Full diff view of all changed/added/removed files when clicking the toolbar file changes indicator
+
+Both features are now fully functional and integrated into the application.
 
 ---
 

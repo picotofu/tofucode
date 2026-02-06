@@ -12,6 +12,7 @@ import {
 import { useRoute, useRouter } from 'vue-router';
 import FileEditor from '../components/FileEditor.vue';
 import FileExplorer from '../components/FileExplorer.vue';
+import GitDiffModal from '../components/GitDiffModal.vue';
 import TerminalOutput from '../components/TerminalOutput.vue';
 import { useChatWebSocket } from '../composables/useWebSocket';
 import { getShortPath } from '../utils/format.js';
@@ -100,6 +101,20 @@ const fileModals = ref({
   editPath: false,
   editPathValue: '',
 });
+
+// Git Diff Modal
+const showGitDiffModal = ref(false);
+
+function openGitDiffModal() {
+  // Only open if we have git changes
+  if (projectStatus.value.gitChanges && fileChangesText.value) {
+    showGitDiffModal.value = true;
+  }
+}
+
+function closeGitDiffModal() {
+  showGitDiffModal.value = false;
+}
 
 // Flag to prevent auto-save during session transitions
 let isLoadingSession = false;
@@ -1563,7 +1578,13 @@ watch(openedFile, (file) => {
       <!-- Toolbar (below input) -->
       <div class="toolbar">
         <div class="toolbar-left">
-          <span class="toolbar-item branch" v-if="projectStatus.gitBranch">
+          <span
+            class="toolbar-item branch"
+            :class="{ clickable: fileChangesText }"
+            v-if="projectStatus.gitBranch"
+            @click="openGitDiffModal"
+            :title="fileChangesText ? 'Click to view changes' : null"
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="6" y1="3" x2="6" y2="15"/>
               <circle cx="18" cy="6" r="3"/>
@@ -1738,6 +1759,13 @@ watch(openedFile, (file) => {
       </div>
 
     </Teleport>
+
+    <!-- Git Diff Modal -->
+    <GitDiffModal
+      v-if="showGitDiffModal"
+      :project-path="projectStatus.cwd"
+      @close="closeGitDiffModal"
+    />
   </div>
 </template>
 
@@ -2203,6 +2231,18 @@ watch(openedFile, (file) => {
 
 .toolbar-item.branch {
   color: var(--text-secondary);
+}
+
+.toolbar-item.branch.clickable {
+  cursor: pointer;
+  padding: 4px 8px;
+  margin: -4px -8px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+
+.toolbar-item.branch.clickable:hover {
+  background: var(--bg-hover);
 }
 
 .toolbar-item.branch .git-changes {

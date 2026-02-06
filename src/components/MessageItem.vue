@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { formatRelativeTime, formatToolDisplay } from '../utils/format.js';
 import { renderMarkdown } from '../utils/markdown.js';
+import DiffViewer from './DiffViewer.vue';
 
 const props = defineProps({
   message: Object,
@@ -9,6 +10,7 @@ const props = defineProps({
 
 const resultExpanded = ref(false);
 const finalResultExpanded = ref(false);
+const diffExpanded = ref(false);
 
 // Format timestamp for display
 const formattedTimestamp = computed(() => {
@@ -115,6 +117,16 @@ const toolDisplay = computed(() => {
   return formatToolDisplay(props.message.tool, props.message.input);
 });
 
+// Check if this is an Edit tool use with diff info
+const isEditTool = computed(() => {
+  return (
+    messageType.value === 'tool_use' &&
+    props.message.tool === 'Edit' &&
+    props.message.input?.old_string &&
+    props.message.input?.new_string
+  );
+});
+
 const toolResultContent = computed(() => {
   if (messageType.value !== 'tool_result') return '';
   const content = props.message.content;
@@ -133,6 +145,10 @@ function toggleResultExpand() {
 
 function toggleFinalResultExpand() {
   finalResultExpanded.value = !finalResultExpanded.value;
+}
+
+function toggleDiffExpand() {
+  diffExpanded.value = !diffExpanded.value;
 }
 </script>
 
@@ -170,6 +186,20 @@ function toggleFinalResultExpand() {
         <span v-else-if="toolDisplay.type === 'text'" class="tool-text">{{ toolDisplay.primary }}</span>
         <pre v-else-if="toolDisplay.type === 'json'" class="tool-json">{{ toolDisplay.secondary }}</pre>
         <small v-if="toolDisplay.secondary && toolDisplay.type !== 'json'" class="tool-description">{{ toolDisplay.secondary }}</small>
+      </div>
+
+      <!-- Show diff for Edit tool -->
+      <div v-if="isEditTool" class="tool-diff-section">
+        <div class="tool-diff-toggle" @click="toggleDiffExpand">
+          <span class="diff-icon">{{ diffExpanded ? '▼' : '▶' }}</span>
+          <span class="diff-label">{{ diffExpanded ? 'Hide diff' : 'Show diff' }}</span>
+        </div>
+        <DiffViewer
+          v-if="diffExpanded"
+          :old-content="message.input.old_string"
+          :new-content="message.input.new_string"
+          :filename="message.input.file_path"
+        />
       </div>
     </div>
 
@@ -525,6 +555,38 @@ function toggleFinalResultExpand() {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+/* Tool diff section */
+.tool-diff-section {
+  border-top: 1px solid var(--border-color);
+}
+
+.tool-diff-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--bg-tertiary);
+  transition: background 0.15s;
+}
+
+.tool-diff-toggle:hover {
+  background: var(--bg-hover);
+}
+
+.diff-icon {
+  font-size: 10px;
+  color: var(--text-secondary);
+  width: 12px;
+}
+
+.diff-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 /* Tool result */
