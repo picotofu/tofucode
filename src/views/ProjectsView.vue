@@ -9,10 +9,12 @@ const sidebar = inject('sidebar');
 
 const {
   connected,
+  projects,
   recentSessions,
   folderContents,
   currentFolder,
   connect,
+  getProjects,
   getRecentSessions,
   browseFolder,
 } = useWebSocket();
@@ -24,9 +26,13 @@ const pathInputRef = ref(null);
 // Get top 5 recent sessions for quick access cards
 const quickSessions = computed(() => recentSessions.value.slice(0, 5));
 
+// Get top 5 recent projects
+const quickProjects = computed(() => projects.value.slice(0, 5));
+
 // Connect on mount and fetch data when ready
 onMounted(() => {
   connect(() => {
+    getProjects();
     getRecentSessions();
     // Start folder browser from home
     if (!currentFolder.value) {
@@ -124,6 +130,27 @@ function cancelEditingPath() {
             </div>
             <p class="quick-card-title truncate">{{ session.title || session.firstPrompt }}</p>
             <p class="quick-card-meta truncate">{{ session.projectName }}</p>
+          </router-link>
+        </div>
+      </section>
+
+      <!-- Recent Projects -->
+      <section class="quick-access" v-if="quickProjects.length > 0">
+        <h2 class="section-title">Recent Projects</h2>
+        <div class="quick-cards">
+          <router-link
+            v-for="project in quickProjects"
+            :key="project.slug"
+            :to="{ name: 'sessions', params: { project: project.slug } }"
+            class="quick-card"
+          >
+            <div class="quick-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <p class="quick-card-title truncate">{{ project.name }}</p>
+            <p class="quick-card-meta truncate">{{ project.sessionCount }} sessions · {{ formatTime(project.lastModified) }}</p>
           </router-link>
         </div>
       </section>
