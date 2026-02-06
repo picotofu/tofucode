@@ -25,44 +25,40 @@ const diffLines = computed(() => {
 
   for (const change of changes) {
     const content = change.value;
-    const lineCount = (content.match(/\n/g) || []).length || 1;
+    // Split once and filter out trailing empty string from final newline
+    const splitLines = content.split('\n');
+    // If content ends with \n, the last element will be empty string - remove it
+    if (splitLines.length > 1 && splitLines[splitLines.length - 1] === '') {
+      splitLines.pop();
+    }
 
     if (change.added) {
-      for (let i = 0; i < lineCount; i++) {
-        const line = content.split('\n')[i];
-        if (line !== undefined) {
-          lines.push({
-            type: 'added',
-            oldLineNum: null,
-            newLineNum: newLineNum++,
-            content: line,
-          });
-        }
+      for (const line of splitLines) {
+        lines.push({
+          type: 'added',
+          oldLineNum: null,
+          newLineNum: newLineNum++,
+          content: line,
+        });
       }
     } else if (change.removed) {
-      for (let i = 0; i < lineCount; i++) {
-        const line = content.split('\n')[i];
-        if (line !== undefined) {
-          lines.push({
-            type: 'removed',
-            oldLineNum: oldLineNum++,
-            newLineNum: null,
-            content: line,
-          });
-        }
+      for (const line of splitLines) {
+        lines.push({
+          type: 'removed',
+          oldLineNum: oldLineNum++,
+          newLineNum: null,
+          content: line,
+        });
       }
     } else {
       // Unchanged lines
-      for (let i = 0; i < lineCount; i++) {
-        const line = content.split('\n')[i];
-        if (line !== undefined && line !== '') {
-          lines.push({
-            type: 'unchanged',
-            oldLineNum: oldLineNum++,
-            newLineNum: newLineNum++,
-            content: line,
-          });
-        }
+      for (const line of splitLines) {
+        lines.push({
+          type: 'unchanged',
+          oldLineNum: oldLineNum++,
+          newLineNum: newLineNum++,
+          content: line,
+        });
       }
     }
   }

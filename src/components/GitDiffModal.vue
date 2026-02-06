@@ -11,7 +11,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close']);
 
-const { ws } = useWebSocket();
+const { sendAndWait } = useWebSocket();
 const loading = ref(true);
 const files = ref([]);
 const diffs = ref({});
@@ -22,40 +22,30 @@ onMounted(() => {
   loadGitDiff();
 });
 
-function loadGitDiff() {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
-    error.value = 'WebSocket not connected';
-    loading.value = false;
-    return;
-  }
-
+async function loadGitDiff() {
   loading.value = true;
   error.value = null;
 
-  const messageHandler = (event) => {
-    const msg = JSON.parse(event.data);
-    if (msg.type === 'git_diff') {
-      files.value = msg.files || [];
-      diffs.value = msg.diffs || {};
-      if (msg.error) {
-        error.value = msg.error;
-      }
-      // Auto-select first file
-      if (files.value.length > 0) {
-        selectedFile.value = files.value[0].path;
-      }
-      loading.value = false;
-      ws.value.removeEventListener('message', messageHandler);
-    }
-  };
+  try {
+    const response = await sendAndWait(
+      { type: 'get_git_diff', projectPath: props.projectPath },
+      'git_diff',
+    );
 
-  ws.value.addEventListener('message', messageHandler);
-  ws.value.send(
-    JSON.stringify({
-      type: 'get_git_diff',
-      projectPath: props.projectPath,
-    }),
-  );
+    files.value = response.files || [];
+    diffs.value = response.diffs || {};
+    if (response.error) {
+      error.value = response.error;
+    }
+    // Auto-select first file
+    if (files.value.length > 0) {
+      selectedFile.value = files.value[0].path;
+    }
+  } catch (err) {
+    error.value = err.message;
+  } finally {
+    loading.value = false;
+  }
 }
 
 const selectedDiff = computed(() => {

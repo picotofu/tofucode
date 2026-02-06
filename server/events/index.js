@@ -17,6 +17,7 @@ import {
   handleFilesRename,
   handleFilesWrite,
 } from './files.js';
+import { handler as getGitDiff } from './get-git-diff.js';
 import { handler as getProjectStatus } from './get-project-status.js';
 import { handler as getProjects } from './get-projects.js';
 import { handler as getRecentSessions } from './get-recent-sessions.js';
@@ -63,4 +64,5 @@ export const handlers = {
   'files:move': handleFilesMove,
   restart: handleRestart,
   upgrade: handleUpgrade,
+  get_git_diff: getGitDiff,
 };

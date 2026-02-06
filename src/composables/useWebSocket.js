@@ -218,6 +218,45 @@ function sendGlobal(message) {
   }
 }
 
+/**
+ * Send a message and wait for a specific response type
+ * @param {object} message - Message to send
+ * @param {string} responseType - Expected response message type
+ * @param {number} timeout - Timeout in ms (default 30000)
+ * @returns {Promise<object>} Response message
+ */
+function sendAndWait(message, responseType, timeout = 30000) {
+  return new Promise((resolve, reject) => {
+    if (!globalWs || globalWs.readyState !== WebSocket.OPEN) {
+      reject(new Error('WebSocket not connected'));
+      return;
+    }
+
+    let timeoutId;
+
+    const messageHandler = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === responseType) {
+          clearTimeout(timeoutId);
+          globalWs.removeEventListener('message', messageHandler);
+          resolve(msg);
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    timeoutId = setTimeout(() => {
+      globalWs.removeEventListener('message', messageHandler);
+      reject(new Error(`Timeout waiting for ${responseType}`));
+    }, timeout);
+
+    globalWs.addEventListener('message', messageHandler);
+    globalWs.send(JSON.stringify(message));
+  });
+}
+
 // Global actions
 function getProjects() {
   sendGlobal({ type: 'get_projects' });
@@ -297,6 +336,7 @@ export function useWebSocket() {
 
     // Direct send
     send: sendGlobal,
+    sendAndWait,
   };
 }
 
