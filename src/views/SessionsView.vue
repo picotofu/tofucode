@@ -55,23 +55,13 @@ watch(projectSlug, (newSlug) => {
 });
 
 function selectSession(sessionId) {
-  router.push({
-    name: 'chat',
-    params: {
-      project: projectSlug.value,
-      session: sessionId,
-    },
-  });
+  // Full page reload to ensure clean WebSocket state - prevents cross-session issues
+  window.location.href = `/project/${projectSlug.value}/session/${sessionId}`;
 }
 
 function startNewSession() {
-  router.push({
-    name: 'chat',
-    params: {
-      project: projectSlug.value,
-      session: 'new',
-    },
-  });
+  // Full page reload to ensure clean WebSocket state
+  window.location.href = `/project/${projectSlug.value}/session/new`;
 }
 
 // Use shared utility
@@ -147,14 +137,8 @@ function handleDeleteSession(sessionId, event) {
           :key="session.sessionId"
           class="session-item"
         >
-          <router-link
-            :to="{
-              name: 'chat',
-              params: {
-                project: projectSlug,
-                session: session.sessionId,
-              },
-            }"
+          <a
+            :href="`/project/${projectSlug}/session/${session.sessionId}`"
             class="session-link"
           >
             <div class="session-icon">
@@ -206,7 +190,7 @@ function handleDeleteSession(sessionId, event) {
                 <path d="M9 18l6-6-6-6"/>
               </svg>
             </div>
-          </router-link>
+          </a>
           <button
             class="delete-session-btn"
             @click.stop="handleDeleteSession(session.sessionId, $event)"

@@ -125,14 +125,8 @@ function closeOnMobile() {
 }
 
 function selectSession(session) {
-  router.push({
-    name: 'chat',
-    params: {
-      project: session.projectSlug,
-      session: session.sessionId,
-    },
-  });
-  closeOnMobile();
+  // Full page reload to ensure clean WebSocket state - prevents cross-session issues
+  window.location.href = `/project/${session.projectSlug}/session/${session.sessionId}`;
 }
 
 function selectProject(project) {
@@ -144,14 +138,8 @@ function selectProject(project) {
 }
 
 function startNewSession(projectSlug) {
-  router.push({
-    name: 'chat',
-    params: {
-      project: projectSlug,
-      session: 'new',
-    },
-  });
-  closeOnMobile();
+  // Full page reload to ensure clean WebSocket state
+  window.location.href = `/project/${projectSlug}/session/new`;
 }
 
 function handleOverlayClick() {
@@ -249,16 +237,9 @@ function handleOverlayClick() {
           class="sidebar-item"
           :class="{ active: currentSession === session.sessionId }"
         >
-          <router-link
-            :to="{
-              name: 'chat',
-              params: {
-                project: session.projectSlug,
-                session: session.sessionId,
-              },
-            }"
+          <a
+            :href="`/project/${session.projectSlug}/session/${session.sessionId}`"
             class="sidebar-link"
-            @click="closeOnMobile"
           >
             <div class="item-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -279,7 +260,7 @@ function handleOverlayClick() {
                 <span>{{ formatRelativeTime(session.modified) }}</span>
               </p>
             </div>
-          </router-link>
+          </a>
           <!-- Task status indicator -->
           <div
             v-if="sessionStatuses.get(session.sessionId)"
