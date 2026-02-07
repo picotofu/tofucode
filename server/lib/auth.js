@@ -108,14 +108,47 @@ export async function setupPassword(password) {
 }
 
 /**
+ * Check if DEBUG_TOKEN is configured
+ * @returns {boolean} True if DEBUG_TOKEN is set in environment
+ */
+export function isDebugTokenEnabled() {
+  return !!process.env.DEBUG_TOKEN;
+}
+
+/**
  * Verify password and create session
- * @param {string} password - Plain text password
+ * Accepts either:
+ * - User's password (verified against hash in .auth.json)
+ * - DEBUG_TOKEN (if set in environment, for Playwright/automation)
+ *
+ * @param {string} password - Plain text password or DEBUG_TOKEN
  * @param {string} userAgent - Browser user agent (optional)
  * @returns {Promise<{token: string, expiresAt: string} | null>} Session info or null if invalid
  */
 export async function login(password, userAgent = '') {
   const data = loadAuthData();
 
+  // Check DEBUG_TOKEN first (if configured)
+  const debugToken = process.env.DEBUG_TOKEN;
+  if (debugToken && password === debugToken) {
+    // DEBUG_TOKEN matched - create session without password verification
+    const session = createSession(userAgent);
+    data.sessions.push(session);
+
+    // Clean up expired sessions
+    data.sessions = data.sessions.filter(
+      (s) => new Date(s.expiresAt) > new Date(),
+    );
+
+    saveAuthData(data);
+
+    return {
+      token: session.token,
+      expiresAt: session.expiresAt,
+    };
+  }
+
+  // Fall back to normal password verification
   if (!data.passwordHash) {
     return null;
   }

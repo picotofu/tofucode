@@ -47,6 +47,8 @@ export function getSessionsList(projectSlug) {
           messageCount: entry.messageCount || 0,
           created: entry.created,
           modified,
+          // Include native customTitle from sessions-index.json
+          title: entry.customTitle || null,
         });
       }
     }
@@ -96,6 +98,8 @@ export function getSessionsList(projectSlug) {
                 messageCount,
                 created: stats.birthtime.toISOString(),
                 modified: stats.mtime.toISOString(),
+                // Unindexed sessions don't have customTitle
+                title: null,
               });
             } catch (err) {
               console.error(`Failed to stat ${file}:`, err.message);

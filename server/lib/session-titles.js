@@ -1,42 +1,78 @@
 /**
  * Session titles management
- * Stores custom session titles in .session-titles.json files per project
+ * Uses Claude Code's native sessions-index.json customTitle field
+ * This keeps cc-web in sync with Claude CLI's session names
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from '../config.js';
 
-const TITLES_FILE = '.session-titles.json';
-
 /**
- * Get the path to the session titles file for a project
+ * Get the path to sessions-index.json for a project
  * @param {string} projectSlug - Project slug (e.g., -home-ts-projects-myapp)
- * @returns {string} Path to the titles file
+ * @returns {string} Path to sessions-index.json
  */
-function getTitlesFilePath(projectSlug) {
-  return path.join(config.projectsDir, projectSlug, TITLES_FILE);
+function getIndexPath(projectSlug) {
+  return path.join(config.projectsDir, projectSlug, 'sessions-index.json');
 }
 
 /**
- * Load all session titles for a project
+ * Load sessions-index.json data
+ * @param {string} projectSlug - Project slug
+ * @returns {Object} Index data with entries array
+ */
+function loadIndex(projectSlug) {
+  try {
+    const indexPath = getIndexPath(projectSlug);
+    if (fs.existsSync(indexPath)) {
+      return JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
+    }
+  } catch (error) {
+    console.error(
+      `Error loading sessions-index.json for ${projectSlug}:`,
+      error.message,
+    );
+  }
+  return { entries: [] };
+}
+
+/**
+ * Save sessions-index.json data
+ * @param {string} projectSlug - Project slug
+ * @param {Object} data - Index data to save
+ * @returns {boolean} Success
+ */
+function saveIndex(projectSlug, data) {
+  try {
+    const indexPath = getIndexPath(projectSlug);
+    fs.writeFileSync(indexPath, JSON.stringify(data, null, 2));
+    return true;
+  } catch (error) {
+    console.error(
+      `Error saving sessions-index.json for ${projectSlug}:`,
+      error.message,
+    );
+    return false;
+  }
+}
+
+/**
+ * Load all session titles for a project (from customTitle field)
  * @param {string} projectSlug - Project slug
  * @returns {Object} Map of sessionId -> title
  */
 export function loadTitles(projectSlug) {
-  try {
-    const filePath = getTitlesFilePath(projectSlug);
-    if (fs.existsSync(filePath)) {
-      const data = fs.readFileSync(filePath, 'utf-8');
-      return JSON.parse(data);
+  const index = loadIndex(projectSlug);
+  const titles = {};
+
+  for (const entry of index.entries || []) {
+    if (entry.customTitle) {
+      titles[entry.sessionId] = entry.customTitle;
     }
-  } catch (error) {
-    console.error(
-      `Error loading session titles for ${projectSlug}:`,
-      error.message,
-    );
   }
-  return {};
+
+  return titles;
 }
 
 /**
@@ -46,12 +82,13 @@ export function loadTitles(projectSlug) {
  * @returns {string|null} Session title or null if not set
  */
 export function getTitle(projectSlug, sessionId) {
-  const titles = loadTitles(projectSlug);
-  return titles[sessionId] || null;
+  const index = loadIndex(projectSlug);
+  const entry = (index.entries || []).find((e) => e.sessionId === sessionId);
+  return entry?.customTitle || null;
 }
 
 /**
- * Set a session title
+ * Set a session title (updates customTitle in sessions-index.json)
  * @param {string} projectSlug - Project slug
  * @param {string} sessionId - Session ID
  * @param {string} title - New title (empty string to remove)
@@ -59,23 +96,32 @@ export function getTitle(projectSlug, sessionId) {
  */
 export function setTitle(projectSlug, sessionId, title) {
   try {
-    const filePath = getTitlesFilePath(projectSlug);
-    const titles = loadTitles(projectSlug);
+    const index = loadIndex(projectSlug);
+    const entries = index.entries || [];
+    const entryIndex = entries.findIndex((e) => e.sessionId === sessionId);
 
-    if (title?.trim()) {
-      titles[sessionId] = title.trim();
-    } else {
-      delete titles[sessionId];
+    if (entryIndex >= 0) {
+      // Update existing entry
+      if (title?.trim()) {
+        entries[entryIndex].customTitle = title.trim();
+      } else {
+        // Remove customTitle if empty
+        delete entries[entryIndex].customTitle;
+      }
+    } else if (title?.trim()) {
+      // Session not in index - this shouldn't happen normally
+      // but we can add a minimal entry for it
+      console.warn(
+        `Session ${sessionId} not found in index, adding minimal entry`,
+      );
+      entries.push({
+        sessionId,
+        customTitle: title.trim(),
+      });
     }
 
-    // Ensure directory exists
-    const dir = path.dirname(filePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    fs.writeFileSync(filePath, JSON.stringify(titles, null, 2));
-    return true;
+    index.entries = entries;
+    return saveIndex(projectSlug, index);
   } catch (error) {
     console.error(
       `Error saving session title for ${projectSlug}/${sessionId}:`,

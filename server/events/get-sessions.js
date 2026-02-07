@@ -21,7 +21,6 @@
  * }
  */
 
-import { getAllTitles } from '../lib/session-titles.js';
 import { getSessionsList } from '../lib/sessions.js';
 import { send } from '../lib/ws.js';
 
@@ -31,17 +30,11 @@ export function handler(ws, _message, context) {
     return;
   }
 
+  // getSessionsList now includes title (customTitle from sessions-index.json)
   const sessions = getSessionsList(context.currentProjectPath);
-  const titles = getAllTitles(context.currentProjectPath);
-
-  // Enrich sessions with titles
-  const enrichedSessions = sessions.map((session) => ({
-    ...session,
-    title: titles[session.sessionId] || null,
-  }));
 
   send(ws, {
     type: 'sessions_list',
-    sessions: enrichedSessions,
+    sessions,
   });
 }
