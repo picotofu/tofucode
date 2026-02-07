@@ -451,8 +451,8 @@ export function useChatWebSocket() {
 
       case 'project_selected':
         currentProject.value = msg.project || { slug: msg.path };
-        // Server has acknowledged our project selection - context is ready
-        contextReady.value = true;
+        // Server has acknowledged our project selection
+        // But don't set contextReady yet - wait for session selection too
         break;
 
       case 'session_selected':
@@ -462,6 +462,17 @@ export function useChatWebSocket() {
           sessionActiveElsewhere.value = msg.isActiveElsewhere || false;
           // Don't clear messages here - selectSession() already did it
           // Clearing again creates a race window for cross-session messages
+          // Server has acknowledged our session selection - NOW context is fully ready
+          contextReady.value = true;
+        } else if (msg.sessionId === null && currentSession.value === null) {
+          // Both null - new session flow
+          contextReady.value = true;
+        } else {
+          // Session mismatch - this shouldn't happen but log it
+          console.warn(
+            `[useChatWebSocket] session_selected mismatch. Expected: ${currentSession.value}, Got: ${msg.sessionId}`,
+          );
+          // Don't set contextReady to true - wait for correct session
         }
         // Note: Don't clear terminalProcesses here - it causes a race condition
         // because listProcesses() is called before selectSession(), so the processes
@@ -624,6 +635,8 @@ export function useChatWebSocket() {
     summaryCount.value = 0;
     sessionTitle.value = null;
     taskStatus.value = 'idle'; // Reset task status when switching sessions
+    // Reset contextReady until server acknowledges session selection
+    contextReady.value = false;
     send({ type: 'select_session', sessionId, ...options });
     // Also get the session title
     send({ type: 'get_session_title', sessionId });
@@ -662,6 +675,8 @@ export function useChatWebSocket() {
     currentSession.value = null;
     messages.value = [];
     taskStatus.value = 'idle'; // Reset task status for new session
+    // Reset contextReady until server acknowledges (sends session_selected)
+    contextReady.value = false;
     send({ type: 'new_session', ...options });
   }
 
