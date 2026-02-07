@@ -2,6 +2,20 @@
 
 All notable changes to cc-web (Claude Code Web).
 
+## 2026-02-08 - Message Turn Navigation
+
+### Conversation Turn Navigation
+- **Turn-based message grouping**: Messages grouped by conversation turn (user message + all responses)
+- **Up/down navigation buttons**: Navigate between turns with arrow buttons (bottom-right)
+- **Turn counter**: Shows current position (e.g., "3/10")
+- **Smart scrolling**: First up press scrolls to top of last turn for easier reading
+- **Smooth scroll animation**: Animated scroll to turn start
+- **Disabled state**: Buttons disabled when at first/last turn
+
+### Bug Fixes
+- **Session navigation**: Full page reload on session switch to prevent cross-session message streaming
+- **WebSocket state**: Clean WebSocket connection on each session load
+
 ## 2026-02-07 - WebSocket Optimization & Code Refactoring
 
 ### WebSocket Flow Optimization

@@ -161,6 +161,25 @@ function updateCurrentTurnIndex() {
 
 // Navigate to previous turn (scroll up)
 function goToPreviousTurn() {
+  const lastIndex = conversationTurns.value.length - 1;
+
+  // If currently at last turn, scroll to top of last turn first
+  if (currentTurnIndex.value === lastIndex) {
+    // Check if we're already scrolled to the top of the last turn
+    const lastTurnEl = turnRefs.value[lastIndex];
+    if (lastTurnEl && messagesEl.value) {
+      const scrollTop = messagesEl.value.scrollTop;
+      const turnTop = lastTurnEl.offsetTop - 16;
+
+      // If not yet at the top of last turn, scroll there first
+      if (Math.abs(scrollTop - turnTop) > 10) {
+        scrollToTurn(lastIndex);
+        return;
+      }
+    }
+  }
+
+  // Otherwise, go to previous turn
   const targetIndex = Math.max(0, currentTurnIndex.value - 1);
   scrollToTurn(targetIndex);
 }
