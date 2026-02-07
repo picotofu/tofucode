@@ -25,6 +25,11 @@ All notable changes to cc-web (Claude Code Web).
   - Load older messages button
   - Empty/loading states
 
+### Directory Renaming
+- **Auth directory**: `~/.claude-web/` → `~/.cc-web/`
+- **Process file**: `/tmp/claude-web-processes.json` → `/tmp/cc-web-processes.json`
+- Consistent naming with package rename to `cc-web`
+
 ## 2026-02-06 - Diff Viewer Feature
 
 ### Edit Tool Diff in Chat History
@@ -162,7 +167,7 @@ All notable changes to cc-web (Claude Code Web).
 ### npm Package
 - Published as `claude-web` on npm (`npx claude-web`)
 - CLI with `--port`, `--host`, `--no-auth` options
-- Auth data moved to `~/.claude-web/.auth.json` for npx compatibility
+- Auth data moved to `~/.cc-web/.auth.json` for npx compatibility
 
 ### Model Selector
 - Added model selector buttons in toolbar (H/S/O/P)
@@ -209,7 +214,7 @@ All notable changes to cc-web (Claude Code Web).
 - Multiline textarea with resizable height
 - Process management with spawn/kill functionality
 - Output streaming with stdout/stderr differentiation
-- Process state persistence to `/tmp/claude-web-processes.json`
+- Process state persistence to `/tmp/cc-web-processes.json`
 - Graceful handling of server restarts (marks processes as killed)
 
 ### Quick Session Switcher

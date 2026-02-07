@@ -4,7 +4,7 @@
  * Handles password hashing, session management, and auth file operations.
  * Uses argon2 for secure password hashing.
  *
- * Auth file location: ~/.claude-code-web/.auth.json
+ * Auth file location: ~/.cc-web/.auth.json
  *
  * Structure:
  * {
@@ -22,7 +22,7 @@ import { join } from 'node:path';
 import argon2 from 'argon2';
 
 // Auth directory and file path (user's home directory)
-const AUTH_DIR = join(homedir(), '.claude-code-web');
+const AUTH_DIR = join(homedir(), '.cc-web');
 const AUTH_FILE = join(AUTH_DIR, '.auth.json');
 
 // Ensure auth directory exists

@@ -374,7 +374,7 @@ npm run start
 ### npm Package
 - Published as `cc-web` on npm (renamed from `claude-web`)
 - CLI entry point with `--port`, `--host`, `--no-auth` options
-- Auth data stored in `~/.claude-web/.auth.json` (works with npx)
+- Auth data stored in `~/.cc-web/.auth.json` (works with npx)
 - Frontend pre-built in `dist/` folder
 
 ### MCP Integration

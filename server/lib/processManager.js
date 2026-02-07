@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-const PROCESS_FILE = '/tmp/claude-web-processes.json';
+const PROCESS_FILE = '/tmp/cc-web-processes.json';
 const MAX_OUTPUT_FOR_FILE = 100; // Limit output saved to file per process
 const MAX_HISTORY_PER_PROJECT = 50; // Max completed processes to keep per project
 const PROCESS_MAX_AGE_MS = 24 * 60 * 60 * 1000; // Auto-cleanup processes older than 24 hours
