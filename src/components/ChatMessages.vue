@@ -30,13 +30,15 @@ const emit = defineEmits(['load-full-history']);
 
 const messagesEl = ref(null);
 const userScrolledUp = ref(false);
+const turnRefs = ref([]); // Array of refs for each conversation turn
+const currentTurnIndex = ref(-1); // Currently visible turn (for navigation)
 
 // Group consecutive tool_use and tool_result messages together
-const groupedMessages = computed(() => {
+function groupToolMessages(messages) {
   const result = [];
   let currentToolGroup = null;
 
-  for (const msg of props.messages) {
+  for (const msg of messages) {
     if (msg.type === 'tool_use') {
       // Start or continue a tool group
       if (!currentToolGroup) {
@@ -67,6 +69,45 @@ const groupedMessages = computed(() => {
   }
 
   return result;
+}
+
+// Group messages into conversation turns (user message + all responses until next user message)
+const conversationTurns = computed(() => {
+  const turns = [];
+  let currentTurn = null;
+
+  for (const msg of props.messages) {
+    if (msg.type === 'user') {
+      // Start a new turn
+      if (currentTurn) {
+        turns.push(currentTurn);
+      }
+      currentTurn = { userMessage: msg, responses: [] };
+    } else if (currentTurn) {
+      // Add to current turn's responses
+      currentTurn.responses.push(msg);
+    } else {
+      // Response without a user message (e.g., loaded history starting mid-conversation)
+      // Create an implicit turn with no user message
+      currentTurn = { userMessage: null, responses: [msg] };
+    }
+  }
+
+  // Push the last turn
+  if (currentTurn) {
+    turns.push(currentTurn);
+  }
+
+  // Group tool messages within each turn's responses
+  return turns.map((turn) => ({
+    ...turn,
+    groupedResponses: groupToolMessages(turn.responses),
+  }));
+});
+
+// For backwards compatibility - flat list of grouped messages
+const groupedMessages = computed(() => {
+  return groupToolMessages(props.messages);
 });
 
 function scrollToBottom() {
@@ -87,10 +128,68 @@ function checkScrollPosition() {
   } else {
     userScrolledUp.value = false;
   }
+
+  // Update current turn index based on scroll position
+  updateCurrentTurnIndex();
 }
 
 function handleScroll() {
   checkScrollPosition();
+}
+
+// Update which turn is currently in view
+function updateCurrentTurnIndex() {
+  if (!messagesEl.value || turnRefs.value.length === 0) return;
+
+  const containerTop = messagesEl.value.scrollTop;
+  const containerHeight = messagesEl.value.clientHeight;
+  const viewportMiddle = containerTop + containerHeight / 3; // Upper third of viewport
+
+  // Find the turn whose top is closest to (but not below) the viewport middle
+  let closestIndex = 0;
+  for (let i = 0; i < turnRefs.value.length; i++) {
+    const el = turnRefs.value[i];
+    if (el) {
+      const turnTop = el.offsetTop;
+      if (turnTop <= viewportMiddle) {
+        closestIndex = i;
+      }
+    }
+  }
+  currentTurnIndex.value = closestIndex;
+}
+
+// Navigate to previous turn (scroll up)
+function goToPreviousTurn() {
+  const targetIndex = Math.max(0, currentTurnIndex.value - 1);
+  scrollToTurn(targetIndex);
+}
+
+// Navigate to next turn (scroll down)
+function goToNextTurn() {
+  const targetIndex = Math.min(
+    conversationTurns.value.length - 1,
+    currentTurnIndex.value + 1,
+  );
+  scrollToTurn(targetIndex);
+}
+
+// Scroll to a specific turn
+function scrollToTurn(index) {
+  const el = turnRefs.value[index];
+  if (el && messagesEl.value) {
+    // Scroll so the turn is near the top with some padding
+    messagesEl.value.scrollTo({
+      top: el.offsetTop - 16,
+      behavior: 'smooth',
+    });
+    currentTurnIndex.value = index;
+  }
+}
+
+// Set ref for a turn element
+function setTurnRef(index, el) {
+  turnRefs.value[index] = el;
 }
 
 // Auto-scroll on new messages
@@ -144,10 +243,21 @@ defineExpose({ scrollToBottom });
             <span class="summary-badge" v-if="summaryCount > 0">{{ summaryCount }} compaction{{ summaryCount > 1 ? 's' : '' }}</span>
           </button>
         </div>
-        <template v-for="(msg, index) in groupedMessages" :key="index">
-          <ToolGroup v-if="msg.type === 'tool_group'" :items="msg.items" />
-          <MessageItem v-else :message="msg" />
-        </template>
+        <!-- Render conversation turns -->
+        <div
+          v-for="(turn, turnIndex) in conversationTurns"
+          :key="turnIndex"
+          :ref="(el) => setTurnRef(turnIndex, el)"
+          class="conversation-turn"
+        >
+          <!-- User message -->
+          <MessageItem v-if="turn.userMessage" :message="turn.userMessage" />
+          <!-- Grouped responses (text, tool groups, results, errors) -->
+          <template v-for="(msg, msgIndex) in turn.groupedResponses" :key="`${turnIndex}-${msgIndex}`">
+            <ToolGroup v-if="msg.type === 'tool_group'" :items="msg.items" />
+            <MessageItem v-else :message="msg" />
+          </template>
+        </div>
       </div>
       <div class="empty" v-else-if="!isRunning && isNewSession">
         <p>Start a conversation</p>
@@ -162,6 +272,31 @@ defineExpose({ scrollToBottom });
         <span class="dot"></span>
       </div>
     </main>
+
+    <!-- Turn navigation buttons (bottom-right) -->
+    <div class="turn-navigation" v-if="conversationTurns.length > 1">
+      <button
+        class="turn-nav-btn"
+        :disabled="currentTurnIndex <= 0"
+        @click="goToPreviousTurn"
+        title="Previous message (scroll up)"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 15l-6-6-6 6"/>
+        </svg>
+      </button>
+      <span class="turn-counter">{{ currentTurnIndex + 1 }}/{{ conversationTurns.length }}</span>
+      <button
+        class="turn-nav-btn"
+        :disabled="currentTurnIndex >= conversationTurns.length - 1"
+        @click="goToNextTurn"
+        title="Next message (scroll down)"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+    </div>
 
     <!-- Jump to bottom button (floats within chat area) -->
     <button
@@ -329,5 +464,59 @@ defineExpose({ scrollToBottom });
 .jump-to-bottom:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+/* Conversation turn grouping */
+.conversation-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Turn navigation */
+.turn-navigation {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 4px;
+  z-index: 10;
+  box-shadow: var(--shadow-md);
+}
+
+.turn-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  background: transparent;
+  transition: background 0.15s, color 0.15s;
+}
+
+.turn-nav-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.turn-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.turn-counter {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 0 4px;
+  min-width: 40px;
+  text-align: center;
 }
 </style>
