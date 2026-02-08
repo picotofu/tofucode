@@ -192,14 +192,97 @@ const titleInputRef = ref(null);
 
 // Keyboard shortcuts
 function handleKeydown(e) {
-  // Escape: Blur input
+  // Escape: Close modals first, then blur input
   if (e.key === 'Escape') {
-    textareaEl.value?.blur();
+    // Close any open modals first (highest priority)
+    if (fileModals.value.createFile) {
+      fileModals.value.createFile = false;
+      return;
+    }
+    if (fileModals.value.createFolder) {
+      fileModals.value.createFolder = false;
+      return;
+    }
+    if (fileModals.value.rename) {
+      fileModals.value.rename = null;
+      return;
+    }
+    if (fileModals.value.delete) {
+      fileModals.value.delete = null;
+      return;
+    }
+    if (fileModals.value.editPath) {
+      cancelEditPath();
+      return;
+    }
+    if (editingSessionTitle.value) {
+      cancelEditingSessionTitle();
+      return;
+    }
+    // Fallback: blur active input
+    document.activeElement?.blur();
+    return;
   }
-  // Ctrl+L or Cmd+L: Scroll to bottom (clear view)
-  if ((e.ctrlKey || e.metaKey) && e.key === 'l' && !terminalMode.value) {
-    e.preventDefault();
-    scrollToBottom();
+
+  // Mode switching: Ctrl/Cmd+1/2/3
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === '1') {
+      e.preventDefault();
+      currentMode.value = 'chat';
+      nextTick(() => {
+        // Wait for TinyMDE editor to be ready in the DOM
+        setTimeout(() => {
+          const editable = editorEl.value?.querySelector('[contenteditable]');
+          if (editable) {
+            editable.focus();
+          }
+        }, 50);
+      });
+      return;
+    }
+    if (e.key === '2') {
+      e.preventDefault();
+      currentMode.value = 'terminal';
+      nextTick(() => {
+        // Initialize CWD if needed
+        if (!terminalCwd.value && projectStatus.value.cwd) {
+          terminalCwd.value = projectStatus.value.cwd;
+        }
+        terminalInputRef.value?.focus();
+      });
+      return;
+    }
+    if (e.key === '3') {
+      e.preventDefault();
+      currentMode.value = 'files';
+      nextTick(() => {
+        // Focus search input in files mode
+        const searchInput = document.querySelector('.files-filter-input');
+        searchInput?.focus();
+      });
+      return;
+    }
+
+    // Ctrl+L or Cmd+L: Scroll to bottom (clear view) in chat mode
+    if (e.key === 'l' && !terminalMode.value) {
+      e.preventDefault();
+      scrollToBottom();
+      return;
+    }
+
+    // Cmd+Up: Navigate to previous turn in chat mode
+    if (e.key === 'ArrowUp' && currentMode.value === 'chat') {
+      e.preventDefault();
+      chatMessagesRef.value?.goToPreviousTurn();
+      return;
+    }
+
+    // Cmd+Down: Navigate to next turn in chat mode
+    if (e.key === 'ArrowDown' && currentMode.value === 'chat') {
+      e.preventDefault();
+      chatMessagesRef.value?.goToNextTurn();
+      return;
+    }
   }
 }
 
@@ -745,13 +828,64 @@ function handleTerminalKeydown(e) {
   const textarea = terminalInputRef.value;
   if (!textarea) return;
 
-  // Ctrl+L: Clear input
-  if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
-    e.preventDefault();
-    terminalInput.value = '';
-    terminalHistoryIndex.value = -1;
-    terminalHistoryTemp.value = '';
-    return;
+  // Terminal-specific Ctrl shortcuts (only Ctrl, not Cmd)
+  if (e.ctrlKey && !e.metaKey) {
+    const cursorPos = textarea.selectionStart;
+    const value = textarea.value;
+
+    switch (e.key) {
+      case 'c': {
+        // Ctrl+C: Clear current input
+        e.preventDefault();
+        e.stopPropagation(); // Prevent global handler
+        terminalInput.value = '';
+        terminalHistoryIndex.value = -1;
+        terminalHistoryTemp.value = '';
+        return;
+      }
+      case 'u': {
+        // Ctrl+U: Clear from cursor to start
+        e.preventDefault();
+        e.stopPropagation();
+        terminalInput.value = value.substring(cursorPos);
+        nextTick(() => {
+          textarea.selectionStart = 0;
+          textarea.selectionEnd = 0;
+        });
+        return;
+      }
+      case 'k': {
+        // Ctrl+K: Clear from cursor to end
+        e.preventDefault();
+        e.stopPropagation(); // Prevent session selector from opening
+        terminalInput.value = value.substring(0, cursorPos);
+        return;
+      }
+      case 'a': {
+        // Ctrl+A: Move cursor to start
+        e.preventDefault();
+        e.stopPropagation();
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 0;
+        return;
+      }
+      case 'e': {
+        // Ctrl+E: Move cursor to end
+        e.preventDefault();
+        e.stopPropagation();
+        textarea.selectionStart = value.length;
+        textarea.selectionEnd = value.length;
+        return;
+      }
+      case 'l': {
+        // Ctrl+L: Clear input (existing behavior)
+        e.preventDefault();
+        terminalInput.value = '';
+        terminalHistoryIndex.value = -1;
+        terminalHistoryTemp.value = '';
+        return;
+      }
+    }
   }
 
   // Up arrow: Navigate history backwards

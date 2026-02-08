@@ -98,12 +98,29 @@ DEBUG=true npx cc-web  # Enable debug logging to cc-web.log
 
 ### Keyboard Shortcuts
 
+**Global:**
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+K` | Quick session switcher |
-| `Ctrl+L` | Scroll to bottom (chat) / Clear input (terminal) |
-| `Escape` | Close palette / Blur input |
-| `Up/Down` | Terminal command history |
+| `Ctrl/Cmd+K` | Quick session switcher |
+| `Ctrl/Cmd+1` | Switch to Chat mode |
+| `Ctrl/Cmd+2` | Switch to Terminal mode |
+| `Ctrl/Cmd+3` | Switch to Files mode |
+| `Ctrl/Cmd+L` | Scroll to bottom (chat mode) |
+| `Ctrl/Cmd+Enter` | Submit message (chat) / Run command (terminal) |
+| `Ctrl/Cmd+↑` | Navigate to previous conversation turn (chat mode) |
+| `Ctrl/Cmd+↓` | Navigate to next conversation turn (chat mode) |
+| `Escape` | Close modals / Blur input |
+
+**Terminal Mode:**
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+C` | Clear current input |
+| `Ctrl+U` | Clear from cursor to start |
+| `Ctrl+K` | Clear from cursor to end |
+| `Ctrl+A` | Move cursor to start |
+| `Ctrl+E` | Move cursor to end |
+| `Ctrl+L` | Clear input |
+| `↑` / `↓` | Navigate command history |
 
 ---
 

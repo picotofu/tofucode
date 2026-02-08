@@ -31,6 +31,7 @@ All notable changes to cc-web (Claude Code Web).
 - **Git Branch Color Coding**: Visual color coding (green: main/master, orange: wip/hotfix, yellow: feature)
 - **Terminal CWD Display**: Editable current working directory field below terminal input
 - **Stop Button Fix**: Stop button now actually cancels the running Claude API request (passes abort controller to SDK)
+- **Keyboard Shortcuts**: Mode switching (Ctrl+1/2/3), terminal shortcuts (Ctrl+C/U/K/A/E), turn navigation (Ctrl+Up/Down), enhanced Escape key behavior
 
 ### Conversation Turn Navigation
 - **Turn-based message grouping**: Messages grouped by conversation turn (user message + all responses)

@@ -244,8 +244,8 @@ watch(
   },
 );
 
-// Expose scrollToBottom for parent to call
-defineExpose({ scrollToBottom });
+// Expose scrollToBottom and navigation functions for parent to call
+defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn });
 </script>
 
 <template>
