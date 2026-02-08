@@ -1,16 +1,50 @@
 import fs from 'node:fs/promises';
+import { homedir } from 'node:os';
 import path from 'node:path';
 import { send } from '../lib/ws.js';
 
 /**
+ * Validate that a path is within allowed directories
+ * @param {string} requestedPath - Path to validate
+ * @param {object} context - WebSocket context with project info
+ * @returns {string} Validated resolved path
+ * @throws {Error} If path is outside allowed directories
+ */
+function validatePath(requestedPath, context) {
+  const resolved = path.resolve(requestedPath);
+
+  // Allow access to:
+  // 1. User's home directory (for browsing projects)
+  // 2. Current project directory (from context.projectPath if available)
+  const allowedRoots = [homedir()];
+
+  // Add project path if available in context
+  if (context?.currentProjectPath) {
+    allowedRoots.push(path.resolve(context.currentProjectPath));
+  }
+
+  // Check if resolved path is within any allowed root
+  const isAllowed = allowedRoots.some(root => {
+    const normalizedRoot = path.resolve(root);
+    return resolved === normalizedRoot || resolved.startsWith(normalizedRoot + path.sep);
+  });
+
+  if (!isAllowed) {
+    throw new Error('Access denied: path outside allowed directories');
+  }
+
+  return resolved;
+}
+
+/**
  * Browse folder contents
  */
-export async function handleFilesBrowse(ws, payload) {
+export async function handleFilesBrowse(ws, payload, context) {
   const { path: folderPath } = payload;
 
   try {
-    // Validate path (prevent directory traversal)
-    const resolvedPath = path.resolve(folderPath);
+    // Validate path (prevent directory traversal and restrict to allowed dirs)
+    const resolvedPath = validatePath(folderPath, context);
 
     // Read directory
     const entries = await fs.readdir(resolvedPath, { withFileTypes: true });
@@ -38,12 +72,12 @@ export async function handleFilesBrowse(ws, payload) {
 /**
  * Read file contents
  */
-export async function handleFilesRead(ws, payload) {
+export async function handleFilesRead(ws, payload, context) {
   const { path: filePath } = payload;
 
   try {
     // Validate path
-    const resolvedPath = path.resolve(filePath);
+    const resolvedPath = validatePath(filePath, context);
 
     // Check file size (limit to 10MB)
     const stats = await fs.stat(resolvedPath);
@@ -85,12 +119,12 @@ export async function handleFilesRead(ws, payload) {
 /**
  * Write file contents
  */
-export async function handleFilesWrite(ws, payload) {
+export async function handleFilesWrite(ws, payload, context) {
   const { path: filePath, content } = payload;
 
   try {
     // Validate path
-    const resolvedPath = path.resolve(filePath);
+    const resolvedPath = validatePath(filePath, context);
 
     // Ensure parent directory exists
     const dir = path.dirname(resolvedPath);
@@ -116,11 +150,11 @@ export async function handleFilesWrite(ws, payload) {
 /**
  * Create new file
  */
-export async function handleFilesCreate(ws, payload) {
+export async function handleFilesCreate(ws, payload, context) {
   const { path: filePath, isDirectory = false } = payload;
 
   try {
-    const resolvedPath = path.resolve(filePath);
+    const resolvedPath = validatePath(filePath, context);
 
     if (isDirectory) {
       await fs.mkdir(resolvedPath, { recursive: true });
@@ -141,7 +175,7 @@ export async function handleFilesCreate(ws, payload) {
 
     // Refresh parent directory
     const parentPath = path.dirname(resolvedPath);
-    handleFilesBrowse(ws, { path: parentPath });
+    handleFilesBrowse(ws, { path: parentPath }, context);
   } catch (err) {
     send(ws, {
       type: 'files:create:error',
@@ -154,12 +188,12 @@ export async function handleFilesCreate(ws, payload) {
 /**
  * Rename file or folder
  */
-export async function handleFilesRename(ws, payload) {
+export async function handleFilesRename(ws, payload, context) {
   const { oldPath, newPath } = payload;
 
   try {
-    const resolvedOldPath = path.resolve(oldPath);
-    const resolvedNewPath = path.resolve(newPath);
+    const resolvedOldPath = validatePath(oldPath, context);
+    const resolvedNewPath = validatePath(newPath, context);
 
     // Check if old path exists
     await fs.access(resolvedOldPath);
@@ -176,7 +210,7 @@ export async function handleFilesRename(ws, payload) {
 
     // Refresh parent directory
     const parentPath = path.dirname(resolvedNewPath);
-    handleFilesBrowse(ws, { path: parentPath });
+    handleFilesBrowse(ws, { path: parentPath }, context);
   } catch (err) {
     send(ws, {
       type: 'files:rename:error',
@@ -190,11 +224,11 @@ export async function handleFilesRename(ws, payload) {
 /**
  * Delete file or folder
  */
-export async function handleFilesDelete(ws, payload) {
+export async function handleFilesDelete(ws, payload, context) {
   const { path: targetPath } = payload;
 
   try {
-    const resolvedPath = path.resolve(targetPath);
+    const resolvedPath = validatePath(targetPath, context);
 
     // Check if exists
     const stats = await fs.stat(resolvedPath);
@@ -215,7 +249,7 @@ export async function handleFilesDelete(ws, payload) {
 
     // Refresh parent directory
     const parentPath = path.dirname(resolvedPath);
-    handleFilesBrowse(ws, { path: parentPath });
+    handleFilesBrowse(ws, { path: parentPath }, context);
   } catch (err) {
     send(ws, {
       type: 'files:delete:error',
@@ -228,12 +262,12 @@ export async function handleFilesDelete(ws, payload) {
 /**
  * Move file or folder
  */
-export async function handleFilesMove(ws, payload) {
+export async function handleFilesMove(ws, payload, context) {
   const { sourcePath, destPath } = payload;
 
   try {
-    const resolvedSourcePath = path.resolve(sourcePath);
-    const resolvedDestPath = path.resolve(destPath);
+    const resolvedSourcePath = validatePath(sourcePath, context);
+    const resolvedDestPath = validatePath(destPath, context);
 
     // Check if source exists
     await fs.access(resolvedSourcePath);
@@ -255,9 +289,9 @@ export async function handleFilesMove(ws, payload) {
     // Refresh both directories
     const sourceParent = path.dirname(resolvedSourcePath);
     const destParent = path.dirname(resolvedDestPath);
-    handleFilesBrowse(ws, { path: sourceParent });
+    handleFilesBrowse(ws, { path: sourceParent }, context);
     if (sourceParent !== destParent) {
-      handleFilesBrowse(ws, { path: destParent });
+      handleFilesBrowse(ws, { path: destParent }, context);
     }
   } catch (err) {
     send(ws, {

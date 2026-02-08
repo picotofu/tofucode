@@ -25,6 +25,12 @@ async function gracefulShutdown(signal) {
   logger.log(`\n${signal} received, shutting down gracefully...`);
 
   try {
+    // Clear task cleanup interval
+    if (global.taskCleanupInterval) {
+      clearInterval(global.taskCleanupInterval);
+      logger.log('Stopped task cleanup interval');
+    }
+
     // Cancel all running tasks
     const { tasks } = await import('./lib/tasks.js');
     for (const [sessionId, task] of tasks) {
@@ -32,6 +38,18 @@ async function gracefulShutdown(signal) {
         logger.log(`Cancelling task for session ${sessionId}`);
         task.abortController.abort();
       }
+    }
+
+    // Stop version checker
+    const { stopVersionChecker } = await import('./lib/version-checker.js');
+    stopVersionChecker();
+    logger.log('Stopped version checker');
+
+    // Clean up process manager
+    const processManager = (await import('./lib/processManager.js')).default;
+    if (processManager.destroy) {
+      processManager.destroy();
+      logger.log('Cleaned up process manager');
     }
 
     // Close HTTP server
@@ -86,6 +104,15 @@ const pkg = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8'));
 
 // Initialize version checker
 initVersionChecker(pkg.version);
+
+// Initialize periodic task cleanup (every hour)
+const { clearOldTasks } = await import('./lib/tasks.js');
+global.taskCleanupInterval = setInterval(() => {
+  const cleared = clearOldTasks();
+  if (cleared > 0) {
+    logger.log(`Cleared ${cleared} old tasks`);
+  }
+}, 60 * 60 * 1000); // Every hour
 
 const app = express();
 const server = createServer(app);

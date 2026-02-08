@@ -539,11 +539,11 @@ export function useChatWebSocket() {
         // Filter out messages that don't belong to the current session
         // Both client and server sessionId must match (and both must be non-null)
         if (msg.sessionId && msg.sessionId === currentSession.value) {
-          messages.value = [...messages.value, msg];
+          messages.value.push(msg);
         } else if (!msg.sessionId && !currentSession.value) {
           // Both are null/undefined - this happens during new session creation
           // before the server assigns an ID. Accept these messages.
-          messages.value = [...messages.value, msg];
+          messages.value.push(msg);
         } else {
           // Mismatch - log for debugging but don't append
           console.warn(

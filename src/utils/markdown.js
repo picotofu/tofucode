@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import hljs from 'highlight.js/lib/core';
 import bash from 'highlight.js/lib/languages/bash';
 import c from 'highlight.js/lib/languages/c';
@@ -113,10 +114,15 @@ const renderer = {
     </div>`;
   },
 
-  // Make links open in new tab
+  // Make links open in new tab (with security checks)
   link({ href, title, text }) {
-    const titleAttr = title ? ` title="${title}"` : '';
-    return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+    // Block javascript: protocol
+    if (href && /^javascript:/i.test(href.trim())) {
+      return text;
+    }
+    const safeHref = escapeHtml(href || '');
+    const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
+    return `<a href="${safeHref}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
   },
 };
 
@@ -124,5 +130,6 @@ marked.use({ renderer });
 
 export function renderMarkdown(text) {
   if (!text) return '';
-  return marked.parse(text);
+  const html = marked.parse(text);
+  return DOMPurify.sanitize(html);
 }

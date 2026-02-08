@@ -2,19 +2,64 @@
 
 All notable changes to cc-web (Claude Code Web).
 
-## 2026-02-08 - Message Turn Navigation
+## 2026-02-08 - Security Hardening, Performance Optimizations & QOL Improvements
+
+### Security Fixes (High Priority)
+- **XSS Prevention**: Added DOMPurify sanitization to markdown rendering
+- **Link Security**: Blocked `javascript:` protocol URLs and escaped link attributes
+- **Path Sandboxing**: Restricted file operations to home directory and current project only
+- **Auth File Caching**: Reduced I/O with 5-second TTL cache for session validation
+
+### Critical Bug Fixes
+- **Memory Leak**: Wired up `clearOldTasks()` to run hourly and clear on graceful shutdown
+- **Computed Property Bug**: Fixed `toggleTerminalMode` assignment to read-only computed
+- **ProcessManager Cleanup**: Added `destroy()` method to clear intervals on shutdown
+- **Path Context Bug**: Fixed `context.projectPath` → `context.currentProjectPath` mismatch
+
+### Performance Improvements
+- **Array Operations**: Replaced array spread with `push()` in message streaming (avoids copying entire array)
+- **Graceful Shutdown**: Added cleanup for version checker, process manager, and task intervals
+
+### Code Quality & Deduplication
+- **Shared Restart Utility**: Extracted `restartWithInvertedSpawn()` to `server/lib/restart.js`
+- **API Error Mapper**: Created shared `server/lib/api-error-mapper.js` for error messages
+- **Context Parameter**: Fixed missing `context` parameter in 3 internal `handleFilesBrowse` calls
+
+### QOL Improvements
+- **Auto-refresh Git Status**: Git branch and file changes auto-update after task completes
+- **Session Loading Skeleton**: Animated skeleton placeholders instead of plain "Loading..." text
+- **Git Branch Color Coding**: Visual color coding (green: main/master, orange: wip/hotfix, yellow: feature)
+- **Terminal CWD Display**: Editable current working directory field below terminal input
 
 ### Conversation Turn Navigation
 - **Turn-based message grouping**: Messages grouped by conversation turn (user message + all responses)
 - **Up/down navigation buttons**: Navigate between turns with arrow buttons (bottom-right)
-- **Turn counter**: Shows current position (e.g., "3/10")
+- **Turn counter**: Shows current position (e.g., "3/10") with auto-update on scroll
 - **Smart scrolling**: First up press scrolls to top of last turn for easier reading
 - **Smooth scroll animation**: Animated scroll to turn start
 - **Disabled state**: Buttons disabled when at first/last turn
 
+### Git Diff Modal Fixes
+- **Vertical scrolling**: Fixed diff viewer not scrolling on long diffs (flex layout fix on modal-body)
+- **No horizontal scrolling**: Long lines now wrap instead of causing horizontal overflow
+- **Proper flex layout**: Modal body uses flex column layout for correct height constraints
+
+### Session Title Fixes
+- **Title persistence**: Reverted to separate `.session-titles.json` file (SDK-safe)
+- **Consistent reads**: Unified all session title reads to use `.session-titles.json`
+
+### Page Load Improvements
+- **Cleaner page title**: Removed "cc-web" prefix, shows "project / session" directly
+- **History-first rendering**: Wait for conversation history before showing chat UI
+- **Typing indicator fix**: Fixed indicator not showing on page refresh by sending sessionId on session select
+
+### Dependencies Added
+- **dompurify**: HTML sanitization library for XSS prevention
+
 ### Bug Fixes
 - **Session navigation**: Full page reload on session switch to prevent cross-session message streaming
 - **WebSocket state**: Clean WebSocket connection on each session load
+- **Cross-session typing**: Task status now correctly filtered by sessionId after reconnect
 
 ## 2026-02-07 - WebSocket Optimization & Code Refactoring
 

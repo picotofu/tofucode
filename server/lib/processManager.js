@@ -377,6 +377,22 @@ class ProcessManager {
       this.serialize(entry),
     );
   }
+
+  /**
+   * Clean up intervals and save state before shutdown
+   */
+  destroy() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+      this.saveTimeout = null;
+    }
+    // Final save
+    this.saveToFileNow();
+  }
 }
 
 // Singleton instance

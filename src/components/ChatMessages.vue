@@ -282,8 +282,28 @@ defineExpose({ scrollToBottom });
         <p>Start a conversation</p>
         <p class="empty-hint">Type a message below to begin.</p>
       </div>
-      <div class="loading" v-else-if="!isRunning && !isNewSession">
-        <p>Loading...</p>
+      <div class="loading-skeleton" v-else-if="!isRunning && !isNewSession">
+        <div class="skeleton-message">
+          <div class="skeleton-avatar"></div>
+          <div class="skeleton-content">
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line short"></div>
+          </div>
+        </div>
+        <div class="skeleton-message">
+          <div class="skeleton-avatar assistant"></div>
+          <div class="skeleton-content">
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line short"></div>
+          </div>
+        </div>
+        <div class="skeleton-message">
+          <div class="skeleton-avatar"></div>
+          <div class="skeleton-content">
+            <div class="skeleton-line"></div>
+          </div>
+        </div>
       </div>
       <div class="typing" v-if="isRunning">
         <span class="dot"></span>
@@ -400,6 +420,61 @@ defineExpose({ scrollToBottom });
   margin-top: 8px;
   font-size: 13px;
   color: var(--text-muted);
+}
+
+.loading-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 16px 0;
+}
+
+.skeleton-message {
+  display: flex;
+  gap: 12px;
+}
+
+.skeleton-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-hover) 50%, var(--bg-tertiary) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  flex-shrink: 0;
+}
+
+.skeleton-avatar.assistant {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 25%, rgba(59, 130, 246, 0.2) 50%, rgba(59, 130, 246, 0.1) 75%);
+  background-size: 200% 100%;
+}
+
+.skeleton-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-line {
+  height: 16px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-hover) 50%, var(--bg-tertiary) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.skeleton-line.short {
+  width: 60%;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .loading {

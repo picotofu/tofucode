@@ -59,6 +59,7 @@ const {
 const currentMode = ref('chat');
 const terminalSubTab = ref('history'); // 'active' | 'history'
 const terminalInput = ref('');
+const terminalCwd = ref(''); // Editable CWD for terminal commands
 const terminalInputRef = ref(null);
 const pathEditInputRef = ref(null);
 const manualExpandState = ref(new Map()); // Map<processId, boolean> for user-toggled items
@@ -639,6 +640,32 @@ const fileChangesText = computed(() => {
   return parts.length > 0 ? parts.join(' ') : null;
 });
 
+// Get branch color class based on branch name patterns
+const branchColorClass = computed(() => {
+  const branch = projectStatus.value.gitBranch;
+  if (!branch) return '';
+
+  const lower = branch.toLowerCase();
+
+  // Main/master branches - green
+  if (lower === 'main' || lower === 'master') {
+    return 'branch-main';
+  }
+
+  // WIP/hotfix branches - orange
+  if (lower.includes('wip') || lower.includes('hotfix')) {
+    return 'branch-wip';
+  }
+
+  // Feature branches - yellow
+  if (lower.includes('feature') || lower.includes('feat')) {
+    return 'branch-feature';
+  }
+
+  // Default - no special color
+  return '';
+});
+
 // Permission mode sync - watch for EnterPlanMode/ExitPlanMode tool usage
 watch(
   () => messages.value,
@@ -664,10 +691,25 @@ watch(
 
 // Note: groupedMessages computed is now inside ChatMessages component
 
+// Auto-refresh git status when task completes
+watch(isRunning, (running, wasRunning) => {
+  // When task stops running (completes or errors)
+  if (wasRunning && !running) {
+    // Refresh git status after a brief delay to allow file operations to complete
+    setTimeout(() => {
+      getProjectStatus();
+    }, 500);
+  }
+});
+
 // Terminal functions
 function toggleTerminalMode() {
-  terminalMode.value = !terminalMode.value;
-  if (terminalMode.value) {
+  currentMode.value = currentMode.value === 'terminal' ? 'chat' : 'terminal';
+  if (currentMode.value === 'terminal') {
+    // Initialize CWD to project path if not set
+    if (!terminalCwd.value && projectStatus.value.cwd) {
+      terminalCwd.value = projectStatus.value.cwd;
+    }
     // Fetch current processes when entering terminal mode
     listProcesses();
     nextTick(() => {
@@ -684,8 +726,19 @@ function handleTerminalSubmit() {
   terminalHistoryIndex.value = -1;
   terminalHistoryTemp.value = '';
 
-  execCommand(command);
+  // Use custom CWD if set, otherwise use project CWD
+  const cwd = terminalCwd.value || projectStatus.value.cwd;
+  execCommand(command, cwd);
   terminalInput.value = '';
+}
+
+function handleCwdFocus(e) {
+  // If CWD is empty, fill it with the project CWD
+  if (!terminalCwd.value && projectStatus.value.cwd) {
+    terminalCwd.value = projectStatus.value.cwd;
+  }
+  // Select all text for easy editing
+  e.target.select();
 }
 
 function handleTerminalKeydown(e) {
@@ -1427,21 +1480,34 @@ watch(openedFile, (file) => {
 
       <!-- Terminal input -->
       <form v-else-if="currentMode === 'terminal'" class="terminal-form" @submit.prevent="handleTerminalSubmit">
-        <span class="terminal-prompt">$</span>
-        <textarea
-          ref="terminalInputRef"
-          v-model="terminalInput"
-          class="terminal-input"
-          placeholder="Enter command... (Enter to run, \ for multiline)"
-          rows="1"
-          :style="{ maxHeight: textareaMaxHeight + 'px' }"
-          @keydown="handleTerminalKeydown"
-          @keydown.ctrl.enter.prevent="handleTerminalSubmit"
-          @keydown.meta.enter.prevent="handleTerminalSubmit"
-        ></textarea>
-        <button type="submit" class="run-btn" :disabled="!terminalInput.trim()">
-          Run
-        </button>
+        <div class="terminal-input-row">
+          <span class="terminal-prompt">$</span>
+          <textarea
+            ref="terminalInputRef"
+            v-model="terminalInput"
+            class="terminal-input"
+            placeholder="Enter command... (Enter to run, \ for multiline)"
+            rows="1"
+            :style="{ maxHeight: textareaMaxHeight + 'px' }"
+            @keydown="handleTerminalKeydown"
+            @keydown.ctrl.enter.prevent="handleTerminalSubmit"
+            @keydown.meta.enter.prevent="handleTerminalSubmit"
+          ></textarea>
+          <button type="submit" class="run-btn" :disabled="!terminalInput.trim()">
+            Run
+          </button>
+        </div>
+        <div class="terminal-cwd-row">
+          <label for="terminal-cwd" class="cwd-label">cwd:</label>
+          <input
+            id="terminal-cwd"
+            v-model="terminalCwd"
+            type="text"
+            class="cwd-input"
+            :placeholder="projectStatus.cwd || '/path/to/directory'"
+            @focus="handleCwdFocus"
+          />
+        </div>
       </form>
 
       <!-- Files filter input -->
@@ -1475,7 +1541,7 @@ watch(openedFile, (file) => {
         <div class="toolbar-left">
           <span
             class="toolbar-item branch"
-            :class="{ clickable: fileChangesText }"
+            :class="[{ clickable: fileChangesText }, branchColorClass]"
             v-if="projectStatus.gitBranch"
             @click="openGitDiffModal"
             :title="fileChangesText ? 'Click to view changes' : null"
@@ -2128,6 +2194,19 @@ watch(openedFile, (file) => {
   color: var(--text-secondary);
 }
 
+/* Branch color coding */
+.toolbar-item.branch.branch-main {
+  color: rgb(34, 197, 94); /* green-500 */
+}
+
+.toolbar-item.branch.branch-wip {
+  color: rgb(249, 115, 22); /* orange-500 */
+}
+
+.toolbar-item.branch.branch-feature {
+  color: rgb(234, 179, 8); /* yellow-500 */
+}
+
 .toolbar-item.branch.clickable {
   cursor: pointer;
   padding: 4px 8px;
@@ -2709,8 +2788,8 @@ watch(openedFile, (file) => {
 
 .terminal-form {
   display: flex;
-  align-items: flex-end;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -2720,6 +2799,45 @@ watch(openedFile, (file) => {
 
 .terminal-form:focus-within {
   border-color: var(--text-muted);
+}
+
+.terminal-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.terminal-cwd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--border-color);
+  margin: 0 -12px -10px -12px;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+}
+
+.cwd-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.cwd-input {
+  flex: 1;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 2px 4px;
+  min-width: 0;
+}
+
+.cwd-input::placeholder {
+  color: var(--text-muted);
 }
 
 /* Files filter form */
