@@ -1056,11 +1056,11 @@ watch(
       }
     }
 
-    // Format: cc-web - project-name / session-title-or-prompt
+    // Format: project-name / session-title-or-prompt (no cc-web prefix to save space)
     if (projectName && sessionDisplay) {
-      document.title = `cc-web - ${projectName} / ${sessionDisplay}`;
+      document.title = `${projectName} / ${sessionDisplay}`;
     } else if (projectName) {
-      document.title = `cc-web - ${projectName}`;
+      document.title = projectName;
     } else if (sessionDisplay) {
       document.title = `cc-web / ${sessionDisplay}`;
     } else {

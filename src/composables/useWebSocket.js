@@ -462,10 +462,9 @@ export function useChatWebSocket() {
           sessionActiveElsewhere.value = msg.isActiveElsewhere || false;
           // Don't clear messages here - selectSession() already did it
           // Clearing again creates a race window for cross-session messages
-          // Server has acknowledged our session selection - NOW context is fully ready
-          contextReady.value = true;
+          // Don't set contextReady yet - wait for session_history to load first
         } else if (msg.sessionId === null && currentSession.value === null) {
-          // Both null - new session flow
+          // Both null - new session flow - no history to wait for
           contextReady.value = true;
         } else {
           // Session mismatch - this shouldn't happen but log it
@@ -490,6 +489,9 @@ export function useChatWebSocket() {
           messages.value = msg.messages;
           hasOlderMessages.value = msg.hasOlderMessages || false;
           summaryCount.value = msg.summaryCount || 0;
+          // History loaded - NOW context is fully ready
+          // This ensures: history loads → then typing indicator (if running) → then UI is interactive
+          contextReady.value = true;
         } else {
           console.warn(
             `[useChatWebSocket] Ignoring session_history for different session. History sessionId: ${msg.sessionId}, Current sessionId: ${currentSession.value}`,
