@@ -288,6 +288,8 @@ function close() {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Loading/Empty/Error states */
@@ -328,7 +330,7 @@ function close() {
   display: flex;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  /* Removed overflow: hidden - children need to scroll independently */
 }
 
 /* File list */
