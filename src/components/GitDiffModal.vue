@@ -412,7 +412,7 @@ function close() {
 /* Diff viewer */
 .diff-viewer {
   flex: 1;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: auto;
   background: var(--bg-primary);
 }
@@ -439,7 +439,8 @@ function close() {
   display: flex;
   padding: 0 16px;
   min-height: 21px;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .diff-line.header {
