@@ -1754,7 +1754,7 @@ watch(openedFile, (file) => {
           :disabled="!inputValue.trim() || isRunning || !contextReady"
           title="Send (Ctrl+Enter)"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="9 10 4 15 9 20"/>
             <path d="M20 4v7a4 4 0 0 1-4 4H4"/>
           </svg>
@@ -2493,7 +2493,6 @@ watch(openedFile, (file) => {
 .toolbar-item.branch.clickable {
   cursor: pointer;
   padding: 4px 8px;
-  margin: -4px -8px;
   border-radius: var(--radius-sm);
   transition: background 0.15s;
 }
@@ -2898,7 +2897,7 @@ watch(openedFile, (file) => {
   gap: 12px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 10px 12px;
+  padding: 8px 32px 8px 8px;
   transition: border-color 0.15s, opacity 0.15s;
   cursor: text;
 }
@@ -2925,7 +2924,8 @@ watch(openedFile, (file) => {
   display: flex;
   align-items: center;
   align-self: flex-start;
-  padding-top: 8px;
+  padding-left: 4px;
+  padding-top: 4px;
 }
 
 .input-form.permission-plan .chat-prompt {
@@ -2968,17 +2968,18 @@ watch(openedFile, (file) => {
 }
 
 .send-btn {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-muted);
   transition: color 0.15s, background 0.15s;
-  margin-right: -4px; /* Align with form padding */
-  margin-bottom: -2px;
 }
 
 .send-btn:disabled {
@@ -2993,8 +2994,8 @@ watch(openedFile, (file) => {
 /* Clear/Undo button (top-right of input) */
 .clear-undo-btn {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 4px;
+  right: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
