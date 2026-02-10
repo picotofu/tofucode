@@ -11,6 +11,7 @@ All notable changes to cc-web (Claude Code Web).
 - **Quiet Mode**: `--quiet` flag suppresses non-error output
 - **Custom Log File**: `--log-file` to specify custom log location
 - **Custom PID File**: `--pid-file` to specify custom PID file location
+- **Bypass Token**: `--bypass-token` flag for auth-free access (automation/testing, uses DEBUG_TOKEN internally)
 - **PID File Management**: Auto-creates `~/.cc-web/` directory, writes PID for daemon tracking
 - **Graceful Shutdown**: Daemon stop with SIGTERM, force kill after timeout
 - **Smart Restart**: Preserves CLI arguments when restarting daemon

@@ -6,5 +6,6 @@
   "daemon": false,
   "quiet": false,
   "logFile": null,
-  "pidFile": null
+  "pidFile": null,
+  "bypassToken": null
 }

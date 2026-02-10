@@ -49,6 +49,7 @@ const options = {
   logFile: null,
   pidFile: DEFAULT_PID_FILE,
   config: null,
+  bypassToken: null,
 };
 
 for (let i = 0; i < args.length; i++) {
@@ -71,6 +72,8 @@ for (let i = 0; i < args.length; i++) {
     options.pidFile = args[++i];
   } else if (arg === '--config' || arg === '-c') {
     options.config = args[++i];
+  } else if (arg === '--bypass-token') {
+    options.bypassToken = args[++i];
   } else if (arg === '--help') {
     console.log(`
 cc-web - Web UI for Claude Code
@@ -91,6 +94,7 @@ Options:
   --log-file <path>          Custom log file path (default: cc-web.log)
   --pid-file <path>          Custom PID file path (default: ~/.cc-web/cc-web.pid)
   -c, --config <path>        Load configuration from JSON file
+  --bypass-token <token>     Set bypass token for auth-free access (automation/testing)
   -v, --version              Show version number
   --help                     Show this help message
 
@@ -106,6 +110,7 @@ Environment Variables:
   DEBUG                      Set to 'true' to enable debug mode
   LOG_FILE                   Custom log file path
   PID_FILE                   Custom PID file path
+  DEBUG_TOKEN                Bypass token for auth-free access (automation/testing)
 
 Configuration File:
   Use --config to load settings from a JSON file. CLI args override config.
@@ -115,7 +120,8 @@ Configuration File:
     "port": 8080,
     "host": "127.0.0.1",
     "auth": false,
-    "debug": true
+    "debug": true,
+    "bypassToken": "your-secret-token"
   }
 
 Examples:
@@ -165,6 +171,10 @@ if (options.debug) {
 
 if (options.logFile) {
   env.LOG_FILE = resolve(options.logFile);
+}
+
+if (options.bypassToken) {
+  env.DEBUG_TOKEN = options.bypassToken;
 }
 
 // Start the server
@@ -291,6 +301,9 @@ async function loadConfig(options) {
     }
     if (config.quiet !== undefined && !argSet.has('--quiet') && !argSet.has('-q')) {
       options.quiet = config.quiet;
+    }
+    if (config.bypassToken !== undefined && !argSet.has('--bypass-token')) {
+      options.bypassToken = config.bypassToken;
     }
 
     if (!options.quiet) {

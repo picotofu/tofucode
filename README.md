@@ -87,6 +87,7 @@ cc-web --help
 | Daemon | `-d` | `"daemon": true` | - |
 | Debug | `--debug` | `"debug": true` | `DEBUG=true` |
 | Log file | `--log-file <path>` | `"logFile": "<path>"` | `LOG_FILE=<path>` |
+| Bypass token | `--bypass-token <token>` | `"bypassToken": "<token>"` | `DEBUG_TOKEN=<token>` |
 
 Run `cc-web --help` for all options.
 
