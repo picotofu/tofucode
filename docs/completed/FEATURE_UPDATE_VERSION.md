@@ -1452,19 +1452,19 @@ The restart button is useful during development for applying changes without man
 9. ✅ Update README with environment variables
 10. ✅ Test with mock npm registry response
 
-### Phase 2: One-Click Upgrade (Active) - Estimated 1-2 days
-1. ⬜ Create `installation.js` module for install type detection
-2. ⬜ Create `upgrade.js` event handler
-3. ⬜ Add `upgrade_request` WebSocket event
-4. ⬜ Add upgrade status broadcasts (`upgrade_started`, `upgrade_success`, `upgrade_error`)
-5. ⬜ Store HTTP server reference globally for graceful shutdown
-6. ⬜ Add upgrade button to sidebar (conditional on `canAutoUpgrade()`)
-7. ⬜ Handle upgrade status messages in frontend
-8. ⬜ Add auto-reload after successful upgrade
-9. ⬜ Test with global install (`npm install -g`)
-10. ⬜ Test with local install
-11. ⬜ Test error handling (permission denied, network failure)
-12. ⬜ Document manual upgrade for npx/Docker/source
+### Phase 2: One-Click Upgrade (Active) - ✅ COMPLETE
+1. ✅ Create `installation.js` module for install type detection
+2. ✅ Create `upgrade.js` event handler
+3. ✅ Add `upgrade_request` WebSocket event
+4. ✅ Add upgrade status broadcasts (`upgrade_started`, `upgrade_success`, `upgrade_error`)
+5. ✅ Store HTTP server reference globally for graceful shutdown
+6. ✅ Add upgrade button to sidebar (conditional on `canAutoUpgrade()`)
+7. ✅ Handle upgrade status messages in frontend
+8. ✅ Add auto-reload after successful upgrade
+9. ✅ Test with global install (`npm install -g`)
+10. ✅ Test with local install
+11. ✅ Test error handling (permission denied, network failure)
+12. ✅ Document manual upgrade for npx/Docker/source
 
 ---
 
@@ -1472,19 +1472,19 @@ The restart button is useful during development for applying changes without man
 
 ## 10. Summary
 
-### Phase 1: Passive Notification (Current)
+### Phase 1: Passive Notification - ✅ COMPLETE
 - ✅ Version checking against npm registry
 - ✅ Visual badge in sidebar when update available
 - ✅ Manual instructions for npm/Docker users
 - ✅ Dismissible per version
 
-### Phase 2: One-Click Upgrade (Planned)
-- ⬜ **Supported**: `npm install -g` and local `npm install`
-- ⬜ **Not Supported**: npx (cache issues), Docker (needs pull), source (dev mode)
-- ⬜ Frontend button triggers backend upgrade command
-- ⬜ Server upgrades npm package and restarts itself
-- ⬜ Frontend auto-reconnects and reloads
-- ⬜ Error handling with fallback to manual instructions
+### Phase 2: One-Click Upgrade - ✅ COMPLETE
+- ✅ **Supported**: `npm install -g` and local `npm install`
+- ✅ **Not Supported**: npx (cache issues), Docker (needs pull), source (dev mode)
+- ✅ Frontend button triggers backend upgrade command
+- ✅ Server upgrades npm package and restarts itself
+- ✅ Frontend auto-reconnects and reloads
+- ✅ Error handling with fallback to manual instructions
 
 ### Benefits
 
@@ -1502,6 +1502,8 @@ The restart button is useful during development for applying changes without man
 - **Clear**: Manual instructions for unsupported installation types
 - **Graceful**: WebSocket notifications keep users informed throughout process
 
-### Estimated Effort
-- **Phase 1**: Already complete
-- **Phase 2**: 1-2 days implementation + testing
+### Status
+- **Phase 1**: ✅ Complete
+- **Phase 2**: ✅ Complete
+
+**Note:** Environment variables (UPDATE_CHECK_INTERVAL, DISABLE_UPDATE_CHECK) should be documented in .env.example or README for completeness.
