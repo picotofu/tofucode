@@ -322,6 +322,12 @@ function loadChatInput() {
       inputValue.value = saved;
     }
   }
+
+  // Check if there's a backup and update state
+  if (chatInputBackupKey.value) {
+    const backup = localStorage.getItem(chatInputBackupKey.value);
+    hasBackupState.value = backup !== null && backup !== '';
+  }
 }
 
 // Save chat input to localStorage
@@ -329,6 +335,12 @@ function saveChatInput() {
   if (chatInputStorageKey.value) {
     if (inputValue.value) {
       localStorage.setItem(chatInputStorageKey.value, inputValue.value);
+      // Clear backup when user starts typing new content (only if there's actual text being typed)
+      // This ensures backup persists when input is cleared via the clear button
+      if (chatInputBackupKey.value && hasBackup.value && inputValue.value.trim() !== '') {
+        localStorage.removeItem(chatInputBackupKey.value);
+        hasBackupState.value = false;
+      }
     } else {
       // Clear storage when input is empty
       localStorage.removeItem(chatInputStorageKey.value);
@@ -343,11 +355,21 @@ function clearChatInput() {
   }
 }
 
+// Reactive backup state (since localStorage isn't reactive)
+const hasBackupState = ref(false);
+
 // Check if there's a backup available for undo
 const hasBackup = computed(() => {
-  if (!chatInputBackupKey.value) return false;
-  const backup = localStorage.getItem(chatInputBackupKey.value);
-  return backup !== null && backup !== '';
+  return hasBackupState.value;
+});
+
+// Show clear button if there's current input, undo button if there's backup but no input
+const showClearButton = computed(() => {
+  return inputValue.value.trim() !== '';
+});
+
+const showUndoButton = computed(() => {
+  return !showClearButton.value && hasBackup.value;
 });
 
 // Clear current input and save it as backup
@@ -358,6 +380,7 @@ function handleClearInput() {
   // Save current input as backup
   if (chatInputBackupKey.value) {
     localStorage.setItem(chatInputBackupKey.value, current);
+    hasBackupState.value = true;
   }
 
   // Clear current input
@@ -388,6 +411,7 @@ function handleUndoClear() {
 
   // Clear the backup
   localStorage.removeItem(chatInputBackupKey.value);
+  hasBackupState.value = false;
 }
 
 // Focus the chat input editor when clicking on the form area
@@ -458,7 +482,7 @@ const permissionStorageKey = computed(() => {
 
 // Storage key for chat input
 const chatInputStorageKey = computed(() => {
-  if (projectSlug.value && sessionParam.value && sessionParam.value !== 'new') {
+  if (projectSlug.value && sessionParam.value) {
     return `chat-input:${projectSlug.value}:${sessionParam.value}`;
   }
   return null;
@@ -466,7 +490,7 @@ const chatInputStorageKey = computed(() => {
 
 // Storage key for backup chat input (for undo after clear)
 const chatInputBackupKey = computed(() => {
-  if (projectSlug.value && sessionParam.value && sessionParam.value !== 'new') {
+  if (projectSlug.value && sessionParam.value) {
     return `chat-input-backup:${projectSlug.value}:${sessionParam.value}`;
   }
   return null;
@@ -1649,7 +1673,7 @@ watch(openedFile, (file) => {
         ></div>
         <!-- Clear/Undo button (top-right) -->
         <button
-          v-if="hasBackup"
+          v-if="showUndoButton"
           type="button"
           class="clear-undo-btn undo"
           @click.stop="handleUndoClear"
@@ -1661,7 +1685,7 @@ watch(openedFile, (file) => {
           </svg>
         </button>
         <button
-          v-else-if="inputValue.trim()"
+          v-else-if="showClearButton"
           type="button"
           class="clear-undo-btn clear"
           @click.stop="handleClearInput"

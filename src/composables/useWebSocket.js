@@ -456,9 +456,12 @@ export function useChatWebSocket() {
         break;
 
       case 'session_selected':
-        // Only update if this matches our expected session (prevents race condition)
-        // currentSession is already set by selectSession() before the request
-        if (msg.sessionId === currentSession.value) {
+        // Handle new session flow first (both null)
+        if (msg.sessionId === null && currentSession.value === null) {
+          // Both null - new session flow - no history to wait for
+          contextReady.value = true;
+        } else if (msg.sessionId === currentSession.value) {
+          // Session match - update state
           sessionActiveElsewhere.value = msg.isActiveElsewhere || false;
           // Don't clear messages here - selectSession() already did it
           // Clearing again creates a race window for cross-session messages
@@ -469,9 +472,6 @@ export function useChatWebSocket() {
             contextReady.value = true;
           }
           // Otherwise, don't set contextReady yet - wait for session_history to load first
-        } else if (msg.sessionId === null && currentSession.value === null) {
-          // Both null - new session flow - no history to wait for
-          contextReady.value = true;
         } else {
           // Session mismatch - this shouldn't happen but log it
           console.warn(
