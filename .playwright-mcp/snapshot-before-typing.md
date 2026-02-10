@@ -1,0 +1,567 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - link "cc-web" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img [ref=e7]
+        - generic [ref=e17]: cc-web
+      - generic [ref=e18]: v1.0.0
+      - button "Restart server" [ref=e19] [cursor=pointer]:
+        - img [ref=e20]
+    - navigation [ref=e24]:
+      - button "Sessions" [ref=e25] [cursor=pointer]
+      - button "Projects" [ref=e26] [cursor=pointer]
+    - list [ref=e28]:
+      - listitem [ref=e29]:
+        - link "cc-web cc-web·just now" [ref=e30] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-cc-web/session/14befc3a-bf07-4b36-ae84-29b28b45c86d
+          - img [ref=e32]
+          - generic [ref=e34]:
+            - paragraph [ref=e35]: cc-web
+            - paragraph [ref=e36]:
+              - link "cc-web" [ref=e37]:
+                - /url: /project/-home-ts-projects-cc-web
+              - text: ·just now
+      - listitem [ref=e38]:
+        - link "dashboard dashboard·3h ago" [ref=e39] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-dashboard/session/39659935-7ca3-454b-a7b9-dd21b88a6219
+          - img [ref=e41]
+          - generic [ref=e43]:
+            - paragraph [ref=e44]: dashboard
+            - paragraph [ref=e45]:
+              - link "dashboard" [ref=e46]:
+                - /url: /project/-home-ts-projects-dashboard
+              - text: ·3h ago
+      - listitem [ref=e47]:
+        - link "ai-memory content-service·19h ago" [ref=e48] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-content-service/session/5cb5e330-c09d-45e6-98dc-fb50ab340130
+          - img [ref=e50]
+          - generic [ref=e52]:
+            - paragraph [ref=e53]: ai-memory
+            - paragraph [ref=e54]:
+              - link "content-service" [ref=e55]:
+                - /url: /project/-home-ts-projects-content-service
+              - text: ·19h ago
+      - listitem [ref=e56]:
+        - link "AOB-149 anime-service·1d ago" [ref=e57] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/70f6863e-f75a-4085-8abe-67dfdc1b73bd
+          - img [ref=e59]
+          - generic [ref=e61]:
+            - paragraph [ref=e62]: AOB-149
+            - paragraph [ref=e63]:
+              - link "anime-service" [ref=e64]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·1d ago
+      - listitem [ref=e65]:
+        - link "let's add a DEBUG=false env, where if it is true, we should tee the output logs to a file, either tm cc-web·2d ago" [ref=e66] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-cc-web/session/3a2b6a36-f8f6-4c99-8080-7a35b26ec9d6
+          - img [ref=e68]
+          - generic [ref=e70]:
+            - paragraph [ref=e71]: let's add a DEBUG=false env, where if it is true, we should tee the output logs to a file, either tm
+            - paragraph [ref=e72]:
+              - link "cc-web" [ref=e73]:
+                - /url: /project/-home-ts-projects-cc-web
+              - text: ·2d ago
+      - listitem [ref=e74]:
+        - link "for actions like comment_* and post_upvote, analyze and confirm that currently it only grants users. social-service·4d ago" [ref=e75] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-social-service/session/6bd5a669-c6fd-4f71-9e61-13c8e6b6db82
+          - img [ref=e77]
+          - generic [ref=e79]:
+            - paragraph [ref=e80]: for actions like comment_* and post_upvote, analyze and confirm that currently it only grants users.
+            - paragraph [ref=e81]:
+              - link "social-service" [ref=e82]:
+                - /url: /project/-home-ts-projects-social-service
+              - text: ·4d ago
+      - listitem [ref=e83]:
+        - link "- create a branch cleanup/remove-weekly-rating-api - identify the existing requirement docs that wor user-service·4d ago" [ref=e84] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-user-service/session/09aecefd-e0fc-4364-ac31-82293f0162b8
+          - img [ref=e86]
+          - generic [ref=e88]:
+            - paragraph [ref=e89]: "- create a branch cleanup/remove-weekly-rating-api - identify the existing requirement docs that wor"
+            - paragraph [ref=e90]:
+              - link "user-service" [ref=e91]:
+                - /url: /project/-home-ts-projects-user-service
+              - text: ·4d ago
+      - listitem [ref=e92]:
+        - link "AOB-137 user-service·4d ago" [ref=e93] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-user-service/session/fdb2ed15-fb86-4e08-b059-75e0abe01ee3
+          - img [ref=e95]
+          - generic [ref=e97]:
+            - paragraph [ref=e98]: AOB-137
+            - paragraph [ref=e99]:
+              - link "user-service" [ref=e100]:
+                - /url: /project/-home-ts-projects-user-service
+              - text: ·4d ago
+      - listitem [ref=e101]:
+        - link "AOB-137 social-service·4d ago" [ref=e102] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-social-service/session/58b09327-ff70-4795-b683-80f66f1acc8b
+          - img [ref=e104]
+          - generic [ref=e106]:
+            - paragraph [ref=e107]: AOB-137
+            - paragraph [ref=e108]:
+              - link "social-service" [ref=e109]:
+                - /url: /project/-home-ts-projects-social-service
+              - text: ·4d ago
+      - listitem [ref=e110]:
+        - link "AOB-137 anime-service·4d ago" [ref=e111] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/f26c56d7-bfc0-4317-a9cb-2a8bc3592523
+          - img [ref=e113]
+          - generic [ref=e115]:
+            - paragraph [ref=e116]: AOB-137
+            - paragraph [ref=e117]:
+              - link "anime-service" [ref=e118]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·4d ago
+      - listitem [ref=e119]:
+        - link "AOB-144 anime-service·4d ago" [ref=e120] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/8984620e-c2de-4229-87cb-b65b2f3c19f9
+          - img [ref=e122]
+          - generic [ref=e124]:
+            - paragraph [ref=e125]: AOB-144
+            - paragraph [ref=e126]:
+              - link "anime-service" [ref=e127]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·4d ago
+      - listitem [ref=e128]:
+        - link "AOB-142 user-service·5d ago" [ref=e129] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-user-service/session/0dbb28ad-7d67-4f5c-939a-6764730e1270
+          - img [ref=e131]
+          - generic [ref=e133]:
+            - paragraph [ref=e134]: AOB-142
+            - paragraph [ref=e135]:
+              - link "user-service" [ref=e136]:
+                - /url: /project/-home-ts-projects-user-service
+              - text: ·5d ago
+      - listitem [ref=e137]:
+        - link "for episode rating, we have a compute function that aggregates and cache the rating stats to metadat anime-service·6d ago" [ref=e138] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/d6f59c04-f0be-4025-9590-d859800fedae
+          - img [ref=e140]
+          - generic [ref=e142]:
+            - paragraph [ref=e143]: for episode rating, we have a compute function that aggregates and cache the rating stats to metadat
+            - paragraph [ref=e144]:
+              - link "anime-service" [ref=e145]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·6d ago
+      - listitem [ref=e146]:
+        - link "https://www.notion.so/kasagilabo/Anime-Static-Data-2fa21ba20aa4808c979fdcfd2ef1eeee here is the not anime-service·6d ago" [ref=e147] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/7c074df2-1606-4946-a97e-ddb673e00e2c
+          - img [ref=e149]
+          - generic [ref=e151]:
+            - paragraph [ref=e152]: https://www.notion.so/kasagilabo/Anime-Static-Data-2fa21ba20aa4808c979fdcfd2ef1eeee here is the not
+            - paragraph [ref=e153]:
+              - link "anime-service" [ref=e154]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·6d ago
+      - listitem [ref=e155]:
+        - link "how many smoke test we reduce from removing this anime-service·6d ago" [ref=e156] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/4c449cfb-b0a4-46a0-a556-fb5f5f9a574d
+          - img [ref=e158]
+          - generic [ref=e160]:
+            - paragraph [ref=e161]: how many smoke test we reduce from removing this
+            - paragraph [ref=e162]:
+              - link "anime-service" [ref=e163]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·6d ago
+      - listitem [ref=e164]:
+        - link "for episode rating, currently there is a compute metadata function that caches the ratings average s anime-service·6d ago" [ref=e165] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/fb94bbc0-58fc-4ba2-8525-7d464052c448
+          - img [ref=e167]
+          - generic [ref=e169]:
+            - paragraph [ref=e170]: for episode rating, currently there is a compute metadata function that caches the ratings average s
+            - paragraph [ref=e171]:
+              - link "anime-service" [ref=e172]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·6d ago
+      - listitem [ref=e173]:
+        - link "for the news section, create the individual news pages, generate the content appropriately for now. ck·6d ago" [ref=e174] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-ck/session/1afd4531-6bbd-4465-be68-19e8d2e0fa8c
+          - img [ref=e176]
+          - generic [ref=e178]:
+            - paragraph [ref=e179]: for the news section, create the individual news pages, generate the content appropriately for now.
+            - paragraph [ref=e180]:
+              - link "ck" [ref=e181]:
+                - /url: /project/-home-ts-projects-ck
+              - text: ·6d ago
+      - listitem [ref=e182]:
+        - link "research if it is possible to do an agent based (based off our agent development) to do a search on content-service·2/2/2026" [ref=e183] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-content-service/session/e1694bc4-2334-4865-a3f2-107239e1387d
+          - img [ref=e185]
+          - generic [ref=e187]:
+            - paragraph [ref=e188]: research if it is possible to do an agent based (based off our agent development) to do a search on
+            - paragraph [ref=e189]:
+              - link "content-service" [ref=e190]:
+                - /url: /project/-home-ts-projects-content-service
+              - text: ·2/2/2026
+      - listitem [ref=e191]:
+        - 'link "scan the agent folder, analyze if: - title matching agent is there and how to use - what AI models content-service·2/2/2026" [ref=e192] [cursor=pointer]':
+          - /url: /project/-home-ts-projects-content-service/session/5fe78988-b0fc-4b79-ac37-93a17987ac1e
+          - img [ref=e194]
+          - generic [ref=e196]:
+            - paragraph [ref=e197]: "scan the agent folder, analyze if: - title matching agent is there and how to use - what AI models"
+            - paragraph [ref=e198]:
+              - link "content-service" [ref=e199]:
+                - /url: /project/-home-ts-projects-content-service
+              - text: ·2/2/2026
+      - listitem [ref=e200]:
+        - link "analyze the agent folder on captcha generator and summarize in short how it works content-service·2/2/2026" [ref=e201] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-content-service/session/12dcd4e4-f4ed-4fe2-8daf-36eb7e445fb9
+          - img [ref=e203]
+          - generic [ref=e205]:
+            - paragraph [ref=e206]: analyze the agent folder on captcha generator and summarize in short how it works
+            - paragraph [ref=e207]:
+              - link "content-service" [ref=e208]:
+                - /url: /project/-home-ts-projects-content-service
+              - text: ·2/2/2026
+      - listitem [ref=e209]:
+        - link "currently there is a slack notification for build notification. identify and analyze this content-service·2/2/2026" [ref=e210] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-content-service/session/197fbe14-af8d-46c3-864b-72ac84702aed
+          - img [ref=e212]
+          - generic [ref=e214]:
+            - paragraph [ref=e215]: currently there is a slack notification for build notification. identify and analyze this
+            - paragraph [ref=e216]:
+              - link "content-service" [ref=e217]:
+                - /url: /project/-home-ts-projects-content-service
+              - text: ·2/2/2026
+      - listitem [ref=e218]:
+        - link "New session ck·2/2/2026" [ref=e219] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-ck/session/a4f209e4-22a5-4e5b-a946-87a69a0a0824
+          - img [ref=e221]
+          - generic [ref=e223]:
+            - paragraph [ref=e224]: New session
+            - paragraph [ref=e225]:
+              - link "ck" [ref=e226]:
+                - /url: /project/-home-ts-projects-ck
+              - text: ·2/2/2026
+      - listitem [ref=e227]:
+        - link "New session ck·2/2/2026" [ref=e228] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-ck/session/9161852e-c8ee-4509-9a33-3cc34239483e
+          - img [ref=e230]
+          - generic [ref=e232]:
+            - paragraph [ref=e233]: New session
+            - paragraph [ref=e234]:
+              - link "ck" [ref=e235]:
+                - /url: /project/-home-ts-projects-ck
+              - text: ·2/2/2026
+      - listitem [ref=e236]:
+        - link "New session ck·2/2/2026" [ref=e237] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-ck/session/3b282cae-f512-484a-8f66-53c87b451468
+          - img [ref=e239]
+          - generic [ref=e241]:
+            - paragraph [ref=e242]: New session
+            - paragraph [ref=e243]:
+              - link "ck" [ref=e244]:
+                - /url: /project/-home-ts-projects-ck
+              - text: ·2/2/2026
+      - listitem [ref=e245]:
+        - link "New session ts·2/1/2026" [ref=e246] [cursor=pointer]:
+          - /url: /project/-home-ts/session/4be95485-caff-400c-b4e8-427a3bba82b4
+          - img [ref=e248]
+          - generic [ref=e250]:
+            - paragraph [ref=e251]: New session
+            - paragraph [ref=e252]:
+              - link "ts" [ref=e253]:
+                - /url: /project/-home-ts
+              - text: ·2/1/2026
+      - listitem [ref=e254]:
+        - link "New session ts·2/1/2026" [ref=e255] [cursor=pointer]:
+          - /url: /project/-home-ts/session/60da8d8e-74c4-42e0-b464-b6b530eab6f7
+          - img [ref=e257]
+          - generic [ref=e259]:
+            - paragraph [ref=e260]: New session
+            - paragraph [ref=e261]:
+              - link "ts" [ref=e262]:
+                - /url: /project/-home-ts
+              - text: ·2/1/2026
+      - listitem [ref=e263]:
+        - link "commit push and pr anime-service·1/31/2026" [ref=e264] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/58dd4524-7d7f-4763-942d-c6ce4042fe91
+          - img [ref=e266]
+          - generic [ref=e268]:
+            - paragraph [ref=e269]: commit push and pr
+            - paragraph [ref=e270]:
+              - link "anime-service" [ref=e271]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·1/31/2026
+      - listitem [ref=e272]:
+        - link "dbclient can exist, the issue is only that the dbclient got stored in pg, which is unnecessary. anime-service·1/31/2026" [ref=e273] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/b29cd4bd-e420-4497-9b7a-0f96db1c7b38
+          - img [ref=e275]
+          - generic [ref=e277]:
+            - paragraph [ref=e278]: dbclient can exist, the issue is only that the dbclient got stored in pg, which is unnecessary.
+            - paragraph [ref=e279]:
+              - link "anime-service" [ref=e280]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·1/31/2026
+      - listitem [ref=e281]:
+        - link "docs/AOB-114-episode-rating-hire-form.md keep track of requirement, plan and status here, keep docum user-service·1/29/2026" [ref=e282] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-user-service/session/0c760298-c5de-44ed-99ba-1063b27e3c2c
+          - img [ref=e284]
+          - generic [ref=e286]:
+            - paragraph [ref=e287]: docs/AOB-114-episode-rating-hire-form.md keep track of requirement, plan and status here, keep docum
+            - paragraph [ref=e288]:
+              - link "user-service" [ref=e289]:
+                - /url: /project/-home-ts-projects-user-service
+              - text: ·1/29/2026
+      - listitem [ref=e290]:
+        - link "check if profile.md has this statistics.reviews documented. add and push to notion user-service·1/29/2026" [ref=e291] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-user-service/session/c7c781fd-b305-43cf-8b30-138e6b9b6cec
+          - img [ref=e293]
+          - generic [ref=e295]:
+            - paragraph [ref=e296]: check if profile.md has this statistics.reviews documented. add and push to notion
+            - paragraph [ref=e297]:
+              - link "user-service" [ref=e298]:
+                - /url: /project/-home-ts-projects-user-service
+              - text: ·1/29/2026
+      - listitem [ref=e299]:
+        - link "docs/AOB-113-episode-rating-raffles-currency.md keep track of requirement, plan and status here - a user-service·1/29/2026" [ref=e300] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-user-service/session/35eef9f3-aab5-41dd-a1ab-d3dad04500e9
+          - img [ref=e302]
+          - generic [ref=e304]:
+            - paragraph [ref=e305]: docs/AOB-113-episode-rating-raffles-currency.md keep track of requirement, plan and status here - a
+            - paragraph [ref=e306]:
+              - link "user-service" [ref=e307]:
+                - /url: /project/-home-ts-projects-user-service
+              - text: ·1/29/2026
+      - listitem [ref=e308]:
+        - link "No prompt content-service·1/28/2026" [ref=e309] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-content-service/session/c63068d0-a396-4273-9a06-4c4dd6d0f444
+          - img [ref=e311]
+          - generic [ref=e313]:
+            - paragraph [ref=e314]: No prompt
+            - paragraph [ref=e315]:
+              - link "content-service" [ref=e316]:
+                - /url: /project/-home-ts-projects-content-service
+              - text: ·1/28/2026
+      - listitem [ref=e317]:
+        - link "@docs/AOB-105-generic-static-entity-and-json-generator.md content-service·1/28/2026" [ref=e318] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-content-service/session/07151bb9-57e7-4407-b09d-120b7ed1341c
+          - img [ref=e320]
+          - generic [ref=e322]:
+            - paragraph [ref=e323]: "@docs/AOB-105-generic-static-entity-and-json-generator.md"
+            - paragraph [ref=e324]:
+              - link "content-service" [ref=e325]:
+                - /url: /project/-home-ts-projects-content-service
+              - text: ·1/28/2026
+      - listitem [ref=e326]:
+        - link "1. ensure that the migration is accurate. i do not want to rerun the migration but manually give me social-service·1/28/2026" [ref=e327] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-social-service/session/947bfe7b-a37c-4cc2-b495-e072c5f3f835
+          - img [ref=e329]
+          - generic [ref=e331]:
+            - paragraph [ref=e332]: 1. ensure that the migration is accurate. i do not want to rerun the migration but manually give me
+            - paragraph [ref=e333]:
+              - link "social-service" [ref=e334]:
+                - /url: /project/-home-ts-projects-social-service
+              - text: ·1/28/2026
+      - listitem [ref=e335]:
+        - link "in @src/controllers/posts.ts summarize in short what are the available predefined queries that have social-service·1/28/2026" [ref=e336] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-social-service/session/81bb0af5-cfeb-4996-9fec-68e77d1dad9d
+          - img [ref=e338]
+          - generic [ref=e340]:
+            - paragraph [ref=e341]: in @src/controllers/posts.ts summarize in short what are the available predefined queries that have
+            - paragraph [ref=e342]:
+              - link "social-service" [ref=e343]:
+                - /url: /project/-home-ts-projects-social-service
+              - text: ·1/28/2026
+      - listitem [ref=e344]:
+        - link "docs/AOB-104-episode-rating-to-rate-api-to-support-watchlist-status-map.md keep track of requirement anime-service·1/27/2026" [ref=e345] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/95eda7c6-dc8e-49df-b820-d4e355c619a8
+          - img [ref=e347]
+          - generic [ref=e349]:
+            - paragraph [ref=e350]: docs/AOB-104-episode-rating-to-rate-api-to-support-watchlist-status-map.md keep track of requirement
+            - paragraph [ref=e351]:
+              - link "anime-service" [ref=e352]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·1/27/2026
+      - listitem [ref=e353]:
+        - link "for the api /episode/ratings, currently there is a ?user_id query, add an additional optional ?sort= anime-service·1/27/2026" [ref=e354] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/7800c7b6-ab87-4198-9787-f0d4a3428032
+          - img [ref=e356]
+          - generic [ref=e358]:
+            - paragraph [ref=e359]: for the api /episode/ratings, currently there is a ?user_id query, add an additional optional ?sort=
+            - paragraph [ref=e360]:
+              - link "anime-service" [ref=e361]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·1/27/2026
+      - listitem [ref=e362]:
+        - link "run the full smoke test anime-service·1/27/2026" [ref=e363] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/70a57f85-21b2-4264-8033-febd81284add
+          - img [ref=e365]
+          - generic [ref=e367]:
+            - paragraph [ref=e368]: run the full smoke test
+            - paragraph [ref=e369]:
+              - link "anime-service" [ref=e370]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·1/27/2026
+      - listitem [ref=e371]:
+        - link "check if PERSPECTIVE_API_KEY is set in staging.yaml anime-service·1/27/2026" [ref=e372] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/40d27959-bbd5-4f1c-a2c0-0dda2da4beba
+          - img [ref=e374]
+          - generic [ref=e376]:
+            - paragraph [ref=e377]: check if PERSPECTIVE_API_KEY is set in staging.yaml
+            - paragraph [ref=e378]:
+              - link "anime-service" [ref=e379]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·1/27/2026
+      - listitem [ref=e380]:
+        - link "for @scripts/recompute-episode-ratings.ts check if it is correct and what does it run against anime-service·1/27/2026" [ref=e381] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/b38b2b3d-57c0-4ad2-88ca-afc989d04162
+          - img [ref=e383]
+          - generic [ref=e385]:
+            - paragraph [ref=e386]: for @scripts/recompute-episode-ratings.ts check if it is correct and what does it run against
+            - paragraph [ref=e387]:
+              - link "anime-service" [ref=e388]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·1/27/2026
+      - listitem [ref=e389]:
+        - link "New session 109·1/27/2026" [ref=e390] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service-aob-109/session/364f1be4-ee61-451f-a297-38a038758da8
+          - img [ref=e392]
+          - generic [ref=e394]:
+            - paragraph [ref=e395]: New session
+            - paragraph [ref=e396]:
+              - link "109" [ref=e397]:
+                - /url: /project/-home-ts-projects-anime-service-aob-109
+              - text: ·1/27/2026
+      - listitem [ref=e398]:
+        - link "New session content-service·1/26/2026" [ref=e399] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-content-service/session/0c74083d-d3ff-4b35-88d6-bcb87f311f56
+          - img [ref=e401]
+          - generic [ref=e403]:
+            - paragraph [ref=e404]: New session
+            - paragraph [ref=e405]:
+              - link "content-service" [ref=e406]:
+                - /url: /project/-home-ts-projects-content-service
+              - text: ·1/26/2026
+      - listitem [ref=e407]:
+        - link "New session content-service·1/26/2026" [ref=e408] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-content-service/session/71c2b742-aa96-4c79-b914-ad42c1fec6a5
+          - img [ref=e410]
+          - generic [ref=e412]:
+            - paragraph [ref=e413]: New session
+            - paragraph [ref=e414]:
+              - link "content-service" [ref=e415]:
+                - /url: /project/-home-ts-projects-content-service
+              - text: ·1/26/2026
+      - listitem [ref=e416]:
+        - link "docs/AOB-23-episode-rating-track-episode-vote-platform.md - update requirement doc - for type = epi content-service·1/26/2026" [ref=e417] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-content-service/session/39fbd8f1-f711-4dd0-a776-d1692ca5eeb3
+          - img [ref=e419]
+          - generic [ref=e421]:
+            - paragraph [ref=e422]: docs/AOB-23-episode-rating-track-episode-vote-platform.md - update requirement doc - for type = epi
+            - paragraph [ref=e423]:
+              - link "content-service" [ref=e424]:
+                - /url: /project/-home-ts-projects-content-service
+              - text: ·1/26/2026
+      - listitem [ref=e425]:
+        - 'link "create a new migration for a new table schema: data table: static columns: - id: id - key: string, pg-migration-pipeline·1/26/2026" [ref=e426] [cursor=pointer]':
+          - /url: /project/-home-ts-projects-pg-migration-pipeline/session/803d48f9-6821-487f-8fc7-f60f5d1b416d
+          - img [ref=e428]
+          - generic [ref=e430]:
+            - paragraph [ref=e431]: "create a new migration for a new table schema: data table: static columns: - id: id - key: string,"
+            - paragraph [ref=e432]:
+              - link "pg-migration-pipeline" [ref=e433]:
+                - /url: /project/-home-ts-projects-pg-migration-pipeline
+              - text: ·1/26/2026
+      - listitem [ref=e434]:
+        - link "New session pg-migration-pipeline·1/26/2026" [ref=e435] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-pg-migration-pipeline/session/3cb899e9-1a7f-41d4-90da-f69e85fb4746
+          - img [ref=e437]
+          - generic [ref=e439]:
+            - paragraph [ref=e440]: New session
+            - paragraph [ref=e441]:
+              - link "pg-migration-pipeline" [ref=e442]:
+                - /url: /project/-home-ts-projects-pg-migration-pipeline
+              - text: ·1/26/2026
+      - listitem [ref=e443]:
+        - link "in migrations/1746332699673_recommendation-taxonomies.js, abstract the shorthands to an export defau pg-migration-pipeline·1/26/2026" [ref=e444] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-pg-migration-pipeline/session/e4416086-2e33-4baf-807c-8d7d90c33135
+          - img [ref=e446]
+          - generic [ref=e448]:
+            - paragraph [ref=e449]: in migrations/1746332699673_recommendation-taxonomies.js, abstract the shorthands to an export defau
+            - paragraph [ref=e450]:
+              - link "pg-migration-pipeline" [ref=e451]:
+                - /url: /project/-home-ts-projects-pg-migration-pipeline
+              - text: ·1/26/2026
+      - listitem [ref=e452]:
+        - 'link "write a `scripts/` to recompute anime.episode_ratings by select distinct episode_id and call the uti anime-service·1/26/2026" [ref=e453] [cursor=pointer]':
+          - /url: /project/-home-ts-projects-anime-service/session/e6657dbe-723d-43b1-b7ea-6bb9dd50ceeb
+          - img [ref=e455]
+          - generic [ref=e457]:
+            - paragraph [ref=e458]: "write a `scripts/` to recompute anime.episode_ratings by select distinct episode_id and call the uti"
+            - paragraph [ref=e459]:
+              - link "anime-service" [ref=e460]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·1/26/2026
+      - listitem [ref=e461]:
+        - link "in the api /watchlist/count/:user_id what is the response body count mean anime-service·1/26/2026" [ref=e462] [cursor=pointer]:
+          - /url: /project/-home-ts-projects-anime-service/session/eacf9655-bc34-4876-8262-e28db42e3a65
+          - img [ref=e464]
+          - generic [ref=e466]:
+            - paragraph [ref=e467]: in the api /watchlist/count/:user_id what is the response body count mean
+            - paragraph [ref=e468]:
+              - link "anime-service" [ref=e469]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·1/26/2026
+      - listitem [ref=e470]:
+        - 'link "investigate identify codes that publishes event to the topic `push-notification` anime-service·1/26/2026" [ref=e471] [cursor=pointer]':
+          - /url: /project/-home-ts-projects-anime-service/session/69b38c6b-0be1-454f-ac13-7242b7742744
+          - img [ref=e473]
+          - generic [ref=e475]:
+            - paragraph [ref=e476]: "investigate identify codes that publishes event to the topic `push-notification`"
+            - paragraph [ref=e477]:
+              - link "anime-service" [ref=e478]:
+                - /url: /project/-home-ts-projects-anime-service
+              - text: ·1/26/2026
+  - generic [ref=e480]:
+    - banner [ref=e481]:
+      - generic [ref=e482]:
+        - button [ref=e483] [cursor=pointer]:
+          - img [ref=e484]
+        - generic [ref=e486]:
+          - link "cc-web" [ref=e487] [cursor=pointer]:
+            - /url: /project/-home-ts-projects-cc-web
+          - generic [ref=e488]: /
+          - generic [ref=e489]: New session
+      - generic [ref=e493]: Connected
+    - main [ref=e495]:
+      - generic [ref=e496]:
+        - paragraph [ref=e497]: Start a conversation
+        - paragraph [ref=e498]: Type a message below to begin.
+    - contentinfo [ref=e499]:
+      - generic [ref=e501]:
+        - button "Chat" [ref=e502] [cursor=pointer]:
+          - img [ref=e503]
+          - text: Chat
+        - button "Terminal" [ref=e505] [cursor=pointer]:
+          - img [ref=e506]
+          - text: Terminal
+        - button "Files" [ref=e508] [cursor=pointer]:
+          - img [ref=e509]
+          - text: Files
+      - generic:
+        - generic:
+          - img
+        - generic "Reconnecting to server...":
+          - img
+          - text: Reconnecting...
+        - button "Send (Ctrl+Enter)" [disabled]:
+          - img
+      - generic [ref=e514]:
+        - generic "Click to view changes" [ref=e516] [cursor=pointer]:
+          - img [ref=e517]
+          - text: wip
+          - generic [ref=e521]: ~1
+        - generic [ref=e522]:
+          - generic [ref=e523]:
+            - button "H" [ref=e524] [cursor=pointer]
+            - button "S" [ref=e525] [cursor=pointer]
+            - button "O" [ref=e526] [cursor=pointer]
+          - generic [ref=e527]:
+            - button "Default - Ask for permissions" [ref=e528] [cursor=pointer]:
+              - img [ref=e529]
+            - button "Plan Mode - Read-only exploration" [ref=e531] [cursor=pointer]:
+              - img [ref=e532]
+            - button "Bypass Permissions - Auto-approve safe operations" [ref=e535] [cursor=pointer]:
+              - img [ref=e536]
+            - button "Skip Permissions - No permission checks (dangerous)" [ref=e539] [cursor=pointer]:
+              - img [ref=e540]

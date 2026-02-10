@@ -26,6 +26,9 @@ export async function restartWithInvertedSpawn(reason, newVersion = null) {
       ...process.env,
       RESTART_TOKEN: restartToken,
       IS_RESTART: 'true',
+      UPGRADE_RETRY_BIND: 'true',
+      UPGRADE_MAX_RETRIES: process.env.UPGRADE_MAX_RETRIES || '20',
+      UPGRADE_RETRY_INTERVAL: process.env.UPGRADE_RETRY_INTERVAL || '1000',
     },
   });
 
