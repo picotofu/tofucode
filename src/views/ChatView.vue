@@ -2925,7 +2925,8 @@ watch(openedFile, (file) => {
   display: flex;
   align-items: center;
   align-self: flex-start;
-  padding-top: 2px;
+  padding-top: 10px;
+  margin-left: -2px; /* Align with form padding */
 }
 
 .input-form.permission-plan .chat-prompt {
@@ -2977,6 +2978,8 @@ watch(openedFile, (file) => {
   background: transparent;
   color: var(--text-muted);
   transition: color 0.15s, background 0.15s;
+  margin-right: -4px; /* Align with form padding */
+  margin-bottom: -2px;
 }
 
 .send-btn:disabled {
@@ -2991,8 +2994,8 @@ watch(openedFile, (file) => {
 /* Clear/Undo button (top-right of input) */
 .clear-undo-btn {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 10px;
+  right: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
