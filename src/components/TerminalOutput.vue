@@ -210,20 +210,6 @@ async function copyOutput(proc, e) {
           class="terminal-block"
           :class="{ running: proc.status === 'running', expanded: isExpanded(proc.id) }"
         >
-          <!-- Floating action buttons -->
-          <div class="floating-actions" v-if="proc.status !== 'running'">
-            <button
-              class="replay-btn"
-              @click.stop="$emit('replay', proc.command, proc.cwd)"
-              title="Run this command again"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="23 4 23 10 17 10"/>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-              </svg>
-            </button>
-          </div>
-
           <!-- Command line -->
           <div class="command-line" @click="proc.status !== 'running' && toggleExpand(proc.id)">
             <span class="terminal-status" :class="proc.status">
@@ -244,6 +230,17 @@ async function copyOutput(proc, e) {
                 <span class="terminal-duration">{{ formatDuration(proc.startedAt, proc.endedAt) }}</span>
               </template>
             </span>
+            <button
+              v-if="proc.status !== 'running'"
+              class="replay-btn"
+              @click.stop="$emit('replay', proc.command, proc.cwd)"
+              title="Run this command again"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+              </svg>
+            </button>
             <button
               v-if="proc.output.length > 0 && (proc.status === 'running' || isExpanded(proc.id))"
               class="copy-btn"
@@ -342,38 +339,23 @@ async function copyOutput(proc, e) {
   border-radius: var(--radius-sm);
 }
 
-.floating-actions {
-  position: absolute;
-  top: 8px;
-  right: 0;
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.terminal-block:hover .floating-actions {
-  opacity: 1;
-}
-
-.floating-actions .replay-btn {
+/* History tab inline replay button */
+.process-list.history .replay-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
   color: var(--text-muted);
   background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
-.floating-actions .replay-btn:hover {
-  color: var(--text-primary);
+.process-list.history .replay-btn:hover {
+  color: var(--text-secondary);
   background: var(--bg-hover);
-  border-color: var(--text-muted);
 }
 
 .command-line {
