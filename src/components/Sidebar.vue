@@ -149,85 +149,6 @@ function handleOverlayClick() {
 
 <template>
   <aside class="sidebar" :class="{ open }">
-    <div class="sidebar-header">
-      <router-link :to="{ name: 'projects' }" class="sidebar-title" @click="closeOnMobile">
-        <svg class="sidebar-logo" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M 4 14 Q 4 11 6 10 Q 6 8 8 8 Q 9 6 12 6 Q 15 6 16 8 Q 18 8 18 10 Q 20 11 20 14 Q 20 16 18 16 H 6 Q 4 16 4 14 Z"/>
-          <g opacity="0.7">
-            <line x1="12" y1="11" x2="12" y2="8"/>
-            <line x1="12" y1="11" x2="15" y2="9"/>
-            <line x1="12" y1="11" x2="16" y2="12"/>
-            <line x1="12" y1="11" x2="14" y2="14"/>
-            <line x1="12" y1="11" x2="12" y2="15"/>
-            <line x1="12" y1="11" x2="10" y2="14"/>
-            <line x1="12" y1="11" x2="8" y2="12"/>
-            <line x1="12" y1="11" x2="9" y2="9"/>
-            <circle cx="12" cy="11" r="1"/>
-          </g>
-        </svg>
-        <span>cc-web</span>
-      </router-link>
-
-      <!-- Version display -->
-      <span v-if="currentVersion" class="current-version">
-        v{{ currentVersion }}
-      </span>
-
-      <!-- Upgrade button (shown when update available) -->
-      <div v-if="updateAvailable" class="upgrade-btn-wrapper">
-        <button
-          class="upgrade-btn"
-          @click="handleUpgrade"
-          :disabled="isUpgrading"
-          :title="`Upgrade to v${updateAvailable.latestVersion}`"
-        >
-          <svg v-if="!isUpgrading" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 19V5M5 12l7-7 7 7"/>
-          </svg>
-          <svg v-else width="12" height="12" viewBox="0 0 24 24" class="spin">
-            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
-          </svg>
-          <span>v{{ updateAvailable.latestVersion }}</span>
-        </button>
-        <button class="dismiss-btn" @click="handleDismissUpdate" title="Dismiss">×</button>
-      </div>
-
-      <!-- Restart button (shown when no update available) -->
-      <button
-        v-if="!updateAvailable"
-        class="restart-btn"
-        @click="handleRestart"
-        :disabled="isRestarting"
-        title="Restart server"
-      >
-        <svg v-if="!isRestarting" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M23 4v6h-6"/>
-          <path d="M1 20v-6h6"/>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
-        <svg v-else width="14" height="14" viewBox="0 0 24 24" class="spin">
-          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
-        </svg>
-      </button>
-    </div>
-
-    <nav class="sidebar-tabs">
-      <button
-        class="sidebar-tab"
-        :class="{ active: activeTab === 'sessions' }"
-        @click="activeTab = 'sessions'"
-      >
-        Sessions
-      </button>
-      <button
-        class="sidebar-tab"
-        :class="{ active: activeTab === 'projects' }"
-        @click="activeTab = 'projects'"
-      >
-        Projects
-      </button>
-    </nav>
-
     <div class="sidebar-content">
       <!-- Recent Sessions Tab -->
       <ul v-if="activeTab === 'sessions'" class="sidebar-list">
@@ -349,6 +270,91 @@ function handleOverlayClick() {
         </li>
       </ul>
     </div>
+
+    <nav class="sidebar-tabs">
+      <button
+        class="sidebar-tab"
+        :class="{ active: activeTab === 'sessions' }"
+        @click="activeTab = 'sessions'"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        Sessions
+      </button>
+      <button
+        class="sidebar-tab"
+        :class="{ active: activeTab === 'projects' }"
+        @click="activeTab = 'projects'"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        Projects
+      </button>
+    </nav>
+
+    <div class="sidebar-header">
+      <router-link :to="{ name: 'projects' }" class="sidebar-title" @click="closeOnMobile">
+        <svg class="sidebar-logo" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M 4 14 Q 4 11 6 10 Q 6 8 8 8 Q 9 6 12 6 Q 15 6 16 8 Q 18 8 18 10 Q 20 11 20 14 Q 20 16 18 16 H 6 Q 4 16 4 14 Z"/>
+          <g opacity="0.7">
+            <line x1="12" y1="11" x2="12" y2="8"/>
+            <line x1="12" y1="11" x2="15" y2="9"/>
+            <line x1="12" y1="11" x2="16" y2="12"/>
+            <line x1="12" y1="11" x2="14" y2="14"/>
+            <line x1="12" y1="11" x2="12" y2="15"/>
+            <line x1="12" y1="11" x2="10" y2="14"/>
+            <line x1="12" y1="11" x2="8" y2="12"/>
+            <line x1="12" y1="11" x2="9" y2="9"/>
+            <circle cx="12" cy="11" r="1"/>
+          </g>
+        </svg>
+        <span>cc-web</span>
+      </router-link>
+
+      <!-- Version display -->
+      <span v-if="currentVersion" class="current-version">
+        v{{ currentVersion }}
+      </span>
+
+      <!-- Upgrade button (shown when update available) -->
+      <div v-if="updateAvailable" class="upgrade-btn-wrapper">
+        <button
+          class="upgrade-btn"
+          @click="handleUpgrade"
+          :disabled="isUpgrading"
+          :title="`Upgrade to v${updateAvailable.latestVersion}`"
+        >
+          <svg v-if="!isUpgrading" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 19V5M5 12l7-7 7 7"/>
+          </svg>
+          <svg v-else width="12" height="12" viewBox="0 0 24 24" class="spin">
+            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+          </svg>
+          <span>v{{ updateAvailable.latestVersion }}</span>
+        </button>
+        <button class="dismiss-btn" @click="handleDismissUpdate" title="Dismiss">×</button>
+      </div>
+
+      <!-- Restart button (shown when no update available) -->
+      <button
+        v-if="!updateAvailable"
+        class="restart-btn"
+        @click="handleRestart"
+        :disabled="isRestarting"
+        title="Restart server"
+      >
+        <svg v-if="!isRestarting" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 4v6h-6"/>
+          <path d="M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        <svg v-else width="14" height="14" viewBox="0 0 24 24" class="spin">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
   </aside>
 
   <!-- Overlay for mobile -->
@@ -382,7 +388,7 @@ function handleOverlayClick() {
   padding: 10px 16px;
   min-height: 57px;
   box-sizing: border-box;
-  border-bottom: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color);
 }
 
 .sidebar-title {
@@ -514,34 +520,42 @@ function handleOverlayClick() {
 
 .sidebar-tabs {
   display: flex;
-  border-bottom: 1px solid var(--border-color);
+  align-items: center;
+  gap: 2px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
 }
 
 .sidebar-tab {
-  flex: 1;
-  padding: 10px 12px;
-  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   background: transparent;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  transition: color 0.15s, border-color 0.15s;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s, background 0.15s;
+  flex: 1;
+  justify-content: center;
 }
 
 .sidebar-tab:hover {
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
 .sidebar-tab.active {
   color: var(--text-primary);
-  border-bottom-color: var(--text-primary);
+  background: var(--bg-tertiary);
 }
 
 .sidebar-content {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+  padding-bottom: 0;
 }
 
 .sidebar-list {
