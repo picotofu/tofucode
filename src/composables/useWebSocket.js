@@ -731,6 +731,10 @@ export function useChatWebSocket() {
     send({ type: 'terminal:clear', processId });
   }
 
+  function clearTaskStatus() {
+    taskStatus.value = 'idle';
+  }
+
   // Auto-cleanup on unmount
   onUnmounted(() => {
     disconnect();
@@ -774,6 +778,9 @@ export function useChatWebSocket() {
     killProcess,
     listProcesses,
     clearTerminal,
+
+    // Task status
+    clearTaskStatus,
 
     // Direct send
     send,

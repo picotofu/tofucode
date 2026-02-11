@@ -144,33 +144,6 @@ async function copyOutput(proc, e) {
 
 <template>
   <div class="terminal-output">
-    <!-- Sub-tabs -->
-    <div class="terminal-tabs">
-      <button
-        class="terminal-tab"
-        :class="{ active: activeTab === 'active' }"
-        @click="setTab('active')"
-      >
-        Active
-        <span class="tab-badge" v-if="runningProcesses.length > 0">{{ runningProcesses.length }}</span>
-      </button>
-      <button
-        class="terminal-tab"
-        :class="{ active: activeTab === 'history' }"
-        @click="setTab('history')"
-      >
-        History
-      </button>
-      <button
-        v-if="activeTab === 'history'"
-        class="clear-all-btn"
-        @click="$emit('clear')"
-        title="Clear completed"
-      >
-        Clear
-      </button>
-    </div>
-
     <!-- Active Tab Content -->
     <div class="tab-content" v-if="activeTab === 'active'">
       <div v-if="runningProcesses.length > 0" class="process-list">
@@ -285,60 +258,6 @@ async function copyOutput(proc, e) {
   height: 100%;
   font-family: var(--font-mono);
   font-size: 13px;
-}
-
-.terminal-tabs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-}
-
-.terminal-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  border-radius: var(--radius-sm);
-  transition: color 0.15s, background 0.15s;
-}
-
-.terminal-tab:hover {
-  color: var(--text-secondary);
-  background: var(--bg-hover);
-}
-
-.terminal-tab.active {
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-}
-
-.tab-badge {
-  font-size: 10px;
-  padding: 1px 5px;
-  background: var(--warning-color);
-  color: var(--bg-primary);
-  border-radius: 10px;
-  font-weight: 600;
-}
-
-.clear-all-btn {
-  margin-left: auto;
-  font-size: 11px;
-  padding: 4px 10px;
-  color: var(--text-muted);
-  border-radius: var(--radius-sm);
-  transition: color 0.15s, background 0.15s;
-}
-
-.clear-all-btn:hover {
-  color: var(--text-secondary);
-  background: var(--bg-hover);
 }
 
 .tab-content {

@@ -51,6 +51,7 @@ const {
   killProcess,
   listProcesses,
   clearTerminal,
+  clearTaskStatus,
   send,
   onMessage,
 } = useChatWebSocket();
@@ -593,6 +594,24 @@ watch(modelSelection, (newModel) => {
 
 // Load model on mount
 loadModelSelection();
+
+// Auto-clear completed status after 3 seconds
+let completedStatusTimer = null;
+watch(taskStatus, (newStatus) => {
+  // Clear any existing timer
+  if (completedStatusTimer) {
+    clearTimeout(completedStatusTimer);
+    completedStatusTimer = null;
+  }
+
+  // If task completed successfully, auto-clear after 3 seconds
+  if (newStatus === 'completed') {
+    completedStatusTimer = setTimeout(() => {
+      clearTaskStatus();
+      completedStatusTimer = null;
+    }, 3000);
+  }
+});
 
 const isRunning = computed(() => taskStatus.value === 'running');
 const isNewSession = computed(() => sessionParam.value === 'new');
@@ -1375,7 +1394,7 @@ watch(openedFile, (file) => {
 
 <template>
   <div class="chat-view">
-    <AppHeader :show-hamburger="true" @toggle-sidebar="sidebar.toggle">
+    <AppHeader :show-hamburger="false">
       <template #content>
         <div class="header-breadcrumb">
           <!-- Folder name (last segment) - links to sessions -->
@@ -1476,83 +1495,127 @@ watch(openedFile, (file) => {
     </main>
 
     <footer class="footer">
-      <!-- Mode tabs: Chat | Terminal | Files -->
-      <div class="mode-tabs">
-        <div class="mode-tabs-group">
-          <button
-            class="mode-tab"
-            :class="{ active: currentMode === 'chat' }"
-            @click="currentMode = 'chat'"
-            title="Chat mode"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            Chat
-          </button>
-          <button
-            class="mode-tab"
-            :class="{ active: currentMode === 'terminal' }"
-            @click="currentMode = 'terminal'"
-            title="Terminal mode"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="4 17 10 11 4 5"/>
-              <line x1="12" y1="19" x2="20" y2="19"/>
-            </svg>
-            Terminal
-            <span class="mode-badge" v-if="runningProcessCount > 0">{{ runningProcessCount }}</span>
-          </button>
-          <button
-            class="mode-tab"
-            :class="{ active: currentMode === 'files' }"
-            @click="currentMode = 'files'"
-            title="Files mode"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
-              <polyline points="13 2 13 9 20 9"/>
-            </svg>
-            Files
-          </button>
-        </div>
-
-        <!-- Task status indicator (flex right) -->
-        <div class="task-status-indicator">
-          <button
-            v-if="isRunning"
-            class="status-stop-btn"
-            @click="cancelTask"
-            title="Stop running task"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="6" y="6" width="12" height="12" rx="1"/>
-            </svg>
-          </button>
+      <!-- Toolbar (at top) -->
+      <div class="toolbar">
+        <div class="toolbar-left">
           <span
-            v-else-if="taskStatus === 'completed'"
-            class="status-completed"
-            title="Completed"
+            class="toolbar-item branch"
+            :class="[{ clickable: fileChangesText }, branchColorClass]"
+            v-if="projectStatus.gitBranch"
+            @click="openGitDiffModal"
+            :title="fileChangesText ? 'Click to view changes' : null"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="20 6 9 17 4 12"/>
+              <line x1="6" y1="3" x2="6" y2="15"/>
+              <circle cx="18" cy="6" r="3"/>
+              <circle cx="6" cy="18" r="3"/>
+              <path d="M18 9a9 9 0 0 1-9 9"/>
             </svg>
+            {{ projectStatus.gitBranch }}
+            <span class="git-changes" v-if="fileChangesText">{{ fileChangesText }}</span>
           </span>
-          <span
-            v-else-if="taskStatus === 'error'"
-            class="status-error"
-            title="Error"
-          >
+          <span class="toolbar-item no-git" v-else-if="projectStatus.cwd">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"/>
-              <line x1="15" y1="9" x2="9" y2="15"/>
-              <line x1="9" y1="9" x2="15" y2="15"/>
+              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
             </svg>
+            No git
           </span>
+        </div>
+        <div class="toolbar-right">
+          <!-- Terminal clear button (terminal mode only) -->
+          <button
+            v-if="terminalMode && terminalSubTab === 'history'"
+            class="action-btn clear-terminal-btn"
+            @click="handleTerminalClear()"
+            title="Clear completed processes"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+            Clear
+          </button>
+
+          <!-- Model selector (chat mode only) -->
+          <div v-if="!terminalMode && !filesMode" class="model-tabs">
+            <button
+              class="model-tab"
+              :class="{ active: modelSelection === 'haiku' }"
+              @click="modelSelection = 'haiku'"
+              title="Haiku - Fast & lightweight"
+            >
+              H
+            </button>
+            <button
+              class="model-tab"
+              :class="{ active: modelSelection === 'sonnet' }"
+              @click="modelSelection = 'sonnet'"
+              title="Sonnet - Balanced (default)"
+            >
+              S
+            </button>
+            <button
+              class="model-tab"
+              :class="{ active: modelSelection === 'opus' }"
+              @click="modelSelection = 'opus'"
+              title="Opus - Most capable"
+            >
+              O
+            </button>
+          </div>
+          <!-- Permission tabs (chat mode only) -->
+          <div v-if="!terminalMode && !filesMode" class="permission-tabs">
+            <button
+              class="permission-tab"
+              :class="{ active: permissionMode === 'default' }"
+              @click="permissionMode = 'default'"
+              title="Default - Ask for permissions"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </button>
+            <button
+              class="permission-tab plan"
+              :class="{ active: permissionMode === 'plan' }"
+              @click="permissionMode = 'plan'"
+              title="Plan Mode - Read-only exploration"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+            </button>
+            <button
+              class="permission-tab bypass"
+              :class="{ active: permissionMode === 'bypass' }"
+              @click="permissionMode = 'bypass'"
+              title="Bypass Permissions - Auto-approve safe operations"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+              </svg>
+            </button>
+            <button
+              class="permission-tab skip"
+              :class="{ active: permissionMode === 'skip' }"
+              @click="permissionMode = 'skip'"
+              title="Skip Permissions - No permission checks (dangerous)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Files explorer header (below mode tabs, only in files mode) -->
+      <!-- Files explorer header (only in files mode) -->
       <div v-if="currentMode === 'files'" class="files-explorer-header">
         <div class="files-breadcrumb">
           <button
@@ -1758,109 +1821,108 @@ watch(openedFile, (file) => {
         </button>
       </div>
 
-      <!-- Toolbar (below input) -->
-      <div class="toolbar">
-        <div class="toolbar-left">
-          <span
-            class="toolbar-item branch"
-            :class="[{ clickable: fileChangesText }, branchColorClass]"
-            v-if="projectStatus.gitBranch"
-            @click="openGitDiffModal"
-            :title="fileChangesText ? 'Click to view changes' : null"
+      <!-- Mode tabs at bottom: Chat | Terminal | Files -->
+      <div class="mode-tabs">
+        <!-- Hamburger button -->
+        <button class="hamburger-btn" @click="sidebar.toggle" title="Toggle sidebar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+
+        <div class="mode-tabs-group">
+          <button
+            class="mode-tab"
+            :class="{ active: currentMode === 'chat' }"
+            @click="currentMode = 'chat'"
+            title="Chat mode"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="6" y1="3" x2="6" y2="15"/>
-              <circle cx="18" cy="6" r="3"/>
-              <circle cx="6" cy="18" r="3"/>
-              <path d="M18 9a9 9 0 0 1-9 9"/>
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
-            {{ projectStatus.gitBranch }}
-            <span class="git-changes" v-if="fileChangesText">{{ fileChangesText }}</span>
+            Chat
+          </button>
+          <button
+            class="mode-tab"
+            :class="{ active: currentMode === 'terminal' }"
+            @click="currentMode = 'terminal'"
+            title="Terminal mode"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="4 17 10 11 4 5"/>
+              <line x1="12" y1="19" x2="20" y2="19"/>
+            </svg>
+            Terminal
+            <span class="mode-badge" v-if="runningProcessCount > 0">{{ runningProcessCount }}</span>
+          </button>
+          <button
+            class="mode-tab"
+            :class="{ active: currentMode === 'files' }"
+            @click="currentMode = 'files'"
+            title="Files mode"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+              <polyline points="13 2 13 9 20 9"/>
+            </svg>
+            Files
+          </button>
+        </div>
+
+        <!-- Terminal subtabs (only shown in terminal mode) -->
+        <div v-if="currentMode === 'terminal'" class="terminal-subtabs">
+          <button
+            class="terminal-subtab"
+            :class="{ active: terminalSubTab === 'active' }"
+            @click="terminalSubTab = 'active'"
+            title="Active processes"
+          >
+            Active
+          </button>
+          <button
+            class="terminal-subtab"
+            :class="{ active: terminalSubTab === 'history' }"
+            @click="terminalSubTab = 'history'"
+            title="Command history"
+          >
+            History
+          </button>
+        </div>
+
+        <!-- Task status indicator (flex right) -->
+        <div class="task-status-indicator">
+          <button
+            v-if="isRunning"
+            class="status-stop-btn"
+            @click="cancelTask"
+            title="Stop running task"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="6" y="6" width="12" height="12" rx="1"/>
+            </svg>
+          </button>
+          <span
+            v-else-if="taskStatus === 'completed'"
+            class="status-completed"
+            title="Completed"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
           </span>
-          <span class="toolbar-item no-git" v-else-if="projectStatus.cwd">
+          <span
+            v-else-if="taskStatus === 'error'"
+            class="status-error"
+            title="Error"
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"/>
-              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+              <line x1="15" y1="9" x2="9" y2="15"/>
+              <line x1="9" y1="9" x2="15" y2="15"/>
             </svg>
-            No git
           </span>
-        </div>
-        <div class="toolbar-right">
-          <!-- Model selector (chat mode only) -->
-          <div v-if="!terminalMode && !filesMode" class="model-tabs">
-            <button
-              class="model-tab"
-              :class="{ active: modelSelection === 'haiku' }"
-              @click="modelSelection = 'haiku'"
-              title="Haiku - Fast & lightweight"
-            >
-              H
-            </button>
-            <button
-              class="model-tab"
-              :class="{ active: modelSelection === 'sonnet' }"
-              @click="modelSelection = 'sonnet'"
-              title="Sonnet - Balanced (default)"
-            >
-              S
-            </button>
-            <button
-              class="model-tab"
-              :class="{ active: modelSelection === 'opus' }"
-              @click="modelSelection = 'opus'"
-              title="Opus - Most capable"
-            >
-              O
-            </button>
-          </div>
-          <!-- Permission tabs (chat mode only) -->
-          <div v-if="!terminalMode && !filesMode" class="permission-tabs">
-            <button
-              class="permission-tab"
-              :class="{ active: permissionMode === 'default' }"
-              @click="permissionMode = 'default'"
-              title="Default - Ask for permissions"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
-            </button>
-            <button
-              class="permission-tab plan"
-              :class="{ active: permissionMode === 'plan' }"
-              @click="permissionMode = 'plan'"
-              title="Plan Mode - Read-only exploration"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-                <polyline points="10 9 9 9 8 9"/>
-              </svg>
-            </button>
-            <button
-              class="permission-tab bypass"
-              :class="{ active: permissionMode === 'bypass' }"
-              @click="permissionMode = 'bypass'"
-              title="Bypass Permissions - Auto-approve safe operations"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
-              </svg>
-            </button>
-            <button
-              class="permission-tab skip"
-              :class="{ active: permissionMode === 'skip' }"
-              @click="permissionMode = 'skip'"
-              title="Skip Permissions - No permission checks (dangerous)"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-              </svg>
-            </button>
-          </div>
         </div>
       </div>
     </footer>
@@ -2369,7 +2431,7 @@ watch(openedFile, (file) => {
   justify-content: space-between;
   gap: 12px;
   font-size: 12px;
-  margin-top: 8px;
+  margin-bottom: 8px;
   min-height: 28px; /* Consistent height when permission tabs hidden */
 }
 
@@ -2573,7 +2635,27 @@ watch(openedFile, (file) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-top: 8px;
+}
+
+.hamburger-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.hamburger-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .mode-tabs-group {
@@ -2582,6 +2664,39 @@ watch(openedFile, (file) => {
   padding: 2px;
   background: var(--bg-secondary);
   border-radius: var(--radius-sm);
+}
+
+.terminal-subtabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.terminal-subtab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.terminal-subtab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.terminal-subtab.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .mode-tab {
