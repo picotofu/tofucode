@@ -77,7 +77,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import compress from 'compression';
 import express from 'express';
+import expressStaticGzip from 'express-static-gzip';
 import { WebSocketServer } from 'ws';
 import { config } from './config.js';
 import {
@@ -119,13 +121,24 @@ global.taskCleanupInterval = setInterval(
 
 const app = express();
 const server = createServer(app);
-const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({
+  noServer: true,
+  perMessageDeflate: {
+    zlibDeflateOptions: { level: 3 },
+    clientNoContextTakeover: true,
+    serverNoContextTakeover: true,
+    threshold: 1024, // Only compress messages > 1KB
+  },
+});
 
 // Set reference for graceful shutdown
 httpServer = server;
 
 // Parse JSON and cookies
 app.use(express.json());
+
+// Compress API responses (gzip/brotli)
+app.use('/api', compress({ threshold: 1024 }));
 
 // Session duration for cookie (from env or default 3 days)
 const SESSION_DURATION_DAYS = Number.parseInt(
@@ -241,7 +254,13 @@ if (existsSync(docsPath)) {
 // ============================================
 const distPath = join(rootDir, 'dist');
 if (existsSync(distPath)) {
-  app.use(express.static(distPath));
+  // Serve pre-compressed static files (gzip/brotli from Vite build)
+  app.use(
+    expressStaticGzip(distPath, {
+      enableBrotli: true,
+      orderPreference: ['br', 'gz'],
+    }),
+  );
 
   // SPA fallback - serve index.html for non-API routes
   app.use((req, res, next) => {

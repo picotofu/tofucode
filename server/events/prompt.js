@@ -341,6 +341,38 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
             };
             addTaskResult(task, result);
             sendAndBroadcast(ws, taskSessionId, result);
+          } else {
+            console.log(
+              'Unhandled assistant content block:',
+              JSON.stringify(block).substring(0, 200),
+            );
+          }
+        }
+      } else if (message.type === 'user') {
+        // User messages contain tool results
+        const msgContent = message.message?.content;
+        if (Array.isArray(msgContent)) {
+          for (const block of msgContent) {
+            if (block.type === 'tool_result') {
+              const content =
+                typeof block.content === 'string'
+                  ? block.content
+                  : Array.isArray(block.content)
+                    ? block.content
+                        .map((c) => (c.type === 'text' ? c.text : ''))
+                        .join('')
+                    : '';
+              const result = {
+                type: 'tool_result',
+                toolUseId: block.tool_use_id,
+                content,
+                isError: block.is_error || false,
+                timestamp: new Date().toISOString(),
+                sessionId: taskSessionId,
+              };
+              addTaskResult(task, result);
+              sendAndBroadcast(ws, taskSessionId, result);
+            }
           }
         }
       } else if (message.type === 'result') {

@@ -69,13 +69,22 @@ const manualExpandState = ref(new Map()); // Map<processId, boolean> for user-to
 const terminalMode = computed(() => currentMode.value === 'terminal');
 const filesMode = computed(() => currentMode.value === 'files');
 
-// Filtered files list based on search and dotfiles toggle
+// Filtered files list based on search, dotfiles toggle, and MD mode
 const filteredFilesItems = computed(() => {
   let items = filesItems.value;
 
   // Filter dotfiles if toggle is off
   if (!showDotfiles.value) {
     items = items.filter((item) => !item.name.startsWith('.'));
+  }
+
+  // Filter for .md files only in MD mode (show directories that contain .md files)
+  if (mdMode.value) {
+    items = items.filter(
+      (item) =>
+        (item.isDirectory && item.hasMarkdown) ||
+        item.name.toLowerCase().endsWith('.md'),
+    );
   }
 
   // Apply search filter
@@ -94,6 +103,20 @@ const filesLoading = ref(false);
 const filesFilter = ref(''); // Filter text for file list
 const showDotfiles = ref(false); // Toggle to show/hide dotfiles
 const openedFile = ref(null); // { path, content, loading }
+const fileEditorRef = ref(null);
+
+const openedFileName = computed(() => {
+  if (!openedFile.value?.path) return '';
+  return openedFile.value.path.split('/').pop();
+});
+
+// MD mode - filter for .md files only, with auto-save
+const mdModeKey = 'cc-web:md-mode';
+const mdMode = ref(localStorage.getItem(mdModeKey) === 'true');
+
+watch(mdMode, (newValue) => {
+  localStorage.setItem(mdModeKey, newValue ? 'true' : 'false');
+});
 const fileModals = ref({
   createFile: false,
   createFileName: '',
@@ -130,7 +153,8 @@ function handleTerminalTabClick() {
       // Don't change terminalSubTab - it retains the last value
     } else {
       // Already in terminal mode: toggle between Active/History
-      terminalSubTab.value = terminalSubTab.value === 'active' ? 'history' : 'active';
+      terminalSubTab.value =
+        terminalSubTab.value === 'active' ? 'history' : 'active';
     }
   } else {
     // Desktop: just switch to terminal mode
@@ -740,7 +764,6 @@ function handleSubmit() {
 function scrollToBottom() {
   chatMessagesRef.value?.scrollToBottom();
 }
-
 
 // Note: Auto-scroll on messages and isRunning are now handled by ChatMessages component
 
@@ -1493,9 +1516,11 @@ watch(openedFile, (file) => {
     <main v-else-if="currentMode === 'files'" class="files-mode">
       <FileEditor
         v-if="openedFile"
+        ref="fileEditorRef"
         :file-path="openedFile.path"
         :content="openedFile.content"
         :loading="openedFile.loading"
+        :auto-save="mdMode"
         @save="handleFileSave"
         @close="handleFileClose"
       />
@@ -1511,6 +1536,35 @@ watch(openedFile, (file) => {
         @delete="handleDelete"
       />
     </main>
+
+    <!-- File editor header (above footer, only when editing a file) -->
+    <div v-if="currentMode === 'files' && openedFile" class="editor-header">
+      <span class="editor-file-name">{{ openedFileName }}</span>
+      <span v-if="fileEditorRef?.isDirty" class="editor-dirty-indicator" title="Unsaved changes">*</span>
+      <div class="editor-header-spacer"></div>
+      <button
+        class="action-btn"
+        :disabled="!fileEditorRef?.isDirty || fileEditorRef?.isSaving"
+        title="Save (Cmd+S)"
+        @click="fileEditorRef?.save()"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+      </button>
+      <button
+        class="action-btn"
+        title="Close"
+        @click="fileEditorRef?.close()"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
 
     <footer class="footer">
       <!-- Toolbar (at top) -->
@@ -1579,6 +1633,15 @@ watch(openedFile, (file) => {
               <line x1="12" y1="11" x2="12" y2="17"/>
               <line x1="9" y1="14" x2="15" y2="14"/>
             </svg>
+          </button>
+          <button
+            v-if="filesMode"
+            class="action-btn md-btn"
+            :class="{ active: mdMode }"
+            @click="mdMode = !mdMode"
+            title="Markdown mode - filter .md files only with auto-save"
+          >
+            MD
           </button>
 
           <!-- Terminal clear button (terminal mode only) -->
@@ -2451,6 +2514,61 @@ watch(openedFile, (file) => {
   }
 }
 
+/* File editor header (between main content and footer) */
+.editor-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.editor-file-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.editor-dirty-indicator {
+  color: var(--warning-color);
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-left: -4px;
+}
+
+.editor-header-spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.editor-header .action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  color: var(--text-secondary);
+  background: transparent;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s, color 0.15s, opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.editor-header .action-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.editor-header .action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .footer {
   padding: 12px 16px;
   border-top: 1px solid var(--border-color);
@@ -2499,6 +2617,11 @@ watch(openedFile, (file) => {
 
 .toolbar .action-btn:hover {
   background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.toolbar .action-btn.active {
+  background: var(--bg-tertiary);
   color: var(--text-primary);
 }
 
@@ -2788,8 +2911,8 @@ watch(openedFile, (file) => {
 .files-explorer-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
+  gap: 6px;
+  padding: 6px 16px;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-primary);
 }

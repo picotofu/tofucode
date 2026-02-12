@@ -6,9 +6,13 @@ const props = defineProps({
   filePath: String,
   content: String,
   loading: Boolean,
+  autoSave: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-const emit = defineEmits(['save', 'close']);
+const emit = defineEmits(['save', 'close', 'dirty']);
 
 const editorContent = ref(props.content || '');
 const isDirty = ref(false);
@@ -103,6 +107,26 @@ function handleTextareaInput(event) {
   isDirty.value = true;
 }
 
+// Auto-save logic - debounced
+let autoSaveTimeout = null;
+watch(
+  [() => editorContent.value, () => props.autoSave],
+  ([_newContent, autoSaveEnabled]) => {
+    // Clear existing timeout
+    if (autoSaveTimeout) {
+      clearTimeout(autoSaveTimeout);
+      autoSaveTimeout = null;
+    }
+
+    // Only auto-save if enabled, dirty, and not currently saving
+    if (autoSaveEnabled && isDirty.value && !isSaving.value) {
+      autoSaveTimeout = setTimeout(() => {
+        handleSave();
+      }, 1000); // 1 second debounce
+    }
+  },
+);
+
 // Save file
 function handleSave() {
   if (isSaving.value || !isDirty.value) return;
@@ -153,6 +177,13 @@ function handleKeydown(event) {
   }
 }
 
+defineExpose({
+  isDirty,
+  isSaving,
+  save: handleSave,
+  close: handleClose,
+});
+
 onMounted(() => {
   document.addEventListener('keydown', handleKeydown);
 });
@@ -160,42 +191,14 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
   tinyMdeInstance = null;
+  if (autoSaveTimeout) {
+    clearTimeout(autoSaveTimeout);
+  }
 });
 </script>
 
 <template>
   <div class="file-editor">
-    <!-- Editor header -->
-    <div class="editor-header">
-      <span class="file-name">{{ fileName }}</span>
-      <span v-if="isDirty" class="dirty-indicator" title="Unsaved changes">*</span>
-      <div class="spacer"></div>
-      <div class="editor-actions">
-        <button
-          class="action-btn"
-          @click="handleSave"
-          :disabled="!isDirty || isSaving"
-          title="Save (Cmd+S)"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-            <polyline points="17 21 17 13 7 13 7 21"/>
-            <polyline points="7 3 7 8 15 8"/>
-          </svg>
-        </button>
-        <button
-          class="action-btn"
-          @click="handleClose"
-          title="Close"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-
     <!-- Editor content -->
     <div class="editor-content">
       <div v-if="loading" class="editor-loading">Loading...</div>
@@ -233,65 +236,6 @@ onUnmounted(() => {
   background: var(--bg-primary);
 }
 
-.editor-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.file-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex-shrink: 0;
-}
-
-.dirty-indicator {
-  color: var(--warning-color);
-  font-size: 16px;
-  font-weight: bold;
-  line-height: 1;
-  flex-shrink: 0;
-  margin-left: -8px;
-}
-
-.spacer {
-  flex: 1;
-  min-width: 0;
-}
-
-.editor-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  color: var(--text-secondary);
-  background: transparent;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s, color 0.15s, opacity 0.15s;
-}
-
-.action-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.action-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
 .editor-content {
   flex: 1;
   overflow: hidden;
@@ -313,14 +257,16 @@ onUnmounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 /* Text / code editor */
 .text-editor {
   flex: 1;
   padding: 16px;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.7;
   color: var(--text-primary);
   background: transparent;
   border: none;
@@ -331,6 +277,7 @@ onUnmounted(() => {
 
 .text-editor.code {
   font-family: var(--font-mono);
+  font-size: 13px;
   line-height: 1.5;
   tab-size: 2;
 }
@@ -340,13 +287,15 @@ onUnmounted(() => {
 }
 
 /* TinyMDE dark theme overrides */
-.TinyMDE {
+.markdown-editor :deep(.TinyMDE) {
   background: transparent;
   color: var(--text-primary);
   border: none;
+  font-size: 14px;
+  line-height: 1.7;
 }
 
-.TinyMDE.TinyMDE_empty::before {
+.markdown-editor :deep(.TinyMDE.TinyMDE_empty::before) {
   color: var(--text-muted);
 }
 </style>

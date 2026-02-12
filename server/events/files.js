@@ -40,6 +40,40 @@ function validatePath(requestedPath, context) {
 }
 
 /**
+ * Check if a directory contains .md files (recursively)
+ * @param {string} dirPath - Directory path to check
+ * @param {number} maxDepth - Maximum recursion depth (default 3)
+ * @returns {Promise<boolean>}
+ */
+async function containsMarkdownFiles(dirPath, maxDepth = 3) {
+  if (maxDepth <= 0) return false;
+
+  try {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      // Skip dotfiles
+      if (entry.name.startsWith('.')) continue;
+
+      if (entry.isDirectory()) {
+        // Recursively check subdirectories
+        const hasMarkdown = await containsMarkdownFiles(
+          path.join(dirPath, entry.name),
+          maxDepth - 1,
+        );
+        if (hasMarkdown) return true;
+      } else if (entry.name.toLowerCase().endsWith('.md')) {
+        return true;
+      }
+    }
+    return false;
+  } catch (_err) {
+    // If we can't read the directory, assume it doesn't contain markdown files
+    return false;
+  }
+}
+
+/**
  * Browse folder contents
  */
 export async function handleFilesBrowse(ws, payload, context) {
@@ -52,11 +86,23 @@ export async function handleFilesBrowse(ws, payload, context) {
     // Read directory
     const entries = await fs.readdir(resolvedPath, { withFileTypes: true });
 
-    const items = entries.map((entry) => ({
-      name: entry.name,
-      path: path.join(resolvedPath, entry.name),
-      isDirectory: entry.isDirectory(),
-    }));
+    // Build items with markdown metadata for directories
+    const items = await Promise.all(
+      entries.map(async (entry) => {
+        const item = {
+          name: entry.name,
+          path: path.join(resolvedPath, entry.name),
+          isDirectory: entry.isDirectory(),
+        };
+
+        // For directories, check if they contain markdown files
+        if (item.isDirectory) {
+          item.hasMarkdown = await containsMarkdownFiles(item.path);
+        }
+
+        return item;
+      }),
+    );
 
     send(ws, {
       type: 'files:browse:result',
