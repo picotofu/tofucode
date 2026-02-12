@@ -27,7 +27,7 @@ import { getAllTitles } from '../lib/session-titles.js';
 import { getSessionsList } from '../lib/sessions.js';
 import { send, unwatchSession } from '../lib/ws.js';
 
-export function handler(ws, message, context) {
+export async function handler(ws, message, context) {
   const projectSlug = message.path;
 
   if (!projectSlug || typeof projectSlug !== 'string') {
@@ -51,7 +51,7 @@ export function handler(ws, message, context) {
   };
 
   // Get sessions and enrich with custom titles
-  const sessions = getSessionsList(projectSlug);
+  const sessions = await getSessionsList(projectSlug);
   const titles = getAllTitles(projectSlug);
   const enrichedSessions = sessions.map((session) => ({
     ...session,

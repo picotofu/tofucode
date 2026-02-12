@@ -24,14 +24,14 @@
 import { getSessionsList } from '../lib/sessions.js';
 import { send } from '../lib/ws.js';
 
-export function handler(ws, _message, context) {
+export async function handler(ws, _message, context) {
   if (!context.currentProjectPath) {
     send(ws, { type: 'error', message: 'No project selected' });
     return;
   }
 
   // getSessionsList now includes title (customTitle from sessions-index.json)
-  const sessions = getSessionsList(context.currentProjectPath);
+  const sessions = await getSessionsList(context.currentProjectPath);
 
   send(ws, {
     type: 'sessions_list',

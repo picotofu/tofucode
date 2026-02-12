@@ -20,9 +20,9 @@ import { loadTitles } from './session-titles.js';
  * to catch newly created sessions that haven't been indexed yet
  *
  * @param {string} projectSlug - Project slug (e.g., -home-ts-projects-foo)
- * @returns {Array<{sessionId: string, firstPrompt: string, messageCount: number, created: string, modified: string}>}
+ * @returns {Promise<Array<{sessionId: string, firstPrompt: string, messageCount: number, created: string, modified: string}>>}
  */
-export function getSessionsList(projectSlug) {
+export async function getSessionsList(projectSlug) {
   try {
     const sessionsDir = getSessionsDir(projectSlug);
     const indexPath = join(sessionsDir, 'sessions-index.json');
@@ -68,30 +68,49 @@ export function getSessionsList(projectSlug) {
             const jsonlPath = join(sessionsDir, file);
             try {
               const stats = statSync(jsonlPath);
-              // Read first line to get the first prompt and count messages
+              // Read first line via streaming (don't load entire file)
               let firstPrompt = 'New session';
               let messageCount = 0;
-              try {
-                const content = readFileSync(jsonlPath, 'utf-8');
-                const lines = content.split('\n').filter((line) => line.trim());
-                messageCount = lines.length;
 
-                const firstLine = lines[0];
-                if (firstLine) {
-                  const entry = JSON.parse(firstLine);
-                  if (entry.type === 'user' && entry.message?.content) {
-                    const contentText =
-                      typeof entry.message.content === 'string'
-                        ? entry.message.content
-                        : Array.isArray(entry.message.content)
-                          ? entry.message.content
-                              .filter((b) => b.type === 'text')
-                              .map((b) => b.text)
-                              .join(' ')
-                          : 'New session';
-                    firstPrompt = contentText.substring(0, 100);
-                  }
-                }
+              try {
+                // Use streaming to count lines and get first line
+                await new Promise((resolve, reject) => {
+                  const rl = createInterface({
+                    input: createReadStream(jsonlPath),
+                    crlfDelay: Number.POSITIVE_INFINITY,
+                  });
+
+                  let firstLine = null;
+                  rl.on('line', (line) => {
+                    if (line.trim()) {
+                      messageCount++;
+                      if (!firstLine) {
+                        firstLine = line;
+                        // Parse first line for prompt text
+                        try {
+                          const entry = JSON.parse(line);
+                          if (entry.type === 'user' && entry.message?.content) {
+                            const contentText =
+                              typeof entry.message.content === 'string'
+                                ? entry.message.content
+                                : Array.isArray(entry.message.content)
+                                  ? entry.message.content
+                                      .filter((b) => b.type === 'text')
+                                      .map((b) => b.text)
+                                      .join(' ')
+                                  : 'New session';
+                            firstPrompt = contentText.substring(0, 100);
+                          }
+                        } catch {
+                          // Couldn't parse first line, keep default
+                        }
+                      }
+                    }
+                  });
+
+                  rl.on('close', () => resolve());
+                  rl.on('error', reject);
+                });
               } catch {
                 // Couldn't read first prompt, use default
               }
