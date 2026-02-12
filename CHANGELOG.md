@@ -2,6 +2,41 @@
 
 All notable changes to cc-web (Claude Code Web).
 
+## 2026-02-12 - Compression, Plan Mode Fix, File Editor UX
+
+### Performance Improvements
+- **HTTP/API Compression**: Added runtime gzip/brotli compression for API responses (1KB threshold)
+- **Static Asset Pre-compression**: Vite build now generates `.gz` and `.br` files at build time
+  - JS bundle: 440KB → 143KB (gzip) / 122KB (brotli) = 72% savings
+  - CSS bundle: 86KB → 12.6KB (gzip) / 11KB (brotli) = 87% savings
+  - Zero CPU cost at serve time using `express-static-gzip`
+- **WebSocket Compression**: Enabled per-message deflate (1KB threshold, compression level 3)
+
+### Bug Fixes
+- **Plan Mode Output**: Fixed plan content not displaying after ExitPlanMode
+  - Backend now handles `user` messages containing tool results
+  - Added diagnostic logging for unhandled assistant content blocks
+- **MD Mode Folder Filter**: Only shows folders containing `.md` files (recursive check up to 3 levels)
+- **TinyMDE Font Override**: Fixed markdown editor font not applying (now uses `:deep()` selector)
+
+### New Features
+- **MD Mode for Files Tab**: Filter to show only `.md` files with auto-save
+  - Toggle state persisted in localStorage across sessions
+  - 1-second debounce on auto-save
+  - Folders filtered by markdown content presence
+
+### UX Improvements
+- **File Editor Layout**: Moved editor header above footer for cleaner separation
+- **File Editor Font**: Updated to match chat messages (14px, line-height 1.7)
+  - Plain text: 13px → 14px
+  - Markdown: Added explicit 14px sizing
+  - Code files: Kept at 13px monospace for readability
+
+### Dependencies Added
+- **compression**: Runtime compression middleware for Express
+- **express-static-gzip**: Serve pre-compressed static files
+- **vite-plugin-compression2**: Generate gzip/brotli files during build
+
 ## 2026-02-11 - File Reference & UX Improvements
 
 ### New Features
