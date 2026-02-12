@@ -1541,6 +1541,46 @@ watch(openedFile, (file) => {
           </span>
         </div>
         <div class="toolbar-right">
+          <!-- Files mode tool icons -->
+          <button
+            v-if="filesMode"
+            class="action-btn"
+            :class="{ active: showDotfiles }"
+            @click="showDotfiles = !showDotfiles"
+            title="Show dotfiles"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="1"/>
+              <circle cx="12" cy="5" r="1"/>
+              <circle cx="12" cy="19" r="1"/>
+            </svg>
+          </button>
+          <button
+            v-if="filesMode"
+            class="action-btn"
+            @click="fileModals.createFile = true"
+            title="New file"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="12" y1="18" x2="12" y2="12"/>
+              <line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>
+          </button>
+          <button
+            v-if="filesMode"
+            class="action-btn"
+            @click="fileModals.createFolder = true"
+            title="New folder"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              <line x1="12" y1="11" x2="12" y2="17"/>
+              <line x1="9" y1="14" x2="15" y2="14"/>
+            </svg>
+          </button>
+
           <!-- Terminal clear button (terminal mode only) -->
           <button
             v-if="terminalMode && terminalSubTab === 'history'"
@@ -1691,35 +1731,6 @@ watch(openedFile, (file) => {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-          </button>
-        </div>
-        <div class="files-actions">
-          <button
-            class="action-btn"
-            :class="{ active: showDotfiles }"
-            @click="showDotfiles = !showDotfiles"
-            title="Show dotfiles"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="1"/>
-              <circle cx="12" cy="5" r="1"/>
-              <circle cx="12" cy="19" r="1"/>
-            </svg>
-          </button>
-          <button class="action-btn" @click="fileModals.createFile = true" title="New file">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="12" y1="18" x2="12" y2="12"/>
-              <line x1="9" y1="15" x2="15" y2="15"/>
-            </svg>
-          </button>
-          <button class="action-btn" @click="fileModals.createFolder = true" title="New folder">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-              <line x1="12" y1="11" x2="12" y2="17"/>
-              <line x1="9" y1="14" x2="15" y2="14"/>
             </svg>
           </button>
         </div>
@@ -2777,7 +2788,6 @@ watch(openedFile, (file) => {
 .files-explorer-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--border-color);
@@ -2895,11 +2905,6 @@ watch(openedFile, (file) => {
   color: var(--text-primary);
 }
 
-.files-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
 
 .files-explorer-header .action-btn {
   display: flex;
