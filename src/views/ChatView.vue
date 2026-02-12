@@ -120,9 +120,22 @@ function closeGitDiffModal() {
   showGitDiffModal.value = false;
 }
 
-// Mobile terminal - just switch mode, subtabs shown inline
+// Mobile terminal - cycle through Active/History on tap
 function handleTerminalTabClick() {
-  currentMode.value = 'terminal';
+  // On mobile (<=768px), cycle through terminal subtabs
+  if (window.innerWidth <= 768) {
+    if (currentMode.value !== 'terminal') {
+      // First tap: switch to terminal mode (Active by default)
+      currentMode.value = 'terminal';
+      terminalSubTab.value = 'active';
+    } else {
+      // Already in terminal mode: toggle between Active/History
+      terminalSubTab.value = terminalSubTab.value === 'active' ? 'history' : 'active';
+    }
+  } else {
+    // Desktop: just switch to terminal mode
+    currentMode.value = 'terminal';
+  }
 }
 
 // Flag to prevent auto-save during session transitions
@@ -1850,7 +1863,7 @@ watch(openedFile, (file) => {
             Chat
           </button>
           <button
-            class="mode-tab"
+            class="mode-tab terminal-tab"
             :class="{ active: currentMode === 'terminal' }"
             @click="handleTerminalTabClick"
             title="Terminal mode"
@@ -1859,7 +1872,8 @@ watch(openedFile, (file) => {
               <polyline points="4 17 10 11 4 5"/>
               <line x1="12" y1="19" x2="20" y2="19"/>
             </svg>
-            Terminal
+            <span class="terminal-label-desktop">Terminal</span>
+            <span class="terminal-label-mobile">{{ terminalSubTab === 'active' ? 'Active' : 'History' }}</span>
             <span class="mode-badge" v-if="runningProcessCount > 0">{{ runningProcessCount }}</span>
 
             <!-- Terminal subtabs (inline, only shown when terminal mode active on desktop) -->
@@ -3448,28 +3462,33 @@ watch(openedFile, (file) => {
     justify-content: flex-start;
   }
 
-  /* Mode tabs - allow wrapping and show terminal subtabs on new line */
+  /* Mode tabs - keep single line on mobile */
   .mode-tabs {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 4px;
   }
 
-  /* Terminal subtabs - show on separate line on mobile */
+  /* Terminal subtabs - hide on mobile */
   .terminal-subtabs {
-    display: flex; /* Keep visible on mobile */
-    width: 100%; /* Full width for better touch targets */
-    margin-left: 0;
-    padding-left: 0;
-    border-left: none;
-    gap: 2px;
-    padding: 2px;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-sm);
+    display: none !important;
   }
 
-  .terminal-subtab {
-    flex: 1; /* Equal width buttons */
-    justify-content: center;
+  /* Terminal label - show Active/History instead of Terminal on mobile */
+  .terminal-label-desktop {
+    display: none;
   }
+
+  .terminal-label-mobile {
+    display: inline;
+  }
+}
+
+/* Desktop - show Terminal label, hide Active/History label */
+.terminal-label-mobile {
+  display: none;
+}
+
+.terminal-label-desktop {
+  display: inline;
 }
 </style>
