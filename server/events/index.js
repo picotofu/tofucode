@@ -23,6 +23,7 @@ import { handler as getProjects } from './get-projects.js';
 import { handler as getRecentSessions } from './get-recent-sessions.js';
 import { handler as getSessionTitle } from './get-session-title.js';
 import { handler as getSessions } from './get-sessions.js';
+import { handler as loadOlderMessages } from './load-older-messages.js';
 import { handler as newSession } from './new-session.js';
 import { handler as prompt } from './prompt.js';
 import { handleRestart } from './restart.js';
@@ -44,6 +45,7 @@ export const handlers = {
   get_sessions: getSessions,
   get_recent_sessions: getRecentSessions,
   select_session: selectSession,
+  load_older_messages: loadOlderMessages,
   new_session: newSession,
   delete_session: deleteSession,
   prompt: prompt,

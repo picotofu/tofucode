@@ -24,9 +24,13 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  loadingOlderMessages: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-const emit = defineEmits(['load-full-history']);
+const emit = defineEmits(['load-full-history', 'load-older-messages']);
 
 const messagesEl = ref(null);
 const userScrolledUp = ref(false);
@@ -254,12 +258,17 @@ defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn });
       <div class="messages-inner" v-if="messages.length > 0">
         <!-- Load older messages button -->
         <div class="older-messages" v-if="hasOlderMessages">
-          <button class="load-older-btn" @click="emit('load-full-history')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <button
+            class="load-older-btn"
+            :disabled="loadingOlderMessages"
+            @click="emit('load-older-messages')"
+          >
+            <svg v-if="!loadingOlderMessages" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 19V5M5 12l7-7 7 7"/>
             </svg>
-            Load older messages
-            <span class="summary-badge" v-if="summaryCount > 0">{{ summaryCount }} compaction{{ summaryCount > 1 ? 's' : '' }}</span>
+            <span v-if="loadingOlderMessages" class="loading-spinner"></span>
+            {{ loadingOlderMessages ? 'Loading...' : 'Load older messages (50)' }}
+            <span class="summary-badge" v-if="summaryCount > 0 && !loadingOlderMessages">{{ summaryCount }} compaction{{ summaryCount > 1 ? 's' : '' }}</span>
           </button>
         </div>
         <!-- Render conversation turns -->
@@ -394,9 +403,27 @@ defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn });
   transition: background 0.15s, color 0.15s;
 }
 
-.load-older-btn:hover {
+.load-older-btn:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.load-older-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--text-muted);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .summary-badge {

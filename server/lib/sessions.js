@@ -257,28 +257,43 @@ function parseEntry(entry) {
 
 /**
  * Parse JSONL file and extract messages for display
- * By default, only loads messages after the last summary for faster loading
+ * Uses circular buffer to limit memory usage for large sessions
+ * Supports pagination via offset/limit parameters
  *
  * @param {string} projectSlug - Project slug
  * @param {string} sessionId - Session ID
  * @param {Object} options - Options
- * @param {boolean} options.fullHistory - If true, load all messages (slower)
- * @returns {Promise<{messages: Array, hasOlderMessages: boolean, summaryCount: number}>}
+ * @param {boolean} options.fullHistory - If true, load all messages (ignores buffer limit)
+ * @param {number} options.limit - Max messages to return (default: 50)
+ * @param {number} options.offset - Start offset from end (0 = most recent, default: 0)
+ * @param {number} options.maxBufferSize - Max entries to keep in memory (default: 500)
+ * @returns {Promise<{messages: Array, hasOlderMessages: boolean, summaryCount: number, totalEntries: number}>}
  */
 export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
   const sessionsDir = getSessionsDir(projectSlug);
   const jsonlPath = join(sessionsDir, `${sessionId}.jsonl`);
 
   if (!existsSync(jsonlPath)) {
-    return { messages: [], hasOlderMessages: false, summaryCount: 0 };
+    return {
+      messages: [],
+      hasOlderMessages: false,
+      summaryCount: 0,
+      totalEntries: 0,
+    };
   }
 
-  const { fullHistory = false } = options;
+  const {
+    fullHistory = false,
+    limit = 50,
+    offset = 0,
+    maxBufferSize = 500,
+  } = options;
 
-  // First pass: find all summary positions if not loading full history
-  const allEntries = [];
+  // Use circular buffer to limit memory usage
+  const buffer = [];
   let summaryCount = 0;
   let lastSummaryIndex = -1;
+  let totalLineCount = 0;
 
   return new Promise((resolve, reject) => {
     const rl = createInterface({
@@ -286,43 +301,57 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
       crlfDelay: Number.POSITIVE_INFINITY,
     });
 
-    let lineIndex = 0;
-
     rl.on('line', (line) => {
       try {
         const entry = JSON.parse(line);
-        allEntries.push(entry);
 
+        // Track summary positions
         if (entry.type === 'summary') {
           summaryCount++;
-          lastSummaryIndex = lineIndex;
+          lastSummaryIndex = totalLineCount;
+          // Clear buffer on summary if not loading full history
+          if (!fullHistory) {
+            buffer.length = 0;
+          }
         }
 
-        lineIndex++;
+        buffer.push(entry);
+
+        // Maintain circular buffer if not loading full history
+        if (!fullHistory && buffer.length > maxBufferSize) {
+          buffer.shift();
+        }
+
+        totalLineCount++;
       } catch (_err) {
         // Skip malformed lines
-        lineIndex++;
+        totalLineCount++;
       }
     });
 
     rl.on('close', () => {
+      // Determine which entries to parse based on pagination
+      const _hasOlderMessages =
+        lastSummaryIndex > 0 || buffer.length < totalLineCount;
+
+      // For pagination: slice from end with offset
+      const startIdx = Math.max(0, buffer.length - offset - limit);
+      const endIdx = buffer.length - offset;
+      const entriesToParse = buffer.slice(startIdx, endIdx);
+
+      // Parse entries into messages
       const messages = [];
-      const hasOlderMessages = lastSummaryIndex > 0;
-
-      // Determine starting index
-      const startIndex = fullHistory
-        ? 0
-        : lastSummaryIndex >= 0
-          ? lastSummaryIndex
-          : 0;
-
-      // Parse entries from starting point
-      for (let i = startIndex; i < allEntries.length; i++) {
-        const parsed = parseEntry(allEntries[i]);
+      for (const entry of entriesToParse) {
+        const parsed = parseEntry(entry);
         messages.push(...parsed);
       }
 
-      resolve({ messages, hasOlderMessages, summaryCount });
+      resolve({
+        messages,
+        hasOlderMessages: offset + messages.length < totalLineCount,
+        summaryCount,
+        totalEntries: totalLineCount,
+      });
     });
 
     rl.on('error', reject);

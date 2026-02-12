@@ -37,10 +37,12 @@ const {
   sessionActiveElsewhere,
   terminalProcesses,
   contextReady,
+  loadingOlderMessages,
   connect,
   selectProject,
   selectSession,
   loadFullHistory,
+  loadOlderMessages,
   newSession,
   sendPrompt,
   cancelTask,
@@ -1495,7 +1497,9 @@ watch(openedFile, (file) => {
       :is-new-session="isNewSession"
       :has-older-messages="hasOlderMessages"
       :summary-count="summaryCount"
+      :loading-older-messages="loadingOlderMessages"
       @load-full-history="loadFullHistory"
+      @load-older-messages="loadOlderMessages"
     />
 
     <!-- Terminal Mode -->

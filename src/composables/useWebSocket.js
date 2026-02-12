@@ -387,6 +387,9 @@ export function useChatWebSocket() {
   const hasOlderMessages = ref(false);
   const summaryCount = ref(0);
   const sessionActiveElsewhere = ref(false); // True if session is open in another tab
+  const totalEntries = ref(0); // Total entries in JSONL (for pagination)
+  const messagesOffset = ref(0); // Current offset for pagination
+  const loadingOlderMessages = ref(false); // Loading state for "Load older" button
   const projectStatus = ref({
     cwd: null,
     gitBranch: null,
@@ -495,6 +498,8 @@ export function useChatWebSocket() {
           messages.value = msg.messages || [];
           hasOlderMessages.value = msg.hasOlderMessages || false;
           summaryCount.value = msg.summaryCount || 0;
+          totalEntries.value = msg.totalEntries || 0;
+          messagesOffset.value = msg.offset || 0;
           // History loaded - NOW context is fully ready
           // This ensures: history loads → then typing indicator (if running) → then UI is interactive
           contextReady.value = true;
@@ -502,6 +507,16 @@ export function useChatWebSocket() {
           console.warn(
             `[useChatWebSocket] Ignoring session_history for different session. History sessionId: ${msg.sessionId}, Current sessionId: ${currentSession.value}`,
           );
+        }
+        break;
+
+      case 'older_messages':
+        // Prepend older messages to the beginning of the array
+        if (msg.sessionId === currentSession.value) {
+          messages.value = [...msg.messages, ...messages.value];
+          hasOlderMessages.value = msg.hasOlderMessages || false;
+          messagesOffset.value = msg.offset || 0;
+          loadingOlderMessages.value = false;
         }
         break;
 
@@ -679,6 +694,19 @@ export function useChatWebSocket() {
     }
   }
 
+  function loadOlderMessages(limit = 50) {
+    if (currentSession.value && !loadingOlderMessages.value) {
+      loadingOlderMessages.value = true;
+      const newOffset = messagesOffset.value + messages.value.length;
+      send({
+        type: 'load_older_messages',
+        sessionId: currentSession.value,
+        offset: newOffset,
+        limit,
+      });
+    }
+  }
+
   function newSession(options = {}) {
     // Clear currentSession to prevent messages from other sessions
     // The server will send back session_info with the new sessionId
@@ -755,6 +783,9 @@ export function useChatWebSocket() {
     summaryCount: readonly(summaryCount),
     sessionActiveElsewhere: readonly(sessionActiveElsewhere),
     terminalProcesses: readonly(terminalProcesses),
+    totalEntries: readonly(totalEntries),
+    messagesOffset: readonly(messagesOffset),
+    loadingOlderMessages: readonly(loadingOlderMessages),
 
     // Connection
     connect,
@@ -765,6 +796,7 @@ export function useChatWebSocket() {
     getProjectStatus,
     selectSession,
     loadFullHistory,
+    loadOlderMessages,
     newSession,
     sendPrompt,
     cancelTask,

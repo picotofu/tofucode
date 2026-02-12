@@ -51,20 +51,25 @@ export async function handler(ws, message, context) {
 
   // Always load history from JSONL for accurate state
   // (in-memory task.results may be incomplete or stale)
+  // Support pagination via limit/offset
   let history = [];
   let hasOlderMessages = false;
   let summaryCount = 0;
+  let totalEntries = 0;
 
   if (context.currentProjectPath && sessionId) {
     const fullHistory = message.fullHistory || false;
+    const limit = message.limit || 50; // Default: load last 50 messages
+    const offset = message.offset || 0; // Default: start from most recent
     const result = await loadSessionHistory(
       context.currentProjectPath,
       sessionId,
-      { fullHistory },
+      { fullHistory, limit, offset },
     );
     history = result.messages;
     hasOlderMessages = result.hasOlderMessages;
     summaryCount = result.summaryCount;
+    totalEntries = result.totalEntries;
   }
 
   send(ws, {
@@ -88,6 +93,9 @@ export async function handler(ws, message, context) {
     messages: history,
     hasOlderMessages,
     summaryCount,
+    totalEntries,
+    offset,
+    limit,
   });
 
   // Broadcast to all clients to clear sidebar indicator for this session
