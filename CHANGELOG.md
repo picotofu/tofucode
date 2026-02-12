@@ -5,16 +5,21 @@ All notable changes to cc-web (Claude Code Web).
 ## 2026-02-13 - Compression Enabled (All Resources)
 
 ### Performance Improvements
+- **HTML Compression**: Enabled Brotli compression for index.html
+  - HTML now served through compression middleware (was bypassing before)
+  - File read once at startup and cached in memory for fast serving
+  - Cache headers: `no-cache` (browsers always check for updates)
+
 - **Static File Compression**: Enabled Brotli/Gzip compression for all static assets
   - JS bundle: 441KB → 123KB (Brotli) = 72% reduction
   - CSS bundle: 86KB → 11KB (Brotli) = 87% reduction
-  - Uses Express `compression` middleware with runtime compression
+  - Cache headers: `max-age=31536000, immutable` (1 year cache with hash-based busting)
   - Supports Brotli (preferred), Gzip, and Deflate based on client capabilities
 
 - **API Response Compression**: Enabled for all API endpoints
-  - Threshold: 1KB (responses below are not compressed)
+  - Threshold: 512 bytes (responses below are not compressed)
   - Automatic content negotiation based on Accept-Encoding header
-  - Same middleware handles both static and API responses
+  - Same middleware handles HTML, static files, and API responses
 
 - **WebSocket Compression**: Enabled permessage-deflate (RFC 7692)
   - Compression level: 3 (balanced performance/size)
@@ -27,11 +32,19 @@ All notable changes to cc-web (Claude Code Web).
   - More reliable and works with all clients
   - Runtime compression provides better compatibility
 - Moved compression middleware to global scope
+- Changed HTML serving from `sendFile()` to `res.send()` to enable compression
+- Lowered compression threshold from 1KB to 512 bytes
 - Added debug logging for WebSocket extension negotiation
-- WebSocket server already had `perMessageDeflate` configured correctly
+- Added `/api/debug/ws-config` endpoint for diagnostics
+
+### Cache Strategy
+- **HTML files**: `no-cache` - Always revalidate to get latest version
+- **Hashed assets** (JS/CSS with cache-busting): `max-age=1y, immutable` - Never revalidate
+- **API responses**: Dynamic, no explicit caching
 
 ### Verification
-- Static files: Tested with Playwright - confirmed `Content-Encoding: br`
+- HTML: Tested with curl - confirmed `Content-Encoding: br` and `Cache-Control: no-cache`
+- Static files: Confirmed `Content-Encoding: br` and `max-age=31536000, immutable`
 - API endpoints: Confirmed compression middleware active (`Vary: Accept-Encoding`)
 - WebSocket: Server logs show `permessage-deflate` successfully negotiated
 
