@@ -38,6 +38,8 @@ const {
   terminalProcesses,
   contextReady,
   loadingOlderMessages,
+  totalTurns,
+  loadedTurns,
   connect,
   selectProject,
   selectSession,
@@ -1498,6 +1500,8 @@ watch(openedFile, (file) => {
       :has-older-messages="hasOlderMessages"
       :summary-count="summaryCount"
       :loading-older-messages="loadingOlderMessages"
+      :total-turns="totalTurns"
+      :loaded-turns="loadedTurns"
       @load-full-history="loadFullHistory"
       @load-older-messages="loadOlderMessages"
     />

@@ -28,6 +28,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  totalTurns: {
+    type: Number,
+    default: 0,
+  },
+  loadedTurns: {
+    type: Number,
+    default: 0,
+  },
 });
 
 const emit = defineEmits(['load-full-history', 'load-older-messages']);
@@ -183,6 +191,12 @@ function goToPreviousTurn() {
     }
   }
 
+  // If at first turn and there are older messages, load them
+  if (currentTurnIndex.value === 0 && props.hasOlderMessages && !props.loadingOlderMessages) {
+    emit('load-older-messages');
+    return;
+  }
+
   // Otherwise, go to previous turn
   const targetIndex = Math.max(0, currentTurnIndex.value - 1);
   scrollToTurn(targetIndex);
@@ -267,7 +281,7 @@ defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn });
               <path d="M12 19V5M5 12l7-7 7 7"/>
             </svg>
             <span v-if="loadingOlderMessages" class="loading-spinner"></span>
-            {{ loadingOlderMessages ? 'Loading...' : 'Load older messages (50)' }}
+            {{ loadingOlderMessages ? 'Loading...' : 'Load 5 more turns' }}
             <span class="summary-badge" v-if="summaryCount > 0 && !loadingOlderMessages">{{ summaryCount }} compaction{{ summaryCount > 1 ? 's' : '' }}</span>
           </button>
         </div>
@@ -325,7 +339,7 @@ defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn });
     <div class="turn-navigation" v-if="conversationTurns.length > 1">
       <button
         class="turn-nav-btn"
-        :disabled="currentTurnIndex <= 0"
+        :disabled="currentTurnIndex <= 0 && !hasOlderMessages"
         @click="goToPreviousTurn"
         title="Previous message (scroll up)"
       >
@@ -333,7 +347,7 @@ defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn });
           <path d="M18 15l-6-6-6 6"/>
         </svg>
       </button>
-      <span class="turn-counter">{{ currentTurnIndex + 1 }}/{{ conversationTurns.length }}</span>
+      <span class="turn-counter">{{ totalTurns > 0 ? (totalTurns - conversationTurns.length + currentTurnIndex + 1) : (currentTurnIndex + 1) }}/{{ totalTurns > 0 ? totalTurns : conversationTurns.length }}</span>
       <button
         class="turn-nav-btn"
         :disabled="currentTurnIndex >= conversationTurns.length - 1"

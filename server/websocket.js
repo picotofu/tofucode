@@ -47,8 +47,9 @@ export function handleWebSocket(ws) {
   }
 
   ws.on('message', async (data) => {
+    let message;
     try {
-      const message = JSON.parse(data.toString());
+      message = JSON.parse(data.toString());
       const handler = handlers[message.type];
 
       if (handler) {
@@ -58,7 +59,12 @@ export function handleWebSocket(ws) {
       }
     } catch (err) {
       logger.error('Message handling error:', err);
-      send(ws, { type: 'error', message: err.message });
+      // Include sessionId from the original message so frontend doesn't filter it out
+      send(ws, {
+        type: 'error',
+        sessionId: message?.sessionId,
+        message: err.message,
+      });
     }
   });
 

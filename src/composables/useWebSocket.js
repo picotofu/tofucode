@@ -390,6 +390,8 @@ export function useChatWebSocket() {
   const totalEntries = ref(0); // Total entries in JSONL (for pagination)
   const messagesOffset = ref(0); // Current offset for pagination
   const loadingOlderMessages = ref(false); // Loading state for "Load older" button
+  const totalTurns = ref(0); // Total turn count
+  const loadedTurns = ref(0); // Currently loaded turn count
   const projectStatus = ref({
     cwd: null,
     gitBranch: null,
@@ -499,6 +501,8 @@ export function useChatWebSocket() {
           hasOlderMessages.value = msg.hasOlderMessages || false;
           summaryCount.value = msg.summaryCount || 0;
           totalEntries.value = msg.totalEntries || 0;
+          totalTurns.value = msg.totalTurns || 0;
+          loadedTurns.value = msg.loadedTurns || 0;
           messagesOffset.value = msg.offset || 0;
           // History loaded - NOW context is fully ready
           // This ensures: history loads → then typing indicator (if running) → then UI is interactive
@@ -515,6 +519,8 @@ export function useChatWebSocket() {
         if (msg.sessionId === currentSession.value) {
           messages.value = [...msg.messages, ...messages.value];
           hasOlderMessages.value = msg.hasOlderMessages || false;
+          totalTurns.value = msg.totalTurns || totalTurns.value;
+          loadedTurns.value = (msg.loadedTurns || 0) + (loadedTurns.value || 0);
           messagesOffset.value = msg.offset || 0;
           loadingOlderMessages.value = false;
         }
@@ -694,15 +700,15 @@ export function useChatWebSocket() {
     }
   }
 
-  function loadOlderMessages(limit = 50) {
+  function loadOlderMessages(turnLimit = 5) {
     if (currentSession.value && !loadingOlderMessages.value) {
       loadingOlderMessages.value = true;
-      const newOffset = messagesOffset.value + messages.value.length;
+      // Use current messagesOffset as starting point for loading older turns
       send({
         type: 'load_older_messages',
         sessionId: currentSession.value,
-        offset: newOffset,
-        limit,
+        offset: messagesOffset.value,
+        turnLimit,
       });
     }
   }
@@ -786,6 +792,8 @@ export function useChatWebSocket() {
     totalEntries: readonly(totalEntries),
     messagesOffset: readonly(messagesOffset),
     loadingOlderMessages: readonly(loadingOlderMessages),
+    totalTurns: readonly(totalTurns),
+    loadedTurns: readonly(loadedTurns),
 
     // Connection
     connect,

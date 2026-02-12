@@ -51,25 +51,39 @@ export async function handler(ws, message, context) {
 
   // Always load history from JSONL for accurate state
   // (in-memory task.results may be incomplete or stale)
-  // Support pagination via limit/offset
+  // Support turn-based pagination
   let history = [];
   let hasOlderMessages = false;
   let summaryCount = 0;
   let totalEntries = 0;
+  let totalTurns = 0;
+  let loadedTurns = 0;
+  let offset = message.offset || 0; // Offset in terms of entries
 
   if (context.currentProjectPath && sessionId) {
-    const fullHistory = message.fullHistory || false;
-    const limit = message.limit || 50; // Default: load last 50 messages
-    const offset = message.offset || 0; // Default: start from most recent
-    const result = await loadSessionHistory(
-      context.currentProjectPath,
-      sessionId,
-      { fullHistory, limit, offset },
-    );
-    history = result.messages;
-    hasOlderMessages = result.hasOlderMessages;
-    summaryCount = result.summaryCount;
-    totalEntries = result.totalEntries;
+    try {
+      const fullHistory = message.fullHistory || false;
+      const loadLastTurn = message.loadLastTurn !== false; // Default to true for initial load
+      const result = await loadSessionHistory(
+        context.currentProjectPath,
+        sessionId,
+        { fullHistory, offset, loadLastTurn },
+      );
+      history = result.messages;
+      hasOlderMessages = result.hasOlderMessages;
+      summaryCount = result.summaryCount;
+      totalEntries = result.totalEntries;
+      totalTurns = result.totalTurns || 0;
+      loadedTurns = result.loadedTurns || 0;
+    } catch (err) {
+      console.error('Failed to load session history:', err);
+      send(ws, {
+        type: 'error',
+        sessionId,
+        message: `Failed to load session history: ${err.message}`,
+      });
+      return;
+    }
   }
 
   send(ws, {
@@ -94,8 +108,9 @@ export async function handler(ws, message, context) {
     hasOlderMessages,
     summaryCount,
     totalEntries,
+    totalTurns,
+    loadedTurns,
     offset,
-    limit,
   });
 
   // Broadcast to all clients to clear sidebar indicator for this session

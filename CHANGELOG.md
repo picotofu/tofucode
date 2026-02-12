@@ -2,6 +2,44 @@
 
 All notable changes to cc-web (Claude Code Web).
 
+## 2026-02-12 - Turn-Based Pagination & Session Loading Optimization
+
+### Performance & UX Improvements
+- **Turn-Based Pagination**: Replaced entry-count pagination with conversation turn-based loading
+  - Initial load: Last **3 complete turns** (user → assistant exchanges)
+  - Pagination: Load **5 turns** per click (was 100 arbitrary entries)
+  - More predictable and user-friendly - always loads complete conversations
+  - Button now shows "Load 5 more turns" instead of "Load older messages (100)"
+
+- **Smart Turn Navigation**:
+  - Turn counter shows total turns in session (e.g., "3/47")
+  - Total turn count efficiently calculated during JSONL streaming (no extra overhead)
+  - **Up arrow at top of chat loads previous turns** - keyboard-friendly navigation
+
+- **Optimized Initial Load**: Session opens with just the last 3 turns instead of loading larger arbitrary chunks
+  - Faster initial render
+  - Better for long sessions with hundreds of messages
+
+### Bug Fixes
+- **Session Loading Error Handling**: Fixed frontend stuck on loading when session history fails
+  - Added try-catch blocks in `select-session.js` and `load-older-messages.js`
+  - Global WebSocket error handler now includes `sessionId` so frontend doesn't filter errors
+  - Fixed variable scope issue with `offset` and `limit` declarations
+
+- **Pagination Offset Calculation**: Fixed incorrect offset calculation in frontend
+  - Was using message count instead of entry count
+  - Now correctly uses loaded entry count for proper pagination
+
+- **Backend Pagination Logic**: Fixed `hasOlderMessages` calculation
+  - Was using parsed message count instead of JSONL entry count
+  - One entry can expand to multiple messages, causing incorrect "has more" state
+
+### Technical Details
+- Backend returns `totalTurns` and `loadedTurns` in session_history and older_messages responses
+- Frontend tracks turn count separately from message count
+- Turn counting happens during single-pass JSONL streaming (efficient, no memory impact)
+- Pagination offset remains entry-based internally for accurate buffer slicing
+
 ## 2026-02-12 - Compression, Plan Mode Fix, File Editor UX
 
 ### Performance Improvements

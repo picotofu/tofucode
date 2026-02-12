@@ -284,9 +284,11 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
 
   const {
     fullHistory = false,
-    limit = 50,
+    limit = 100,
     offset = 0,
     maxBufferSize = 500,
+    loadLastTurn = false, // New option: load from last user message to end
+    turnLimit = null, // If set, load by turn count instead of entry count
   } = options;
 
   // Use circular buffer to limit memory usage
@@ -294,6 +296,7 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
   let summaryCount = 0;
   let lastSummaryIndex = -1;
   let totalLineCount = 0;
+  let totalSessionTurns = 0; // Count ALL turns in session (persists across summaries)
 
   return new Promise((resolve, reject) => {
     const rl = createInterface({
@@ -304,6 +307,22 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
     rl.on('line', (line) => {
       try {
         const entry = JSON.parse(line);
+
+        // Count ALL turns in session (before buffer management)
+        if (entry.type === 'user' || entry.type === 'human') {
+          const content = entry.message?.content;
+          let hasTextContent = false;
+
+          if (typeof content === 'string' && content.trim()) {
+            hasTextContent = true;
+          } else if (Array.isArray(content)) {
+            hasTextContent = content.some(block => block.type === 'text' && block.text?.trim());
+          }
+
+          if (hasTextContent) {
+            totalSessionTurns++; // Never reset, counts full session history
+          }
+        }
 
         // Track summary positions
         if (entry.type === 'summary') {
@@ -330,14 +349,90 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
     });
 
     rl.on('close', () => {
-      // Determine which entries to parse based on pagination
-      const _hasOlderMessages =
-        lastSummaryIndex > 0 || buffer.length < totalLineCount;
+      // Helper: Check if entry has text content
+      const hasTextContent = (entry) => {
+        const content = entry.message?.content;
+        if (typeof content === 'string' && content.trim()) {
+          return true;
+        }
+        if (Array.isArray(content)) {
+          return content.some(block => block.type === 'text' && block.text?.trim());
+        }
+        return false;
+      };
 
-      // For pagination: slice from end with offset
-      const startIdx = Math.max(0, buffer.length - offset - limit);
-      const endIdx = buffer.length - offset;
-      const entriesToParse = buffer.slice(startIdx, endIdx);
+      // Count turns in the final buffer (not accumulated during streaming)
+      // This gives us turns in the current window (after summaries/circular buffer)
+      let bufferTurnCount = 0;
+      for (const entry of buffer) {
+        if ((entry.type === 'user' || entry.type === 'human') && hasTextContent(entry)) {
+          bufferTurnCount++;
+        }
+      }
+
+      let entriesToParse;
+      let effectiveOffset = offset;
+      let loadedTurnCount = 0;
+
+      if (turnLimit !== null) {
+        // TURN-BASED PAGINATION: Load N turns instead of N entries
+        const userIndices = [];
+
+        // Find user messages with text, starting from (buffer.length - offset) going backward
+        const searchEnd = buffer.length - offset;
+        for (let i = searchEnd - 1; i >= 0; i--) {
+          if ((buffer[i].type === 'user' || buffer[i].type === 'human') && hasTextContent(buffer[i])) {
+            userIndices.push(i);
+            if (userIndices.length >= turnLimit) break;
+          }
+        }
+
+        loadedTurnCount = userIndices.length;
+
+        if (userIndices.length > 0) {
+          // Load from earliest found user message to searchEnd
+          const startIdx = userIndices[userIndices.length - 1];
+          entriesToParse = buffer.slice(startIdx, searchEnd);
+          effectiveOffset = buffer.length - searchEnd;
+        } else {
+          // No turns found, return empty
+          entriesToParse = [];
+          effectiveOffset = offset;
+        }
+      } else if (loadLastTurn && offset === 0) {
+        // INITIAL LOAD: Load last N turns (specified by turnLimit in initial call)
+        // This is kept for backward compatibility but we'll use turnLimit going forward
+        const userIndices = [];
+        for (let i = buffer.length - 1; i >= 0; i--) {
+          if ((buffer[i].type === 'user' || buffer[i].type === 'human') && hasTextContent(buffer[i])) {
+            userIndices.push(i);
+            if (userIndices.length === 3) break; // Load last 3 turns
+          }
+        }
+
+        loadedTurnCount = userIndices.length;
+
+        if (userIndices.length === 3) {
+          const startIdx = userIndices[2]; // Third-to-last user message
+          entriesToParse = buffer.slice(startIdx);
+          effectiveOffset = buffer.length - entriesToParse.length;
+        } else if (userIndices.length > 0) {
+          // Less than 3 turns - load from earliest found
+          const startIdx = userIndices[userIndices.length - 1];
+          entriesToParse = buffer.slice(startIdx);
+          effectiveOffset = buffer.length - entriesToParse.length;
+        } else {
+          // No user message found, fall back to limit-based loading
+          const startIdx = Math.max(0, buffer.length - limit);
+          entriesToParse = buffer.slice(startIdx);
+          effectiveOffset = buffer.length - entriesToParse.length;
+        }
+      } else {
+        // ENTRY-BASED FALLBACK: Standard pagination by entry count
+        const startIdx = Math.max(0, buffer.length - offset - limit);
+        const endIdx = buffer.length - offset;
+        entriesToParse = buffer.slice(startIdx, endIdx);
+      }
 
       // Parse entries into messages
       const messages = [];
@@ -346,11 +441,14 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
         messages.push(...parsed);
       }
 
+      // hasOlderMessages based on entries, not messages (one entry can expand to multiple messages)
       resolve({
         messages,
-        hasOlderMessages: offset + messages.length < totalLineCount,
+        hasOlderMessages: effectiveOffset + entriesToParse.length < totalLineCount,
         summaryCount,
         totalEntries: totalLineCount,
+        totalTurns: totalSessionTurns, // Total turns in full session history
+        loadedTurns: loadedTurnCount,
       });
     });
 
