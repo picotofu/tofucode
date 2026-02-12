@@ -2587,6 +2587,7 @@ watch(openedFile, (file) => {
   display: flex;
   gap: 2px;
   margin-right: 8px;
+  flex-shrink: 0; /* Don't shrink */
 }
 
 .model-tab {
@@ -2616,6 +2617,7 @@ watch(openedFile, (file) => {
 .permission-tabs {
   display: flex;
   gap: 4px;
+  flex-shrink: 0; /* Don't shrink */
 }
 
 .permission-tab {
@@ -3460,6 +3462,13 @@ watch(openedFile, (file) => {
     justify-content: flex-start;
     flex-wrap: nowrap; /* Prevent wrapping */
     overflow-x: auto; /* Allow horizontal scroll if needed */
+    min-width: 0; /* Allow shrinking */
+  }
+
+  /* Ensure child containers don't wrap on mobile */
+  .model-tabs,
+  .permission-tabs {
+    flex-wrap: nowrap;
   }
 
   /* Mode tabs - keep single line on mobile */
