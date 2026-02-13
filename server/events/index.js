@@ -23,6 +23,7 @@ import { handler as getProjects } from './get-projects.js';
 import { handler as getRecentSessions } from './get-recent-sessions.js';
 import { handler as getSessionTitle } from './get-session-title.js';
 import { handler as getSessions } from './get-sessions.js';
+import { handler as getSettings } from './get-settings.js';
 import { handler as loadOlderMessages } from './load-older-messages.js';
 import { handler as newSession } from './new-session.js';
 import { handler as prompt } from './prompt.js';
@@ -36,6 +37,7 @@ import {
   killHandler as terminalKill,
   listHandler as terminalList,
 } from './terminal.js';
+import { handler as updateSettings } from './update-settings.js';
 import { handleUpgrade } from './upgrade.js';
 
 export const handlers = {
@@ -67,4 +69,6 @@ export const handlers = {
   restart: handleRestart,
   upgrade: handleUpgrade,
   get_git_diff: getGitDiff,
+  get_settings: getSettings,
+  update_settings: updateSettings,
 };

@@ -2,6 +2,43 @@
 
 All notable changes to cc-web (Claude Code Web).
 
+## 2026-02-13 - Debug Mode & Settings
+
+### New Features
+- **Settings Modal**: Added global settings accessible from sidebar
+  - Settings button (⚙️) beside restart button in sidebar
+  - Clean modal interface with auto-save (no save button needed)
+  - Settings stored in `~/.cc-web/settings.json`
+
+- **Debug Mode**: Element inspector for development
+  - Toggle in Settings modal (default: off)
+  - Hover over any element to see `#id .class1 .class2` format
+  - Filters out Vue runtime classes (e.g., `_abc123`)
+  - Non-intrusive popover with syntax highlighting
+  - Perfect for identifying elements during development discussions
+
+### Technical Implementation
+- **Backend**:
+  - `server/lib/settings.js` - Settings persistence
+  - `server/events/get-settings.js` & `update-settings.js` - WebSocket handlers
+  - Settings auto-sync across browser tabs via WebSocket
+
+- **Frontend**:
+  - `SettingsModal.vue` - Settings UI with auto-save
+  - `DebugPopover.vue` - Element info display
+  - `useDebugMode.js` - Hover detection composable
+  - Global settings context provided from App.vue
+  - Fixed `onMessage` export in `useWebSocket()` composable
+
+### Bug Fixes
+- Fixed HTML caching issue causing module loading errors
+  - Changed from startup cache to per-request read
+  - Prevents stale asset references after rebuilds
+- Fixed watch loop in SettingsModal causing checkbox flicker
+  - Added `isUpdatingFromProps` flag to prevent circular updates
+- Reduced spacing between sidebar buttons (8px → 4px)
+- Added `/assets` path exclusion to SPA fallback
+
 ## 2026-02-13 - Compression Enabled (All Resources)
 
 ### Performance Improvements

@@ -294,7 +294,7 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
   // Use circular buffer to limit memory usage
   const buffer = [];
   let summaryCount = 0;
-  let lastSummaryIndex = -1;
+  let _lastSummaryIndex = -1;
   let totalLineCount = 0;
   let totalSessionTurns = 0; // Count ALL turns in session (persists across summaries)
 
@@ -316,7 +316,9 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
           if (typeof content === 'string' && content.trim()) {
             hasTextContent = true;
           } else if (Array.isArray(content)) {
-            hasTextContent = content.some(block => block.type === 'text' && block.text?.trim());
+            hasTextContent = content.some(
+              (block) => block.type === 'text' && block.text?.trim(),
+            );
           }
 
           if (hasTextContent) {
@@ -327,7 +329,7 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
         // Track summary positions
         if (entry.type === 'summary') {
           summaryCount++;
-          lastSummaryIndex = totalLineCount;
+          _lastSummaryIndex = totalLineCount;
           // Clear buffer on summary if not loading full history
           if (!fullHistory) {
             buffer.length = 0;
@@ -356,17 +358,22 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
           return true;
         }
         if (Array.isArray(content)) {
-          return content.some(block => block.type === 'text' && block.text?.trim());
+          return content.some(
+            (block) => block.type === 'text' && block.text?.trim(),
+          );
         }
         return false;
       };
 
       // Count turns in the final buffer (not accumulated during streaming)
       // This gives us turns in the current window (after summaries/circular buffer)
-      let bufferTurnCount = 0;
+      let _bufferTurnCount = 0;
       for (const entry of buffer) {
-        if ((entry.type === 'user' || entry.type === 'human') && hasTextContent(entry)) {
-          bufferTurnCount++;
+        if (
+          (entry.type === 'user' || entry.type === 'human') &&
+          hasTextContent(entry)
+        ) {
+          _bufferTurnCount++;
         }
       }
 
@@ -381,7 +388,10 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
         // Find user messages with text, starting from (buffer.length - offset) going backward
         const searchEnd = buffer.length - offset;
         for (let i = searchEnd - 1; i >= 0; i--) {
-          if ((buffer[i].type === 'user' || buffer[i].type === 'human') && hasTextContent(buffer[i])) {
+          if (
+            (buffer[i].type === 'user' || buffer[i].type === 'human') &&
+            hasTextContent(buffer[i])
+          ) {
             userIndices.push(i);
             if (userIndices.length >= turnLimit) break;
           }
@@ -404,7 +414,10 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
         // This is kept for backward compatibility but we'll use turnLimit going forward
         const userIndices = [];
         for (let i = buffer.length - 1; i >= 0; i--) {
-          if ((buffer[i].type === 'user' || buffer[i].type === 'human') && hasTextContent(buffer[i])) {
+          if (
+            (buffer[i].type === 'user' || buffer[i].type === 'human') &&
+            hasTextContent(buffer[i])
+          ) {
             userIndices.push(i);
             if (userIndices.length === 3) break; // Load last 3 turns
           }
@@ -444,7 +457,8 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
       // hasOlderMessages based on entries, not messages (one entry can expand to multiple messages)
       resolve({
         messages,
-        hasOlderMessages: effectiveOffset + entriesToParse.length < totalLineCount,
+        hasOlderMessages:
+          effectiveOffset + entriesToParse.length < totalLineCount,
         summaryCount,
         totalEntries: totalLineCount,
         totalTurns: totalSessionTurns, // Total turns in full session history

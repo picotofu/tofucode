@@ -58,7 +58,7 @@ export async function handler(ws, message, context) {
   let totalEntries = 0;
   let totalTurns = 0;
   let loadedTurns = 0;
-  let offset = message.offset || 0; // Offset in terms of entries
+  const offset = message.offset || 0; // Offset in terms of entries
 
   if (context.currentProjectPath && sessionId) {
     try {

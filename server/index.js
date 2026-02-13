@@ -272,18 +272,23 @@ if (existsSync(distPath)) {
   );
 
   // SPA fallback - serve index.html for non-API routes
-  // Read file once at startup and cache in memory
+  // NOTE: During development (with vite build --watch), index.html changes
+  // frequently as asset hashes update. We read it fresh each time rather than
+  // caching to avoid serving stale asset references.
   const indexHtmlPath = join(distPath, 'index.html');
-  const indexHtml = readFileSync(indexHtmlPath, 'utf8');
-  const indexHtmlStats = statSync(indexHtmlPath);
 
   app.use((req, res, next) => {
     if (
       req.method === 'GET' &&
       !req.path.startsWith('/api') &&
       !req.path.startsWith('/ws') &&
-      !req.path.startsWith('/docs')
+      !req.path.startsWith('/docs') &&
+      !req.path.startsWith('/assets')
     ) {
+      // Read fresh to get latest asset hashes from vite build --watch
+      const indexHtml = readFileSync(indexHtmlPath, 'utf8');
+      const indexHtmlStats = statSync(indexHtmlPath);
+
       // Set cache headers: always revalidate index.html
       res.set({
         'Content-Type': 'text/html; charset=utf-8',
@@ -322,7 +327,10 @@ server.on('upgrade', (request, socket, head) => {
   wss.handleUpgrade(request, socket, head, (ws) => {
     // Debug: log compression status
     if (process.env.DEBUG === 'true') {
-      logger.log('WebSocket connected with extensions:', ws.extensions || 'none');
+      logger.log(
+        'WebSocket connected with extensions:',
+        ws.extensions || 'none',
+      );
     }
     wss.emit('connection', ws, request);
   });

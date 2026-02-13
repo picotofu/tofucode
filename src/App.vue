@@ -1,11 +1,48 @@
 <script setup>
 import { onMounted, onUnmounted, provide, ref } from 'vue';
 import CommandPalette from './components/CommandPalette.vue';
+import SettingsModal from './components/SettingsModal.vue';
 import Sidebar from './components/Sidebar.vue';
 import { useWebSocket } from './composables/useWebSocket';
 
-const { connect, disconnect, recentSessions, getRecentSessionsImmediate } =
-  useWebSocket();
+const {
+  connect,
+  disconnect,
+  recentSessions,
+  getRecentSessionsImmediate,
+  send,
+  onMessage,
+} = useWebSocket();
+
+// Settings state
+const showSettings = ref(false);
+const settings = ref({ debugMode: false });
+
+function openSettings() {
+  showSettings.value = true;
+}
+
+function closeSettings() {
+  showSettings.value = false;
+}
+
+function updateSettings(newSettings) {
+  send({
+    type: 'update_settings',
+    settings: newSettings,
+  });
+}
+
+// Handle settings messages
+onMessage((msg) => {
+  if (msg.type === 'settings') {
+    settings.value = msg.settings;
+  } else if (msg.type === 'settings_updated') {
+    if (msg.success) {
+      settings.value = msg.settings;
+    }
+  }
+});
 
 // Command palette state
 const showPalette = ref(false);
@@ -53,9 +90,17 @@ provide('sidebar', {
   close: closeSidebar,
 });
 
+// Provide settings to child components
+provide('settings', {
+  settings,
+  debugMode: () => settings.value.debugMode,
+});
+
 onMounted(() => {
   connect();
   document.addEventListener('keydown', handleGlobalKeydown);
+  // Load settings
+  send({ type: 'get_settings' });
 });
 
 onUnmounted(() => {
@@ -66,7 +111,7 @@ onUnmounted(() => {
 
 <template>
   <div class="app" :class="{ 'sidebar-open': sidebarOpen }">
-    <Sidebar :open="sidebarOpen" @close="closeSidebar" />
+    <Sidebar :open="sidebarOpen" @close="closeSidebar" @open-settings="openSettings" />
     <div class="app-main">
       <router-view />
     </div>
@@ -74,6 +119,12 @@ onUnmounted(() => {
       :show="showPalette"
       :sessions="recentSessions"
       @close="closePalette"
+    />
+    <SettingsModal
+      :show="showSettings"
+      :settings="settings"
+      @close="closeSettings"
+      @update="updateSettings"
     />
   </div>
 </template>

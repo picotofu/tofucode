@@ -192,7 +192,11 @@ function goToPreviousTurn() {
   }
 
   // If at first turn and there are older messages, load them
-  if (currentTurnIndex.value === 0 && props.hasOlderMessages && !props.loadingOlderMessages) {
+  if (
+    currentTurnIndex.value === 0 &&
+    props.hasOlderMessages &&
+    !props.loadingOlderMessages
+  ) {
     emit('load-older-messages');
     return;
   }

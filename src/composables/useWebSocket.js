@@ -23,6 +23,9 @@ const updateAvailable = ref(null); // { currentVersion, latestVersion, updateUrl
 let globalWs = null;
 let globalReconnectTimeout = null;
 
+// Global message listeners for components
+const globalMessageListeners = [];
+
 // Callbacks to run when connection is established
 let onConnectCallbacks = [];
 
@@ -81,6 +84,18 @@ function connectGlobal(onConnect) {
   globalWs.onerror = () => {
     globalConnected.value = false;
     globalConnectionState.value = 'disconnected';
+  };
+}
+
+// Add a global message listener
+function addGlobalMessageListener(callback) {
+  globalMessageListeners.push(callback);
+  // Return unsubscribe function
+  return () => {
+    const index = globalMessageListeners.indexOf(callback);
+    if (index > -1) {
+      globalMessageListeners.splice(index, 1);
+    }
   };
 }
 
@@ -215,6 +230,10 @@ function handleGlobalMessage(msg) {
         sessionStatuses.value = newStatuses;
       }
       break;
+  }
+  // Call all registered message listeners
+  for (const listener of globalMessageListeners) {
+    listener(msg);
   }
 }
 
@@ -363,6 +382,9 @@ export function useWebSocket() {
     // Direct send
     send: sendGlobal,
     sendAndWait,
+
+    // Message listeners
+    onMessage: addGlobalMessageListener,
   };
 }
 

@@ -11,15 +11,18 @@ import {
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ChatMessages from '../components/ChatMessages.vue';
+import DebugPopover from '../components/DebugPopover.vue';
 import FileEditor from '../components/FileEditor.vue';
 import FileExplorer from '../components/FileExplorer.vue';
 import GitDiffModal from '../components/GitDiffModal.vue';
 import TerminalOutput from '../components/TerminalOutput.vue';
+import { useDebugMode } from '../composables/useDebugMode';
 import { useChatWebSocket } from '../composables/useWebSocket';
 import { getShortPath } from '../utils/format.js';
 
-// Get sidebar from App.vue
+// Get sidebar and settings from App.vue
 const sidebar = inject('sidebar');
+const settingsContext = inject('settings');
 
 const router = useRouter();
 const route = useRoute();
@@ -59,6 +62,11 @@ const {
   send,
   onMessage,
 } = useChatWebSocket();
+
+// Debug mode
+const debugModeEnabled = computed(() => settingsContext.debugMode());
+const { hoveredElement, popoverPosition, popoverData } =
+  useDebugMode(debugModeEnabled);
 
 // Mode state: 'chat' | 'terminal' | 'files'
 const currentMode = ref('chat');
@@ -2113,6 +2121,13 @@ watch(openedFile, (file) => {
       @close="closeGitDiffModal"
     />
 
+    <!-- Debug Popover -->
+    <DebugPopover
+      v-if="debugModeEnabled"
+      :visible="!!hoveredElement"
+      :position="popoverPosition"
+      :data="popoverData"
+    />
   </div>
 </template>
 
