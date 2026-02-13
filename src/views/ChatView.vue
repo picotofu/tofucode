@@ -2056,7 +2056,6 @@ watch(openedFile, (file) => {
 
         <!-- Recent sessions switcher -->
         <template v-if="displayedRecentSessions.length > 0">
-          <div class="recent-sessions-divider"></div>
           <div class="recent-sessions-group">
             <a
               v-for="session in displayedRecentSessions"
@@ -3221,13 +3220,6 @@ watch(openedFile, (file) => {
 }
 
 /* Recent sessions switcher */
-.recent-sessions-divider {
-  width: 1px;
-  height: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  margin: 0 12px;
-}
-
 .recent-sessions-group {
   display: flex;
   gap: 8px;
