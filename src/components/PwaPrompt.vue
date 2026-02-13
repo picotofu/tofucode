@@ -9,10 +9,12 @@ const showUpdatePrompt = ref(false);
 const { needRefresh, updateServiceWorker } = useRegisterSW({
   onRegistered(r) {
     console.log('Service Worker registered:', r);
-    // Check for updates every 60 seconds
-    setInterval(() => {
-      r?.update();
-    }, 60000);
+    // Check for updates when app comes to foreground
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && r) {
+        r.update();
+      }
+    });
   },
   onRegisterError(error) {
     console.error('Service Worker registration error:', error);
