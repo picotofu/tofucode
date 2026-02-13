@@ -135,6 +135,24 @@ Run `cc-web --help` for all options.
 
 ---
 
+## Settings
+
+Access settings via the gear icon in the sidebar. Settings are persisted in `~/.cc-web/settings.json`.
+
+**Available Settings:**
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| **Debug Mode** | Off | Hover over UI elements to see their ID and class names for development |
+| **Auto-save Files** | On | Automatically save file changes after 1 second of inactivity in Files mode |
+
+**Tips:**
+- Settings apply across all sessions and persist after server restart
+- Changes take effect immediately without reload
+- Use `Ctrl/Cmd+S` for immediate manual save when auto-save is disabled
+
+---
+
 ## Progressive Web App (PWA)
 
 CC Web can be installed as a standalone application on desktop and mobile devices:
