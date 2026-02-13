@@ -164,6 +164,44 @@ function handleClose() {
   emit('close');
 }
 
+// Insert symbol at cursor position
+function insertSymbol(symbol) {
+  if (fileType.value === 'markdown' && tinyMdeInstance) {
+    // For TinyMDE, get current content and selection
+    const content = tinyMdeInstance.getContent();
+    const selection = window.getSelection();
+    const range = selection?.getRangeAt(0);
+
+    if (range) {
+      // Insert at cursor
+      range.deleteContents();
+      range.insertNode(document.createTextNode(symbol));
+      range.collapse(false);
+
+      // Update content and mark as dirty
+      editorContent.value = tinyMdeInstance.getContent();
+      isDirty.value = true;
+    }
+  } else if (textareaRef.value) {
+    // For textarea
+    const textarea = textareaRef.value;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+
+    // Insert symbol at cursor position
+    const newText = text.substring(0, start) + symbol + text.substring(end);
+    editorContent.value = newText;
+    isDirty.value = true;
+
+    // Update textarea and restore cursor position
+    textarea.value = newText;
+    const newCursorPos = start + symbol.length;
+    textarea.setSelectionRange(newCursorPos, newCursorPos);
+    textarea.focus();
+  }
+}
+
 // Keyboard shortcuts
 function handleKeydown(event) {
   // Cmd/Ctrl+S to save
@@ -222,6 +260,19 @@ onUnmounted(() => {
           placeholder="Start typing..."
         ></textarea>
       </template>
+    </div>
+
+    <!-- Symbol toolbar -->
+    <div v-if="!loading" class="symbol-toolbar">
+      <button
+        v-for="symbol in ['`', '$', '%', '^', '&', '*', '~', '/', '\\', '|', '[', ']', '{', '}', '<', '>', '=', '+', '-', '_']"
+        :key="symbol"
+        class="symbol-btn"
+        @click="insertSymbol(symbol)"
+        :title="`Insert ${symbol}`"
+      >
+        {{ symbol }}
+      </button>
     </div>
   </div>
 </template>
@@ -297,5 +348,77 @@ onUnmounted(() => {
 
 .markdown-editor :deep(.TinyMDE.TinyMDE_empty::before) {
   color: var(--text-muted);
+}
+
+/* Symbol toolbar */
+.symbol-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Prevent scrollbar on desktop */
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) transparent;
+}
+
+.symbol-toolbar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.symbol-toolbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.symbol-toolbar::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 2px;
+}
+
+.symbol-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.symbol-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.symbol-btn:active {
+  transform: scale(0.95);
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .symbol-toolbar {
+    padding: 6px 8px;
+    gap: 3px;
+  }
+
+  .symbol-btn {
+    min-width: 36px;
+    height: 36px;
+    font-size: 15px;
+  }
 }
 </style>
