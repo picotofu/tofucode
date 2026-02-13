@@ -159,6 +159,18 @@ CC Web can be installed as a standalone application on desktop and mobile device
 - **Desktop/dock icon** - Quick launch like native applications
 - **Offline UI** - App shell loads instantly (requires connection for chat)
 - **Better mobile experience** - Full-screen on mobile devices
+- **Auto-update notifications** - Get prompted when new versions are available
+
+### How Updates Work
+
+The PWA uses service workers to detect when the frontend code changes:
+
+1. **Automatic detection** - Service worker checks for updates on page navigation
+2. **Update prompt** - When a new version is available, you'll see a prompt to reload
+3. **One-click update** - Click "Update" to activate the new version instantly
+4. **Content-addressed caching** - Any JS/CSS change triggers an update notification
+
+The PWA updates independently from the backend npm package. For full updates (backend + frontend), use `cc-web --upgrade` or the upgrade button in settings.
 
 ---
 
