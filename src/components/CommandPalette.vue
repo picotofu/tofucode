@@ -349,19 +349,19 @@ const formatTime = formatRelativeTime;
   width: 20px;
   height: 20px;
   padding: 0;
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: transparent;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  color: #3b82f6;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s;
   flex-shrink: 0;
 }
 
 .palette-new-session-btn:hover {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.5);
-  color: #2563eb;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
 }
 
 .palette-item-content {
