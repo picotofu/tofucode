@@ -134,28 +134,69 @@ export async function handleFilesRead(ws, payload, context) {
       throw new Error('File too large (max 10MB)');
     }
 
-    // Check if binary (skip for empty files)
-    if (stats.size > 0) {
-      const sampleSize = Math.min(8192, stats.size);
-      const buffer = Buffer.alloc(sampleSize);
-      const fd = await fs.open(resolvedPath, 'r');
-      await fd.read(buffer, 0, sampleSize, 0);
-      await fd.close();
+    // Detect if file is an image based on extension
+    const ext = path.extname(resolvedPath).toLowerCase();
+    const imageExtensions = [
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.gif',
+      '.webp',
+      '.svg',
+      '.bmp',
+      '.ico',
+    ];
+    const isImage = imageExtensions.includes(ext);
 
-      if (buffer.includes(0)) {
-        throw new Error('Cannot edit binary file');
+    if (isImage) {
+      // For images, read as base64
+      const buffer = await fs.readFile(resolvedPath);
+      const base64 = buffer.toString('base64');
+
+      // Detect MIME type
+      const mimeTypes = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml',
+        '.bmp': 'image/bmp',
+        '.ico': 'image/x-icon',
+      };
+      const mimeType = mimeTypes[ext] || 'image/png';
+
+      send(ws, {
+        type: 'files:read:result',
+        path: resolvedPath,
+        content: `data:${mimeType};base64,${base64}`,
+        size: stats.size,
+        isImage: true,
+      });
+    } else {
+      // Check if binary (skip for empty files)
+      if (stats.size > 0) {
+        const sampleSize = Math.min(8192, stats.size);
+        const buffer = Buffer.alloc(sampleSize);
+        const fd = await fs.open(resolvedPath, 'r');
+        await fd.read(buffer, 0, sampleSize, 0);
+        await fd.close();
+
+        if (buffer.includes(0)) {
+          throw new Error('Cannot edit binary file');
+        }
       }
+
+      // Read full content
+      const content = await fs.readFile(resolvedPath, 'utf-8');
+
+      send(ws, {
+        type: 'files:read:result',
+        path: resolvedPath,
+        content,
+        size: stats.size,
+      });
     }
-
-    // Read full content
-    const content = await fs.readFile(resolvedPath, 'utf-8');
-
-    send(ws, {
-      type: 'files:read:result',
-      path: resolvedPath,
-      content,
-      size: stats.size,
-    });
   } catch (err) {
     send(ws, {
       type: 'files:read:error',

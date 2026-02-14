@@ -124,6 +124,28 @@ onUnmounted(() => {
             Automatically save file changes after 1 second of inactivity
           </p>
         </div>
+
+        <!-- Symbol Toolbar Setting -->
+        <div class="setting-item">
+          <div class="setting-header">
+            <span class="setting-title">Symbol Toolbar</span>
+          </div>
+          <p class="setting-description">
+            Customize symbols shown in the text editor toolbar. Enter symbols separated by spaces.
+          </p>
+          <textarea
+            v-model="localSettings.symbolToolbar"
+            class="setting-textarea"
+            placeholder="Enter symbols (e.g., ` ~ ! @ # $ % ^ & * ( ) - _ = + /)"
+            rows="3"
+          ></textarea>
+          <button
+            class="reset-btn"
+            @click="localSettings.symbolToolbar = '` ~ ! @ # $ % ^ & * ( ) - _ = + /'"
+          >
+            Reset to Default
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -251,5 +273,54 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.5;
+}
+
+.setting-header {
+  margin-bottom: 8px;
+}
+
+.setting-textarea {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.setting-textarea:hover {
+  border-color: var(--text-muted);
+}
+
+.setting-textarea:focus {
+  border-color: var(--text-primary);
+}
+
+.setting-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.reset-btn {
+  margin-top: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.reset-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+  background: var(--bg-tertiary);
 }
 </style>

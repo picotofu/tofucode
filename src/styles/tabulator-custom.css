@@ -1,0 +1,133 @@
+/* Import core Tabulator CSS */
+@import "tabulator-tables/dist/css/tabulator.min.css";
+
+/* Override with design system colors */
+.tabulator {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: var(--font-sans);
+}
+
+/* Header styling */
+.tabulator .tabulator-header {
+  background-color: var(--bg-secondary);
+  border-bottom: 2px solid var(--border-color);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.tabulator .tabulator-header .tabulator-col {
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+}
+
+.tabulator .tabulator-header .tabulator-col:hover {
+  background-color: var(--bg-hover);
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-col-content {
+  padding: 8px;
+}
+
+/* Row styling */
+.tabulator .tabulator-row {
+  background-color: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.tabulator .tabulator-row:hover {
+  background-color: var(--bg-hover);
+}
+
+.tabulator .tabulator-row.tabulator-selectable:hover {
+  background-color: var(--bg-hover);
+}
+
+.tabulator .tabulator-row.tabulator-selected {
+  background-color: var(--bg-tertiary);
+}
+
+/* Cell styling */
+.tabulator .tabulator-cell {
+  border-right: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 8px;
+}
+
+.tabulator .tabulator-cell.tabulator-editing {
+  border: 2px solid var(--accent-color);
+  padding: 6px;
+}
+
+.tabulator .tabulator-cell input,
+.tabulator .tabulator-cell select {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--accent-color);
+  padding: 4px 8px;
+  font-size: 14px;
+  font-family: var(--font-sans);
+}
+
+.tabulator .tabulator-cell input:focus,
+.tabulator .tabulator-cell select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+/* Sort arrows */
+.tabulator .tabulator-header .tabulator-col .tabulator-arrow {
+  border-bottom-color: var(--text-primary);
+}
+
+/* Scrollbar styling */
+.tabulator .tabulator-tableholder::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 4px;
+}
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 4px;
+}
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Column resizer */
+.tabulator .tabulator-header .tabulator-col .tabulator-col-resize-handle {
+  background-color: var(--border-color);
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-col-resize-handle:hover {
+  background-color: var(--accent-color);
+}
+
+/* Empty table placeholder */
+.tabulator .tabulator-placeholder {
+  color: var(--text-muted);
+  background-color: var(--bg-primary);
+}
+
+/* Loading overlay */
+.tabulator .tabulator-loader {
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.tabulator .tabulator-loader .tabulator-loader-msg {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px 24px;
+}

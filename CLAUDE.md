@@ -67,8 +67,11 @@ npm run check
 - Dev server runs via nodemon in manual restart mode (no file watching) for resilience
 - Press `rs` + Enter in the nodemon terminal to manually restart after code changes
 - Server logs stream to `dev.log` - check for errors there
-- **NEVER restart the server automatically** - always prompt the user to do it
-- Backend must remain resilient for testing; user manages server lifecycle
+- **Server Restart Policy:**
+  - **Always get user consent** before restarting the server
+  - Exception: Small, safe, low-risk changes where auto-restart is explicitly permitted
+  - When permitted, use: `npx cc-web --restart --port 3001 --bypass-token <token>`
+  - Backend must remain resilient for testing; user manages server lifecycle
 
 ### Code Style
 

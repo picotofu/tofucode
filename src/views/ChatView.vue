@@ -2971,6 +2971,7 @@ watch(openedFile, (file) => {
   align-items: center;
   gap: 8px;
   margin-top: 8px;
+  width: 100%;
 }
 
 .hamburger-btn {
@@ -2999,6 +3000,7 @@ watch(openedFile, (file) => {
   padding: 2px;
   background: var(--bg-secondary);
   border-radius: var(--radius-sm);
+  flex-shrink: 0;
 }
 
 .terminal-subtabs {
@@ -3222,17 +3224,18 @@ watch(openedFile, (file) => {
 /* Recent sessions switcher */
 .recent-sessions-group {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  flex-shrink: 1;
+  flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .recent-session-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 4px;
+  padding: 3px 8px;
   font-size: 10px;
   color: rgba(255, 255, 255, 0.7);
   background: rgba(255, 255, 255, 0.05);
@@ -3242,6 +3245,8 @@ watch(openedFile, (file) => {
   cursor: pointer;
   transition: all 0.15s ease;
   max-width: 150px;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .recent-session-text {
@@ -3304,6 +3309,7 @@ watch(openedFile, (file) => {
   margin-left: auto;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .status-stop-btn {
@@ -3821,8 +3827,8 @@ watch(openedFile, (file) => {
   opacity: 0.9;
 }
 
-/* Mobile styles */
-@media (max-width: 768px) {
+/* Mobile styles - only icons, no text labels */
+@media (max-width: 639px) {
   /* Toolbar - keep single line on mobile */
   .toolbar {
     gap: 8px;
@@ -3848,7 +3854,7 @@ watch(openedFile, (file) => {
     display: none !important;
   }
 
-  /* Hide all mode tab text labels on mobile - show icons only */
+  /* Hide all terminal labels on mobile - icon only */
   .terminal-label-desktop {
     display: none !important;
   }
@@ -3860,6 +3866,17 @@ watch(openedFile, (file) => {
   /* Branch - smaller max width on mobile */
   .toolbar-item.branch {
     max-width: 180px;
+  }
+}
+
+/* Tablet (640px - 1024px) - show Terminal label, hide Active/History label */
+@media (min-width: 640px) and (max-width: 1024px) {
+  .terminal-label-desktop {
+    display: inline !important;
+  }
+
+  .terminal-label-mobile {
+    display: none !important;
   }
 }
 

@@ -9,6 +9,7 @@ const SETTINGS_FILE = join(SETTINGS_DIR, 'settings.json');
 const DEFAULT_SETTINGS = {
   debugMode: false,
   autoSaveFiles: true, // Auto-save file edits after 1 second of inactivity
+  symbolToolbar: '` ~ ! @ # $ % ^ & * ( ) - _ = + /',
 };
 
 export function loadSettings() {

@@ -17,7 +17,11 @@ const {
 
 // Settings state
 const showSettings = ref(false);
-const settings = ref({ debugMode: false, autoSaveFiles: true });
+const settings = ref({
+  debugMode: false,
+  autoSaveFiles: true,
+  symbolToolbar: '` ~ ! @ # $ % ^ & * ( ) - _ = + /',
+});
 
 function openSettings() {
   showSettings.value = true;
@@ -106,13 +110,15 @@ provide('settings', {
   settings,
   debugMode: () => settings.value.debugMode,
   autoSaveFiles: () => settings.value.autoSaveFiles,
+  symbolToolbar: () => settings.value.symbolToolbar,
 });
 
 onMounted(() => {
-  connect();
+  connect(() => {
+    // Load settings once WebSocket is connected
+    send({ type: 'get_settings' });
+  });
   document.addEventListener('keydown', handleGlobalKeydown);
-  // Load settings
-  send({ type: 'get_settings' });
 });
 
 onUnmounted(() => {

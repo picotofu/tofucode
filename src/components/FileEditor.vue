@@ -1,6 +1,16 @@
 <script setup>
 import { Editor as TinyMDE } from 'tiny-markdown-editor';
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import {
+  computed,
+  inject,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+} from 'vue';
+import CsvEditor from './CsvEditor.vue';
+import '../styles/tabulator-custom.css';
 
 const props = defineProps({
   filePath: String,
@@ -21,12 +31,61 @@ const textareaRef = ref(null);
 const mdEditorRef = ref(null);
 let tinyMdeInstance = null;
 
+// Get settings
+const settingsContext = inject('settings');
+
+// Symbol list for toolbar - from settings or default
+const symbolList = computed(() => {
+  const customSymbols = settingsContext?.symbolToolbar?.() || '';
+  if (customSymbols.trim()) {
+    // Split by spaces and filter out empty strings
+    return customSymbols.split(/\s+/).filter((s) => s.length > 0);
+  }
+  // Default symbols (keyboard layout order)
+  return [
+    '`',
+    '~',
+    '!',
+    '@',
+    '#',
+    '$',
+    '%',
+    '^',
+    '&',
+    '*',
+    '(',
+    ')',
+    '-',
+    '_',
+    '=',
+    '+',
+    '[',
+    ']',
+    '{',
+    '}',
+    '\\',
+    '|',
+    ':',
+    "'",
+    '"',
+    ',',
+    '.',
+    '<',
+    '>',
+    '/',
+    '?',
+  ];
+});
+
 // Detect file type
 const fileType = computed(() => {
   if (!props.filePath) return 'text';
   const ext = props.filePath.split('.').pop()?.toLowerCase();
 
   if (ext === 'md') return 'markdown';
+  if (ext === 'csv') return 'csv';
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext))
+    return 'image';
   if (
     [
       'js',
@@ -107,6 +166,12 @@ function handleTextareaInput(event) {
   isDirty.value = true;
 }
 
+// Handle CSV editor changes
+function handleCsvChange(newContent) {
+  isDirty.value = true; // Set dirty flag FIRST
+  editorContent.value = newContent; // Then update content (triggers watch)
+}
+
 // Auto-save logic - debounced
 let autoSaveTimeout = null;
 watch(
@@ -178,9 +243,9 @@ function insertSymbol(symbol) {
       range.insertNode(document.createTextNode(symbol));
       range.collapse(false);
 
-      // Update content and mark as dirty
-      editorContent.value = tinyMdeInstance.getContent();
+      // Mark as dirty FIRST, then update content (to trigger watch correctly)
       isDirty.value = true;
+      editorContent.value = tinyMdeInstance.getContent();
     }
   } else if (textareaRef.value) {
     // For textarea
@@ -191,8 +256,10 @@ function insertSymbol(symbol) {
 
     // Insert symbol at cursor position
     const newText = text.substring(0, start) + symbol + text.substring(end);
-    editorContent.value = newText;
+
+    // Mark as dirty FIRST, then update content (to trigger watch correctly)
     isDirty.value = true;
+    editorContent.value = newText;
 
     // Update textarea and restore cursor position
     textarea.value = newText;
@@ -248,6 +315,19 @@ onUnmounted(() => {
           class="markdown-editor"
         ></div>
 
+        <!-- CSV editor (Tabulator) -->
+        <CsvEditor
+          v-else-if="fileType === 'csv'"
+          :content="editorContent"
+          :file-path="props.filePath"
+          @change="handleCsvChange"
+        />
+
+        <!-- Image viewer -->
+        <div v-else-if="fileType === 'image'" class="image-viewer">
+          <img :src="editorContent" :alt="props.filePath" />
+        </div>
+
         <!-- Plain text / code editor -->
         <textarea
           v-else
@@ -262,10 +342,10 @@ onUnmounted(() => {
       </template>
     </div>
 
-    <!-- Symbol toolbar -->
-    <div v-if="!loading" class="symbol-toolbar">
+    <!-- Symbol toolbar (not shown for CSV or image files) -->
+    <div v-if="!loading && fileType !== 'csv' && fileType !== 'image'" class="symbol-toolbar">
       <button
-        v-for="symbol in ['`', '$', '%', '^', '&', '*', '~', '/', '\\', '|', '[', ']', '{', '}', '<', '>', '=', '+', '-', '_']"
+        v-for="symbol in symbolList"
         :key="symbol"
         class="symbol-btn"
         @click="insertSymbol(symbol)"
@@ -335,6 +415,25 @@ onUnmounted(() => {
 
 .text-editor::placeholder {
   color: var(--text-muted);
+}
+
+/* Image viewer */
+.image-viewer {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: auto;
+  background: var(--bg-primary);
+}
+
+.image-viewer img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* TinyMDE dark theme overrides */
