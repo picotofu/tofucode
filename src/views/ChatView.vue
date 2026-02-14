@@ -149,6 +149,25 @@ const openedFileName = computed(() => {
   return openedFile.value.path.split('/').pop();
 });
 
+// File statistics
+const fileSize = computed(() => {
+  if (!openedFile.value?.content) return '0 B';
+  const bytes = new Blob([openedFile.value.content]).size;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+});
+
+const totalLines = computed(() => {
+  if (!openedFile.value?.content) return 0;
+  return openedFile.value.content.split('\n').length;
+});
+
+const totalChars = computed(() => {
+  if (!openedFile.value?.content) return 0;
+  return openedFile.value.content.length;
+});
+
 // MD mode - filter for .md files only, with auto-save
 const mdModeKey = 'cc-web:md-mode';
 const mdMode = ref(localStorage.getItem(mdModeKey) === 'true');
@@ -1447,8 +1466,12 @@ watch(
 );
 
 // URL state management - sync mode, terminal tab, and opened file to URL
+// Flag to prevent watch loops when syncing from URL
+let syncingFromUrl = false;
+
 // Update URL when mode changes
 watch(currentMode, (mode) => {
+  if (syncingFromUrl) return;
   const query = { ...route.query };
   if (mode !== 'chat') {
     query.mode = mode;
@@ -1459,11 +1482,12 @@ watch(currentMode, (mode) => {
   if (mode !== 'files') {
     delete query.file;
   }
-  router.replace({ query });
+  router.push({ query });
 });
 
 // Update URL when terminal sub-tab changes
 watch(terminalSubTab, (tab) => {
+  if (syncingFromUrl) return;
   if (currentMode.value === 'terminal') {
     const query = { ...route.query };
     if (tab !== 'history') {
@@ -1471,12 +1495,13 @@ watch(terminalSubTab, (tab) => {
     } else {
       delete query.terminalTab;
     }
-    router.replace({ query });
+    router.push({ query });
   }
 });
 
 // Update URL when file is opened/closed in files mode
 watch(openedFile, (file) => {
+  if (syncingFromUrl) return;
   if (currentMode.value === 'files') {
     const query = { ...route.query };
     if (file?.path) {
@@ -1484,9 +1509,48 @@ watch(openedFile, (file) => {
     } else {
       delete query.file;
     }
-    router.replace({ query });
+    router.push({ query });
   }
 });
+
+// Sync state from URL (handles back/forward navigation)
+watch(
+  () => route.query,
+  (query) => {
+    syncingFromUrl = true;
+
+    // Sync mode from URL
+    if (query.mode === 'terminal') {
+      currentMode.value = 'terminal';
+    } else if (query.mode === 'files') {
+      currentMode.value = 'files';
+    } else {
+      currentMode.value = 'chat';
+    }
+
+    // Sync terminal sub-tab from URL
+    if (query.terminalTab === 'active') {
+      terminalSubTab.value = 'active';
+    } else {
+      terminalSubTab.value = 'history';
+    }
+
+    // Sync opened file from URL
+    if (query.file && currentMode.value === 'files') {
+      if (!openedFile.value || openedFile.value.path !== query.file) {
+        openedFile.value = { path: query.file, content: '', loading: true };
+        send({ type: 'files:read', path: query.file });
+      }
+    } else if (currentMode.value === 'files' && !query.file) {
+      openedFile.value = null;
+    }
+
+    nextTick(() => {
+      syncingFromUrl = false;
+    });
+  },
+  { deep: true },
+);
 </script>
 
 <template>
@@ -1612,6 +1676,11 @@ watch(openedFile, (file) => {
       <span class="editor-file-name">{{ openedFileName }}</span>
       <span v-if="fileEditorRef?.isDirty" class="editor-dirty-indicator" title="Unsaved changes">*</span>
       <div class="editor-header-spacer"></div>
+      <span class="editor-stats">
+        <span class="stat-item" :title="`File size: ${fileSize}`">{{ fileSize }}</span>
+        <span class="stat-item" :title="`Total lines: ${totalLines}`">≡ {{ totalLines }}</span>
+        <span class="stat-item" :title="`Total characters: ${totalChars}`">∑ {{ totalChars }}</span>
+      </span>
       <button
         class="action-btn"
         :disabled="!fileEditorRef?.isDirty || fileEditorRef?.isSaving"
@@ -2697,6 +2766,19 @@ watch(openedFile, (file) => {
   line-height: 1;
   flex-shrink: 0;
   margin-left: -4px;
+}
+
+.editor-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.editor-stats .stat-item {
+  white-space: nowrap;
 }
 
 .editor-header-spacer {

@@ -175,8 +175,8 @@ function handleCsvChange(newContent) {
 // Auto-save logic - debounced
 let autoSaveTimeout = null;
 watch(
-  [() => editorContent.value, () => props.autoSave],
-  ([_newContent, autoSaveEnabled]) => {
+  [() => editorContent.value, () => props.autoSave, () => isDirty.value],
+  ([_newContent, autoSaveEnabled, dirty]) => {
     // Clear existing timeout
     if (autoSaveTimeout) {
       clearTimeout(autoSaveTimeout);
@@ -184,7 +184,7 @@ watch(
     }
 
     // Only auto-save if enabled, dirty, and not currently saving
-    if (autoSaveEnabled && isDirty.value && !isSaving.value) {
+    if (autoSaveEnabled && dirty && !isSaving.value) {
       autoSaveTimeout = setTimeout(() => {
         handleSave();
       }, 1000); // 1 second debounce
@@ -246,6 +246,13 @@ function insertSymbol(symbol) {
       // Mark as dirty FIRST, then update content (to trigger watch correctly)
       isDirty.value = true;
       editorContent.value = tinyMdeInstance.getContent();
+
+      // Ensure focus returns to editor after Vue updates
+      nextTick(() => {
+        if (mdEditorRef.value) {
+          mdEditorRef.value.focus();
+        }
+      });
     }
   } else if (textareaRef.value) {
     // For textarea
@@ -256,16 +263,19 @@ function insertSymbol(symbol) {
 
     // Insert symbol at cursor position
     const newText = text.substring(0, start) + symbol + text.substring(end);
+    const newCursorPos = start + symbol.length;
 
     // Mark as dirty FIRST, then update content (to trigger watch correctly)
     isDirty.value = true;
     editorContent.value = newText;
 
-    // Update textarea and restore cursor position
-    textarea.value = newText;
-    const newCursorPos = start + symbol.length;
-    textarea.setSelectionRange(newCursorPos, newCursorPos);
-    textarea.focus();
+    // Restore cursor position and focus after Vue updates the textarea
+    nextTick(() => {
+      if (textareaRef.value) {
+        textareaRef.value.setSelectionRange(newCursorPos, newCursorPos);
+        textareaRef.value.focus();
+      }
+    });
   }
 }
 
@@ -348,7 +358,7 @@ onUnmounted(() => {
         v-for="symbol in symbolList"
         :key="symbol"
         class="symbol-btn"
-        @click="insertSymbol(symbol)"
+        @mousedown.prevent="insertSymbol(symbol)"
         :title="`Insert ${symbol}`"
       >
         {{ symbol }}

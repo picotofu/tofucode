@@ -66,21 +66,7 @@ function handleBack() {
           <p class="header-subtitle truncate" v-if="subtitle">{{ subtitle }}</p>
         </div>
         <div class="header-logo" v-else>
-          <svg class="logo-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M 4 14 Q 4 11 6 10 Q 6 8 8 8 Q 9 6 12 6 Q 15 6 16 8 Q 18 8 18 10 Q 20 11 20 14 Q 20 16 18 16 H 6 Q 4 16 4 14 Z"/>
-            <g opacity="0.7">
-              <line x1="12" y1="11" x2="12" y2="8"/>
-              <line x1="12" y1="11" x2="15" y2="9"/>
-              <line x1="12" y1="11" x2="16" y2="12"/>
-              <line x1="12" y1="11" x2="14" y2="14"/>
-              <line x1="12" y1="11" x2="12" y2="15"/>
-              <line x1="12" y1="11" x2="10" y2="14"/>
-              <line x1="12" y1="11" x2="8" y2="12"/>
-              <line x1="12" y1="11" x2="9" y2="9"/>
-              <circle cx="12" cy="11" r="1"/>
-            </g>
-          </svg>
-          <span>cc-web</span>
+          <img src="/icons/icon-192.png" alt="CC Web" class="logo-icon" />
         </div>
       </slot>
     </div>
@@ -175,6 +161,9 @@ function handleBack() {
 
 .logo-icon {
   flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
 }
 
 .connection-pill {

@@ -99,7 +99,7 @@ Run `cc-web --help` for all options.
 
 - **Chat Interface** - Full markdown rendering, syntax highlighting, collapsible tool outputs
 - **Terminal Mode** - Run shell commands with output streaming, command history
-- **Files Mode** - Browse and edit project files with markdown support
+- **Files Mode** - Browse and edit files with markdown, CSV spreadsheet, and image viewer support
 - **Session Management** - Multiple sessions, rename, quick switcher (Ctrl+K)
 - **Permission Modes** - Configure Claude's access: Default, Plan, Bypass, Skip
 - **Multi-tab Support** - Session warnings, per-tab isolation
@@ -147,6 +147,7 @@ Access settings via the gear icon in the sidebar. Settings are persisted in `~/.
 |---------|---------|-------------|
 | **Debug Mode** | Off | Hover over UI elements to see their ID and class names for development |
 | **Auto-save Files** | On | Automatically save file changes after 1 second of inactivity in Files mode |
+| **Symbol Toolbar** | Top row + ` ~ / | Customize symbols shown in the file editor toolbar for quick insertion |
 
 **Tips:**
 - Settings apply across all sessions and persist after server restart

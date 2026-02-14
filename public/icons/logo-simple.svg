@@ -1,0 +1,16 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Tofu block -->
+  <rect x="8" y="10" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/>
+
+  <!-- Sprout leaves -->
+  <path d="M 14 10 Q 14 7 16 6 Q 18 7 18 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Face: left eye -->
+  <circle cx="13" cy="16" r="1.5" fill="currentColor"/>
+
+  <!-- Face: right eye -->
+  <circle cx="19" cy="16" r="1.5" fill="currentColor"/>
+
+  <!-- Face: smile -->
+  <path d="M 13 20 Q 16 22 19 20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+</svg>
