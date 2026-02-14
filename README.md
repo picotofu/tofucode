@@ -158,18 +158,18 @@ Access settings via the gear icon in the sidebar. Settings are persisted in `~/.
 
 ## Progressive Web App (PWA)
 
-CC Web can be installed as a standalone application on desktop and mobile devices:
+tofucode can be installed as a standalone application on desktop and mobile devices:
 
 ### Installing as an App
 
 **Desktop (Chrome/Edge/Brave):**
-1. Open CC Web in your browser
+1. Open tofucode in your browser
 2. Click the install icon (⊕) in the address bar
 3. Click "Install" in the prompt
 4. Launch from desktop/start menu like any native app
 
 **Mobile (iOS/Android):**
-1. Open CC Web in Safari (iOS) or Chrome (Android)
+1. Open tofucode in Safari (iOS) or Chrome (Android)
 2. Tap the Share button (iOS) or Menu (Android)
 3. Select "Add to Home Screen"
 4. Launch from home screen

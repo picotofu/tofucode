@@ -88,7 +88,7 @@ onMounted(() => {
         <line x1="12" y1="15" x2="12" y2="3"/>
       </svg>
       <div class="prompt-text">
-        <strong>Install CC Web</strong>
+        <strong>Install tofucode</strong>
         <span>Install as an app for quick access</span>
       </div>
       <div class="prompt-actions">

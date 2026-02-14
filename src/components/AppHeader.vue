@@ -66,7 +66,7 @@ function handleBack() {
           <p class="header-subtitle truncate" v-if="subtitle">{{ subtitle }}</p>
         </div>
         <div class="header-logo" v-else>
-          <img src="/icons/icon-192.png" alt="CC Web" class="logo-icon" />
+          <img src="/icons/icon-192.png" alt="tofucode" class="logo-icon" />
         </div>
       </slot>
     </div>

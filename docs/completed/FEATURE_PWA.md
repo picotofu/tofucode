@@ -5,7 +5,7 @@
 
 ## Overview
 
-CC Web is now a Progressive Web App (PWA), allowing users to install it as a standalone application on desktop and mobile devices. This provides an app-like experience with quick launch, standalone window, and offline UI capabilities.
+tofucode is now a Progressive Web App (PWA), allowing users to install it as a standalone application on desktop and mobile devices. This provides an app-like experience with quick launch, standalone window, and offline UI capabilities.
 
 ## Implementation
 
@@ -41,8 +41,8 @@ VitePWA({
   registerType: 'prompt',
   includeAssets: ['favicon.svg', 'icons/*.png'],
   manifest: {
-    name: 'CC Web',
-    short_name: 'CC Web',
+    name: 'tofucode',
+    short_name: 'tofucode',
     description: 'Web UI for Claude Code with full system access',
     theme_color: '#1a1a1a',
     background_color: '#1a1a1a',
@@ -109,7 +109,7 @@ VitePWA({
 
 ### Installation Flow
 
-1. User opens CC Web in browser
+1. User opens tofucode in browser
 2. Browser shows install prompt (or PwaPrompt component)
 3. User clicks "Install"
 4. App installs to desktop/home screen
@@ -198,7 +198,7 @@ When launched as installed PWA:
 ### Manual Testing Steps
 
 1. **Installation:**
-   - Open CC Web in Chrome
+   - Open tofucode in Chrome
    - Check for install prompt
    - Click install
    - Verify app installs
@@ -269,7 +269,7 @@ Possible improvements:
    - Update notifications
 
 3. **Share Target:**
-   - Share code/files to CC Web
+   - Share code/files to tofucode
    - Open shared content in new session
 
 4. **Shortcuts:**

@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['favicon.svg', 'icons/*.png'],
       manifest: {
-        name: 'CC Web',
-        short_name: 'CC Web',
+        name: 'tofucode',
+        short_name: 'tofucode',
         description: 'Web UI for Claude Code with full system access',
         theme_color: '#1a1a1a',
         background_color: '#1a1a1a',

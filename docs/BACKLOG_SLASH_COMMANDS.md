@@ -6,7 +6,7 @@
 
 ## Overview
 
-Native Claude Code CLI has 53+ built-in slash commands that provide quick access to various features without interrupting the conversation flow. This document evaluates which commands could potentially be implemented in CC Web if needed in the future.
+Native Claude Code CLI has 53+ built-in slash commands that provide quick access to various features without interrupting the conversation flow. This document evaluates which commands could potentially be implemented in tofucode if needed in the future.
 
 ## Available Commands in Native CLI
 

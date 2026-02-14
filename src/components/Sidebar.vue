@@ -296,7 +296,7 @@ function handleOverlayClick() {
 
     <div class="sidebar-header">
       <router-link :to="{ name: 'projects' }" class="sidebar-title" @click="closeOnMobile">
-        <img src="/icons/icon-192.png" alt="CC Web" class="sidebar-logo" />
+        <img src="/icons/icon-192.png" alt="tofucode" class="sidebar-logo" />
       </router-link>
 
       <!-- Version display -->
