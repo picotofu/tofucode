@@ -146,6 +146,22 @@ onUnmounted(() => {
             Reset to Default
           </button>
         </div>
+
+        <!-- Quick Access File Setting -->
+        <div class="setting-item">
+          <div class="setting-header">
+            <span class="setting-title">Quick Access File</span>
+          </div>
+          <p class="setting-description">
+            Filename to quickly open in Files mode (e.g., TODO.md, NOTES.md). Leave empty to disable.
+          </p>
+          <input
+            type="text"
+            v-model="localSettings.quickAccessFile"
+            class="setting-input"
+            placeholder="TODO.md"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -303,6 +319,32 @@ onUnmounted(() => {
 }
 
 .setting-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.setting-input {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.setting-input:hover {
+  border-color: var(--text-muted);
+}
+
+.setting-input:focus {
+  border-color: var(--text-primary);
+}
+
+.setting-input::placeholder {
   color: var(--text-muted);
 }
 

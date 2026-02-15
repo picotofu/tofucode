@@ -1164,6 +1164,24 @@ function handleFileSelect(file) {
   });
 }
 
+function openQuickAccessFile() {
+  const filename = settingsContext?.quickAccessFile?.();
+  if (!filename || !projectStatus.value?.path) return;
+
+  // Switch to files mode
+  currentMode.value = 'files';
+
+  // Construct full path (assuming file is in project root)
+  const fullPath = `${projectStatus.value.path}/${filename}`;
+
+  // Open the file
+  openedFile.value = { path: fullPath, content: '', loading: true };
+  send({
+    type: 'files:read',
+    path: fullPath,
+  });
+}
+
 function handleFileSave(data) {
   send({
     type: 'files:write',
@@ -2123,6 +2141,19 @@ watch(
           </button>
         </div>
 
+        <!-- Quick access file button -->
+        <button
+          v-if="settingsContext?.quickAccessFile?.()"
+          class="quick-access-btn"
+          @click="openQuickAccessFile"
+          :title="`Open ${settingsContext.quickAccessFile()}`"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+            <polyline points="13 2 13 9 20 9"/>
+          </svg>
+        </button>
+
         <!-- Recent sessions switcher -->
         <template v-if="displayedRecentSessions.length > 0">
           <div class="recent-sessions-group">
@@ -3072,6 +3103,26 @@ watch(
 }
 
 .hamburger-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.quick-access-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.quick-access-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
 }

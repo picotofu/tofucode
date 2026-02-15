@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS = {
   debugMode: false,
   autoSaveFiles: true, // Auto-save file edits after 1 second of inactivity
   symbolToolbar: '` ~ ! @ # $ % ^ & * ( ) - _ = + /',
+  quickAccessFile: 'TODO.md', // Quick access file in Files mode
 };
 
 export function loadSettings() {
