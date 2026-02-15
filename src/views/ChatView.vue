@@ -1164,6 +1164,9 @@ function handleFileSelect(file) {
   });
 }
 
+// Track quick access file attempts for auto-creation
+let quickAccessAttempt = null;
+
 function openQuickAccessFile() {
   const filename = settingsContext?.quickAccessFile?.();
   if (!filename || !projectStatus.value?.path) return;
@@ -1174,7 +1177,10 @@ function openQuickAccessFile() {
   // Construct full path (assuming file is in project root)
   const fullPath = `${projectStatus.value.path}/${filename}`;
 
-  // Open the file
+  // Mark this as a quick access attempt
+  quickAccessAttempt = fullPath;
+
+  // Try to open the file
   openedFile.value = { path: fullPath, content: '', loading: true };
   send({
     type: 'files:read',
@@ -1363,11 +1369,27 @@ function handleFileMessage(msg) {
           content: msg.content,
           loading: false,
         };
+        // Clear quick access attempt flag on success
+        if (quickAccessAttempt === msg.path) {
+          quickAccessAttempt = null;
+        }
       }
       break;
     case 'files:read:error':
       console.error('Read error:', msg.error);
-      if (openedFile.value) {
+      // If this was a quick access file that doesn't exist, create it
+      if (quickAccessAttempt && openedFile.value?.path === quickAccessAttempt) {
+        const path = quickAccessAttempt;
+        quickAccessAttempt = null; // Clear the attempt flag
+        // Create the file with empty content
+        send({
+          type: 'files:write',
+          path: path,
+          content: '',
+        });
+        // Open the newly created file
+        openedFile.value = { path: path, content: '', loading: false };
+      } else if (openedFile.value) {
         openedFile.value = null;
       }
       break;
@@ -2081,6 +2103,18 @@ watch(
           </svg>
         </button>
 
+        <!-- Quick access file button -->
+        <button
+          v-if="settingsContext?.quickAccessFile?.()"
+          class="quick-access-btn"
+          @click="openQuickAccessFile"
+          :title="`Quick access: ${settingsContext.quickAccessFile()}`"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+        </button>
+
         <div class="mode-tabs-group">
           <button
             class="mode-tab"
@@ -2140,19 +2174,6 @@ watch(
             <span class="mode-label">Files</span>
           </button>
         </div>
-
-        <!-- Quick access file button -->
-        <button
-          v-if="settingsContext?.quickAccessFile?.()"
-          class="quick-access-btn"
-          @click="openQuickAccessFile"
-          :title="`Open ${settingsContext.quickAccessFile()}`"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
-            <polyline points="13 2 13 9 20 9"/>
-          </svg>
-        </button>
 
         <!-- Recent sessions switcher -->
         <template v-if="displayedRecentSessions.length > 0">
