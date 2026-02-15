@@ -6,6 +6,8 @@ Web UI for Claude Code with full system access. Run Claude through a browser int
 
 ## Quick Start
 
+### NPM
+
 ```bash
 # Run directly with npx (recommended)
 npx tofucode
@@ -16,6 +18,30 @@ tofucode
 ```
 
 Open http://localhost:3000 and start chatting.
+
+### Docker
+
+```bash
+# Pull and run
+docker run -d \
+  -p 3000:3000 \
+  -e ANTHROPIC_API_KEY=your_key_here \
+  -v $(pwd):/workspace \
+  picotofu/tofucode:latest
+
+# Open http://localhost:3000
+```
+
+**Mount Points:**
+- `/home/appuser/.claude/.credentials.json` - required - API credentials (isolated, recommended)
+- `/home/appuser/.claude` - required - full Claude config (alternative, for host interop)
+- `ANTHROPIC_API_KEY` env var - required - API key (alternative)
+- `/workspace` - optional - project directory
+- `/home/appuser/.tofucode` - optional - auth, settings, state storage
+
+**Note:** Only one API authentication method is required (credentials file, full `.claude` folder, or env var)
+
+See [Docker Guide](./docs/DOCKER.md) for all configuration options.
 
 ---
 
@@ -121,14 +147,15 @@ The `--root` restriction is **not foolproof**:
 **For full isolation, use Docker:**
 
 ```bash
-docker run -it --rm \
+docker run -d \
   -p 3000:3000 \
-  -v /path/to/project:/workspace:ro \
+  -e ANTHROPIC_API_KEY=your_key_here \
   -e ROOT_PATH=/workspace \
-  tofucode
+  -v /path/to/project:/workspace \
+  picotofu/tofucode:latest --root /workspace
 ```
 
-Docker provides OS-level isolation that cannot be bypassed.
+Docker provides OS-level isolation that cannot be bypassed. See the [Docker Guide](./docs/DOCKER.md) for flexible volume mounting strategies.
 
 ---
 

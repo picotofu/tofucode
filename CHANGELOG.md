@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Rebranded from cc-web to tofucode
-- Updated repository URL to https://github.com/jasonrey/tofucode
+- Updated repository URL to https://github.com/picotofu/tofucode
 - Updated PWA manifest with new app name
 - Updated all branding references throughout UI and documentation
 
