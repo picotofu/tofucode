@@ -20,6 +20,7 @@ const {
   projects,
   recentSessions,
   sessionStatuses,
+  terminalCounts,
   currentVersion,
   updateAvailable,
   getProjects,
@@ -207,6 +208,10 @@ function handleOverlayClick() {
                 <span class="separator">·</span>
                 <span>{{ formatRelativeTime(session.modified) }}</span>
               </p>
+            </div>
+            <!-- Terminal indicator badge -->
+            <div v-if="terminalCounts.get(session.projectSlug)" class="terminal-badge">
+              {{ terminalCounts.get(session.projectSlug) }}
             </div>
           </a>
         </li>
@@ -551,6 +556,23 @@ function handleOverlayClick() {
   text-decoration: none;
   flex: 1;
   min-width: 0;
+  position: relative;
+}
+
+.terminal-badge {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #f59e0b;
+  color: #000;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.4;
 }
 
 .item-icon {

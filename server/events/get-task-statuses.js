@@ -22,6 +22,7 @@
  * }
  */
 
+import processManager from '../lib/processManager.js';
 import { tasks } from '../lib/tasks.js';
 import { send } from '../lib/ws.js';
 
@@ -44,8 +45,20 @@ export function handler(ws, _message, _context) {
     }
   }
 
+  // Collect terminal process counts per project
+  const terminalCounts = {};
+  for (const [projectSlug, processMap] of processManager.projects) {
+    const runningCount = Array.from(processMap.values()).filter(
+      (p) => p.status === 'running',
+    ).length;
+    if (runningCount > 0) {
+      terminalCounts[projectSlug] = runningCount;
+    }
+  }
+
   send(ws, {
     type: 'task_statuses',
     statuses,
+    terminalCounts,
   });
 }

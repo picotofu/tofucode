@@ -15,6 +15,9 @@ const currentFolder = ref(null);
 // Track task status per session for sidebar indicators
 // Map of sessionId -> { status: 'running' | 'completed' | 'error', timestamp }
 const sessionStatuses = ref(new Map());
+// Track terminal process counts per project
+// Map of projectSlug -> count
+const terminalCounts = ref(new Map());
 
 // Version info
 const currentVersion = ref(null);
@@ -228,6 +231,14 @@ function handleGlobalMessage(msg) {
         }
         sessionStatuses.value = newStatuses;
       }
+      // Restore terminal counts per project
+      if (msg.terminalCounts && typeof msg.terminalCounts === 'object') {
+        const newCounts = new Map();
+        for (const [projectSlug, count] of Object.entries(msg.terminalCounts)) {
+          newCounts.set(projectSlug, count);
+        }
+        terminalCounts.value = newCounts;
+      }
       break;
 
     case 'session_opened':
@@ -385,6 +396,7 @@ export function useWebSocket() {
     folderContents: readonly(folderContents),
     currentFolder: readonly(currentFolder),
     sessionStatuses: readonly(sessionStatuses),
+    terminalCounts: readonly(terminalCounts),
     currentVersion: readonly(currentVersion),
     updateAvailable: readonly(updateAvailable),
     rootPath: readonly(rootPath),
@@ -631,10 +643,32 @@ export function useChatWebSocket() {
       // Terminal events
       case 'terminal:processes':
         terminalProcesses.value = msg.processes;
+        // Update global terminal count for this project
+        if (currentProject.value?.slug) {
+          const runningCount = msg.processes.filter(
+            (p) => p.status === 'running',
+          ).length;
+          const newCounts = new Map(terminalCounts.value);
+          if (runningCount > 0) {
+            newCounts.set(currentProject.value.slug, runningCount);
+          } else {
+            newCounts.delete(currentProject.value.slug);
+          }
+          terminalCounts.value = newCounts;
+        }
         break;
 
       case 'terminal:started':
         terminalProcesses.value = [...terminalProcesses.value, msg.process];
+        // Update global terminal count
+        if (currentProject.value?.slug) {
+          const runningCount = terminalProcesses.value.filter(
+            (p) => p.status === 'running',
+          ).length;
+          const newCounts = new Map(terminalCounts.value);
+          newCounts.set(currentProject.value.slug, runningCount);
+          terminalCounts.value = newCounts;
+        }
         break;
 
       case 'terminal:output': {
@@ -663,6 +697,19 @@ export function useChatWebSocket() {
           proc.endedAt = Date.now();
           // Trigger reactivity
           terminalProcesses.value = [...terminalProcesses.value];
+        }
+        // Update global terminal count
+        if (currentProject.value?.slug) {
+          const runningCount = terminalProcesses.value.filter(
+            (p) => p.status === 'running',
+          ).length;
+          const newCounts = new Map(terminalCounts.value);
+          if (runningCount > 0) {
+            newCounts.set(currentProject.value.slug, runningCount);
+          } else {
+            newCounts.delete(currentProject.value.slug);
+          }
+          terminalCounts.value = newCounts;
         }
         break;
       }
