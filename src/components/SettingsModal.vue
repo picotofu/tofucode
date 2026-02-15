@@ -10,9 +10,13 @@ const props = defineProps({
     type: Object,
     default: () => ({ debugMode: false }),
   },
+  connected: {
+    type: Boolean,
+    default: true,
+  },
 });
 
-const emit = defineEmits(['close', 'update']);
+const emit = defineEmits(['close', 'update', 'restart']);
 
 // Local copy of settings
 const localSettings = ref({ ...props.settings });
@@ -72,6 +76,32 @@ watch(
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
 });
+
+// Restart functionality
+const isRestarting = ref(false);
+
+// Reset restart state when reconnected
+watch(
+  () => props.connected,
+  (isConnected) => {
+    if (isConnected) {
+      isRestarting.value = false;
+    }
+  },
+);
+
+function handleRestart() {
+  if (isRestarting.value) return;
+
+  const confirmed = confirm(
+    'Restart the server?\n\nThis will briefly disconnect all clients. They will automatically reconnect.',
+  );
+
+  if (confirmed) {
+    isRestarting.value = true;
+    emit('restart');
+  }
+}
 </script>
 
 <template>
@@ -161,6 +191,33 @@ onUnmounted(() => {
             class="setting-input"
             placeholder="TODO.md"
           />
+        </div>
+
+        <hr class="divider" />
+
+        <!-- Restart Server -->
+        <div class="setting-item">
+          <div class="setting-header">
+            <span class="setting-title">Server Control</span>
+          </div>
+          <p class="setting-description">
+            Restart the server. All clients will be briefly disconnected and automatically reconnect.
+          </p>
+          <button
+            class="restart-btn"
+            @click="handleRestart"
+            :disabled="isRestarting"
+          >
+            <svg v-if="!isRestarting" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6"/>
+              <path d="M1 20v-6h6"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            <svg v-else width="14" height="14" viewBox="0 0 24 24" class="spin">
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+            </svg>
+            <span>{{ isRestarting ? 'Restarting...' : 'Restart Server' }}</span>
+          </button>
         </div>
       </div>
     </div>
@@ -364,5 +421,50 @@ onUnmounted(() => {
   color: var(--text-primary);
   border-color: var(--text-muted);
   background: var(--bg-tertiary);
+}
+
+.divider {
+  margin: 24px 0;
+  border: none;
+  border-top: 1px solid var(--border-color);
+}
+
+.restart-btn {
+  margin-top: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.restart-btn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--text-muted);
+}
+
+.restart-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.restart-btn .spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

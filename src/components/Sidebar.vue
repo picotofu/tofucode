@@ -28,15 +28,13 @@ const {
   send,
 } = useWebSocket();
 
-// Upgrade/Restart state
+// Upgrade state
 const isUpgrading = ref(false);
-const isRestarting = ref(false);
 
-// Reset states when reconnected
+// Reset state when reconnected
 watch(connected, (isConnected) => {
   if (isConnected) {
     isUpgrading.value = false;
-    isRestarting.value = false;
   }
 });
 
@@ -52,19 +50,6 @@ function handleUpgrade() {
   if (confirmed) {
     isUpgrading.value = true;
     send({ type: 'upgrade', version });
-  }
-}
-
-function handleRestart() {
-  if (isRestarting.value) return;
-
-  const confirmed = confirm(
-    'Restart the server?\n\nThis will briefly disconnect all clients. They will automatically reconnect.',
-  );
-
-  if (confirmed) {
-    isRestarting.value = true;
-    send({ type: 'restart' });
   }
 }
 
@@ -347,24 +332,6 @@ function handleOverlayClick() {
           <circle cx="12" cy="12" r="3"/>
         </svg>
       </button>
-
-      <!-- Restart button (shown when no update available) -->
-      <button
-        v-if="!updateAvailable"
-        class="restart-btn"
-        @click="handleRestart"
-        :disabled="isRestarting"
-        title="Restart server"
-      >
-        <svg v-if="!isRestarting" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M23 4v6h-6"/>
-          <path d="M1 20v-6h6"/>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
-        <svg v-else width="14" height="14" viewBox="0 0 24 24" class="spin">
-          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
-        </svg>
-      </button>
     </div>
   </aside>
 
@@ -513,45 +480,6 @@ function handleOverlayClick() {
   background: var(--bg-tertiary);
   color: var(--text-primary);
   border-color: var(--text-muted);
-}
-
-.restart-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  background: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.restart-btn:hover:not(:disabled) {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border-color: var(--text-muted);
-}
-
-.restart-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.restart-btn .spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .sidebar-tabs {

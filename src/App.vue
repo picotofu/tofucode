@@ -10,6 +10,7 @@ import { useWebSocket } from './composables/useWebSocket';
 const {
   connect,
   disconnect,
+  connected,
   recentSessions,
   getRecentSessionsImmediate,
   send,
@@ -49,6 +50,10 @@ function updateSettings(newSettings) {
     type: 'update_settings',
     settings: newSettings,
   });
+}
+
+function handleRestart() {
+  send({ type: 'restart' });
 }
 
 // Handle settings messages
@@ -160,8 +165,10 @@ onUnmounted(() => {
     <SettingsModal
       :show="showSettings"
       :settings="settings"
+      :connected="connected"
       @close="closeSettings"
       @update="updateSettings"
+      @restart="handleRestart"
     />
     <KeyboardShortcutsModal
       v-if="showHelp"
