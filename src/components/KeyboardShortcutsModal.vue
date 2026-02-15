@@ -25,7 +25,7 @@ const shortcuts = [
       { keys: ['Ctrl/Cmd', 'B'], description: 'Toggle sidebar' },
       { keys: ['Ctrl/Cmd', ','], description: 'Open settings' },
       {
-        keys: ['Ctrl/Cmd', '?'],
+        keys: ['Ctrl/Cmd', '/'],
         description: 'Show keyboard shortcuts (this dialog)',
       },
     ],
