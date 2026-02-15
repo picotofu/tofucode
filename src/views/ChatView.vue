@@ -1911,6 +1911,17 @@ watch(
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
               </svg>
             </button>
+            <!-- Quick access file button (beside permission tabs) -->
+            <button
+              v-if="settingsContext?.quickAccessFile?.()"
+              class="quick-access-btn"
+              @click="openQuickAccessFile"
+              :title="`Quick access: ${settingsContext.quickAccessFile()}`"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -2100,18 +2111,6 @@ watch(
             <line x1="3" y1="12" x2="21" y2="12"/>
             <line x1="3" y1="6" x2="21" y2="6"/>
             <line x1="3" y1="18" x2="21" y2="18"/>
-          </svg>
-        </button>
-
-        <!-- Quick access file button -->
-        <button
-          v-if="settingsContext?.quickAccessFile?.()"
-          class="quick-access-btn"
-          @click="openQuickAccessFile"
-          :title="`Quick access: ${settingsContext.quickAccessFile()}`"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
           </svg>
         </button>
 
