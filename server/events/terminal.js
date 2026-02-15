@@ -7,22 +7,28 @@
 import path from 'node:path';
 import { config, slugToPath } from '../config.js';
 import processManager from '../lib/processManager.js';
+import { getTerminalCounts } from '../lib/terminalUtils.js';
 import { broadcast, send } from '../lib/ws.js';
 
+// Debounce timer for terminal count broadcasts
+let broadcastTimer = null;
+const BROADCAST_DEBOUNCE_MS = 100; // 100ms debounce to prevent spam during high process churn
+
 /**
- * Broadcast terminal count update to all clients
+ * Broadcast terminal count update to all clients (debounced)
  */
 function broadcastTerminalCounts() {
-  const terminalCounts = {};
-  for (const [projectSlug, processMap] of processManager.projects) {
-    const runningCount = Array.from(processMap.values()).filter(
-      (p) => p.status === 'running',
-    ).length;
-    if (runningCount > 0) {
-      terminalCounts[projectSlug] = runningCount;
-    }
+  // Clear existing timer
+  if (broadcastTimer) {
+    clearTimeout(broadcastTimer);
   }
-  broadcast({ type: 'terminal_counts', terminalCounts });
+
+  // Schedule broadcast
+  broadcastTimer = setTimeout(() => {
+    const terminalCounts = getTerminalCounts();
+    broadcast({ type: 'terminal_counts', terminalCounts });
+    broadcastTimer = null;
+  }, BROADCAST_DEBOUNCE_MS);
 }
 
 /**
