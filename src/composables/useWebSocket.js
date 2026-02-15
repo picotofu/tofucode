@@ -654,7 +654,17 @@ export function useChatWebSocket() {
           } else {
             newCounts.delete(currentProject.value.slug);
           }
+          console.log('[terminal:processes] Updating terminalCounts:', {
+            projectSlug: currentProject.value.slug,
+            runningCount,
+            newCounts: Object.fromEntries(newCounts),
+          });
           terminalCounts.value = newCounts;
+        } else {
+          console.log('[terminal:processes] Skipping count update - no currentProject:', {
+            currentProject: currentProject.value,
+            processCount: msg.processes.length,
+          });
         }
         break;
 
