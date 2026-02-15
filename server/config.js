@@ -14,6 +14,9 @@ export const config = {
 
   // Permission mode: 'bypassPermissions' for full access
   permissionMode: 'bypassPermissions',
+
+  // Root path restriction (if set, limits file/terminal access)
+  rootPath: process.env.ROOT_PATH || null,
 };
 
 // Convert project path to slug (how Claude stores it)

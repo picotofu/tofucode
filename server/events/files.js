@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { config } from '../config.js';
 import { send } from '../lib/ws.js';
 
 /**
@@ -13,9 +14,20 @@ import { send } from '../lib/ws.js';
 function validatePath(requestedPath, context) {
   const resolved = path.resolve(requestedPath);
 
-  // Allow access to:
-  // 1. User's home directory (for browsing projects)
-  // 2. Current project directory (from context.projectPath if available)
+  // If --root is set, enforce strict root restriction
+  if (config.rootPath) {
+    const resolvedRoot = path.resolve(config.rootPath);
+    const relativePath = path.relative(resolvedRoot, resolved);
+
+    // Check if path is within root (relative path shouldn't start with ..)
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+      throw new Error(`Access denied: path outside root (${config.rootPath})`);
+    }
+
+    return resolved;
+  }
+
+  // Default behavior (no --root set): Allow home directory and project
   const allowedRoots = [homedir()];
 
   // Add project path if available in context

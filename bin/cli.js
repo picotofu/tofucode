@@ -50,6 +50,7 @@ const options = {
   pidFile: DEFAULT_PID_FILE,
   config: null,
   bypassToken: null,
+  root: null,
 };
 
 for (let i = 0; i < args.length; i++) {
@@ -74,6 +75,8 @@ for (let i = 0; i < args.length; i++) {
     options.config = args[++i];
   } else if (arg === '--bypass-token') {
     options.bypassToken = args[++i];
+  } else if (arg === '--root') {
+    options.root = resolve(args[++i]);
   } else if (arg === '--help') {
     console.log(`
 tofucode - Web UI for Claude Code
@@ -95,6 +98,7 @@ Options:
   --pid-file <path>          Custom PID file path (default: ~/.tofucode/tofucode.pid)
   -c, --config <path>        Load configuration from JSON file
   --bypass-token <token>     Set bypass token for auth-free access (automation/testing)
+  --root <path>              Restrict access to specified directory (best effort)
   -v, --version              Show version number
   --help                     Show this help message
 
@@ -121,7 +125,8 @@ Configuration File:
     "host": "127.0.0.1",
     "auth": false,
     "debug": true,
-    "bypassToken": "your-secret-token"
+    "bypassToken": "your-secret-token",
+    "root": "/path/to/project"
   }
 
 Examples:
@@ -131,8 +136,13 @@ Examples:
   tofucode -d                        # Run as background daemon
   tofucode -d --debug                # Daemon with debug logging
   tofucode --config prod.json -d     # Use config file + daemon mode
+  tofucode --root /path/to/project   # Restrict to specific directory
   tofucode --stop                    # Stop running daemon
   tofucode --status                  # Check daemon status
+
+Security:
+  --root restricts file and terminal access to the specified directory on a
+  best-effort basis. For full isolation, use Docker with bind mounts.
 `);
     process.exit(0);
   }
@@ -177,6 +187,10 @@ if (options.bypassToken) {
   env.DEBUG_TOKEN = options.bypassToken;
 }
 
+if (options.root) {
+  env.ROOT_PATH = options.root;
+}
+
 // Pass PID file path to server (for restart to update it)
 if (options.pidFile) {
   env.PID_FILE = resolve(options.pidFile);
@@ -190,6 +204,9 @@ if (!options.quiet) {
   }
   if (options.debug) {
     console.log('Debug mode enabled');
+  }
+  if (options.root) {
+    console.log(`Restricted mode: ${options.root} (best effort)`);
   }
   console.log('');
 }
@@ -309,6 +326,9 @@ async function loadConfig(options) {
     }
     if (config.bypassToken !== undefined && !argSet.has('--bypass-token')) {
       options.bypassToken = config.bypassToken;
+    }
+    if (config.root !== undefined && !argSet.has('--root')) {
+      options.root = resolve(config.root);
     }
 
     if (!options.quiet) {

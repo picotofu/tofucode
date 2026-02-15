@@ -4,7 +4,8 @@
  * Provides command execution and process management capabilities.
  */
 
-import { slugToPath } from '../config.js';
+import path from 'node:path';
+import { config, slugToPath } from '../config.js';
 import processManager from '../lib/processManager.js';
 import { send } from '../lib/ws.js';
 
@@ -45,6 +46,24 @@ export function execHandler(ws, message, context) {
   // Resolve working directory
   const projectPath = slugToPath(projectSlug);
   const workingDir = cwd || projectPath;
+
+  // Best effort: validate CWD is within root (if --root is set)
+  if (config.rootPath) {
+    const resolvedCwd = path.resolve(workingDir);
+    const resolvedRoot = path.resolve(config.rootPath);
+    const relativePath = path.relative(resolvedRoot, resolvedCwd);
+
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+      send(ws, {
+        type: 'terminal:error',
+        error: `Access denied: working directory outside root (${config.rootPath})`,
+      });
+      return;
+    }
+
+    // Warning: Commands can still access files outside root using absolute paths
+    // This is best-effort protection. Use Docker for full isolation.
+  }
 
   // Spawn the process
   const entry = processManager.spawn(projectSlug, {
