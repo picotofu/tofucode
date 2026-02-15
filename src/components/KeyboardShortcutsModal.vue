@@ -21,11 +21,11 @@ const shortcuts = [
   {
     category: 'Global',
     items: [
-      { keys: ['Ctrl/Cmd', 'K'], description: 'Open command palette' },
-      { keys: ['Ctrl/Cmd', 'B'], description: 'Toggle sidebar' },
-      { keys: ['Ctrl/Cmd', ','], description: 'Open settings' },
+      { keys: ['⌘/^', 'K'], description: 'Open command palette' },
+      { keys: ['⌘/^', 'B'], description: 'Toggle sidebar' },
+      { keys: ['⌘/^', ','], description: 'Open settings' },
       {
-        keys: ['Ctrl/Cmd', '/'],
+        keys: ['⌘/^', '/'],
         description: 'Show keyboard shortcuts (this dialog)',
       },
     ],
@@ -33,12 +33,12 @@ const shortcuts = [
   {
     category: 'Chat View',
     items: [
-      { keys: ['Ctrl/Cmd', '1'], description: 'Switch to Chat tab' },
-      { keys: ['Ctrl/Cmd', '2'], description: 'Switch to Terminal tab' },
-      { keys: ['Ctrl/Cmd', '3'], description: 'Switch to Files tab' },
-      { keys: ['Ctrl/Cmd', 'L'], description: 'Scroll to bottom (clear view)' },
-      { keys: ['Ctrl/Cmd', '↑'], description: 'Navigate to previous turn' },
-      { keys: ['Ctrl/Cmd', '↓'], description: 'Navigate to next turn' },
+      { keys: ['⌘/^', '1'], description: 'Switch to Chat tab' },
+      { keys: ['⌘/^', '2'], description: 'Switch to Terminal tab' },
+      { keys: ['⌘/^', '3'], description: 'Switch to Files tab' },
+      { keys: ['⌘/^', 'L'], description: 'Scroll to bottom (clear view)' },
+      { keys: ['⌘/^', '↑'], description: 'Navigate to previous turn' },
+      { keys: ['⌘/^', '↓'], description: 'Navigate to next turn' },
       { keys: ['Escape'], description: 'Close modals / blur input' },
     ],
   },
@@ -47,7 +47,7 @@ const shortcuts = [
     items: [
       { keys: ['Enter'], description: 'Send message' },
       { keys: ['Shift', 'Enter'], description: 'New line in message' },
-      { keys: ['Ctrl/Cmd', 'Enter'], description: 'Send message (alternate)' },
+      { keys: ['⌘/^', 'Enter'], description: 'Send message (alternate)' },
     ],
   },
   {
@@ -60,7 +60,7 @@ const shortcuts = [
   {
     category: 'File Editor',
     items: [
-      { keys: ['Ctrl/Cmd', 'S'], description: 'Save file' },
+      { keys: ['⌘/^', 'S'], description: 'Save file' },
       { keys: ['Escape'], description: 'Close editor' },
     ],
   },
