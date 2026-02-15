@@ -23,10 +23,10 @@ claude-code-web/
 │   ├── components/      # Reusable components
 │   ├── composables/     # Vue composables (useWebSocket)
 │   └── utils/           # Utility functions
-├── docs/                # Feature documentation
+├── docs/                # Documentation
+│   ├── todo/            # Planning and ideas not yet implemented
 │   ├── completed/       # Completed feature documentation
-│   ├── FEATURE_*.md     # Active feature plans and status documents
-│   └── *.md             # Other reference documentation
+│   └── *.md             # Misc reference documentation (DOCKER.md, STYLEGUIDE.md)
 ├── README.md            # User-facing: setup, usage, contribute
 ├── CLAUDE.md            # This file - development workflow
 ├── PLAN.md              # High-level task tracking
@@ -42,10 +42,10 @@ claude-code-web/
 - `CHANGELOG.md` - Version-based release notes following [Keep a Changelog](https://keepachangelog.com/) format
 
 **`docs/` Folder:**
-- `FEATURE_*.md` - Active feature planning and status documents
+- `todo/` - Planning documents and ideas not yet implemented (FEATURE_*, BACKLOG_*, IMPLEMENTATION_*)
 - `completed/` - Completed feature documentation (fully implemented features)
-- Any other reference documentation with specialized prefixes
-- Keeps root clean while organizing detailed technical specs
+- `*.md` - Misc reference documentation (DOCKER.md, STYLEGUIDE.md, etc.)
+- Keeps root clean while organizing detailed technical specs by status
 
 ## Development
 

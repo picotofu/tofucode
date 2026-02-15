@@ -311,17 +311,11 @@ npm run dev
 
 ### Feature Documentation
 
-Feature documentation in the [`docs/`](./docs) folder:
+The [`docs/`](./docs) folder is organized by implementation status:
 
-**Implemented:**
-- [Terminal Mode](./docs/FEATURE_TERMINAL.md) - Command execution with output streaming (✅ v1.0.0)
-- [File Explorer](./docs/FEATURE_FILE_EXPLORER.md) - Browse and edit files (✅ v1.0.0)
-
-**Planned:**
-- [Diff Viewer](./docs/FEATURE_DIFF_VIEWER.md) - Inline diffs for Edit operations
-- [Version Updates](./docs/FEATURE_UPDATE_VERSION.md) - Update checking
-- [Claude Interactivity](./docs/FEATURE_CLAUDE_INTERACTIVE.md) - Permission prompts & Q&A
-- [Terminal Interactivity](./docs/FEATURE_TERMINAL_INTERACTIVE.md) - stdin support for interactive programs
+- **[`docs/completed/`](./docs/completed)** - Completed features (Terminal, File Explorer, PWA, etc.)
+- **[`docs/todo/`](./docs/todo)** - Planned features and ideas (Claude Interactivity, File Mentions, etc.)
+- **[`docs/`](./docs)** - Reference documentation (DOCKER.md, STYLEGUIDE.md)
 
 ### Testing
 
