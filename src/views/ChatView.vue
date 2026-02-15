@@ -2446,12 +2446,11 @@ watch(
               {{ quickAccessFileSize }} · {{ quickAccessTotalLines }} lines · {{ quickAccessTotalChars }} chars
             </span>
           </div>
-          <button class="quick-access-close-btn" @click="closeQuickAccess">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <button class="quick-access-close-btn" @click="closeQuickAccess" title="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
-            Close
           </button>
         </div>
       </div>
@@ -4206,18 +4205,17 @@ watch(
 .quick-access-close-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 20px;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   background: var(--bg-hover);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
   transition: all 0.15s;
   flex-shrink: 0;
-  white-space: nowrap;
 }
 
 .quick-access-close-btn:hover {
@@ -4226,8 +4224,8 @@ watch(
 }
 
 .quick-access-close-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
 /* Tablet and Desktop: Right sidebar (>600px) */
