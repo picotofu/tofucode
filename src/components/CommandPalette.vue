@@ -146,6 +146,24 @@ function createNewSession(projectSlug) {
   window.location.href = `/project/${projectSlug}/session/new`;
 }
 
+// Calculate flattened index for a given group and session
+// sessionIndex = -1 means the project header itself
+function calculateFlattenedIndex(groupIndex, sessionIndex) {
+  let index = 0;
+  // Count all items from previous groups
+  for (let i = 0; i < groupIndex; i++) {
+    const prevGroup = groupedSessions.value[i];
+    index += 1 + prevGroup.sessions.length; // 1 for project header + sessions
+  }
+  // Add current group's offset
+  if (sessionIndex === -1) {
+    // Project header
+    return index;
+  }
+  // Session within current group
+  return index + 1 + sessionIndex; // +1 for current group's project header
+}
+
 // Use shared formatRelativeTime utility
 const formatTime = formatRelativeTime;
 </script>
@@ -176,7 +194,7 @@ const formatTime = formatRelativeTime;
             <div
               class="palette-item palette-item-project"
               :class="{ selected: flattenedItems[selectedIndex]?.type === 'project' && flattenedItems[selectedIndex]?.projectSlug === group.projectSlug }"
-              @mouseenter="selectedIndex = groupIndex * (group.sessions.length + 1)"
+              @mouseenter="selectedIndex = calculateFlattenedIndex(groupIndex, -1)"
             >
               <div class="palette-project-header">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -203,7 +221,7 @@ const formatTime = formatRelativeTime;
               class="palette-item palette-item-session"
               :class="{ selected: flattenedItems[selectedIndex]?.sessionId === session.sessionId }"
               @click="selectSession(session)"
-              @mouseenter="selectedIndex = groupIndex * (group.sessions.length + 1) + sessionIndex + 1"
+              @mouseenter="selectedIndex = calculateFlattenedIndex(groupIndex, sessionIndex)"
             >
               <div class="palette-item-content">
                 <span class="palette-item-title">{{ session.title || session.firstPrompt || 'Untitled' }}</span>
