@@ -64,6 +64,9 @@ tofucode --stop
 tofucode --restart
 tofucode --status
 
+# Restrict access to a specific directory
+tofucode --root /path/to/project
+
 # Use config file
 tofucode --config prod.json
 
@@ -88,10 +91,44 @@ tofucode --help
 | Debug | `--debug` | `"debug": true` | `DEBUG=true` |
 | Log file | `--log-file <path>` | `"logFile": "<path>"` | `LOG_FILE=<path>` |
 | Bypass token | `--bypass-token <token>` | `"bypassToken": "<token>"` | `DEBUG_TOKEN=<token>` |
+| Root path | `--root <path>` | `"root": "<path>"` | `ROOT_PATH=<path>` |
 | Disable update check | - | - | `DISABLE_UPDATE_CHECK=true` |
 | Update check interval | - | - | `UPDATE_CHECK_INTERVAL=3600000` |
 
 Run `tofucode --help` for all options.
+
+### Security: Root Path Restriction
+
+Use `--root` to restrict file and terminal access to a specific directory:
+
+```bash
+tofucode --root /home/user/projects/myapp
+```
+
+**What it does:**
+- Limits Files tab navigation to the specified directory
+- Validates terminal working directory (best effort)
+- Filters project/session lists to only show items within the root
+- Displays a "Restricted Mode" banner on the homepage
+
+**⚠️ Important: Best Effort Basis**
+
+The `--root` restriction is **not foolproof**:
+- File access is strictly validated ✅
+- Terminal CWD is validated ✅
+- But users can still run commands like `cat /etc/passwd` or `cd /` ⚠️
+
+**For full isolation, use Docker:**
+
+```bash
+docker run -it --rm \
+  -p 3000:3000 \
+  -v /path/to/project:/workspace:ro \
+  -e ROOT_PATH=/workspace \
+  tofucode
+```
+
+Docker provides OS-level isolation that cannot be bypassed.
 
 ---
 
