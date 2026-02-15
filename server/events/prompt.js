@@ -21,6 +21,7 @@
  * { type: 'task_status', taskId: '123', status: 'completed', resultsCount: 10 }
  */
 
+import path from 'node:path';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { config, slugToPath } from '../config.js';
 import { loadMcpServers } from '../lib/mcp.js';
@@ -88,6 +89,21 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
 
   // Convert slug to actual path for cwd
   const projectPath = slugToPath(projectSlug);
+
+  // SECURITY: Validate that projectPath is within root (if --root is set)
+  if (config.rootPath) {
+    const resolvedProject = path.resolve(projectPath);
+    const resolvedRoot = path.resolve(config.rootPath);
+    const relativePath = path.relative(resolvedRoot, resolvedProject);
+
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+      send(ws, {
+        type: 'error',
+        message: `Access denied: project outside root (${config.rootPath})`,
+      });
+      return sessionId; // Return current session unchanged
+    }
+  }
 
   // Determine permission mode
   // Valid modes: 'default', 'acceptEdits', 'bypassPermissions', 'plan', 'delegate', 'dontAsk'

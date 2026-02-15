@@ -1,3 +1,4 @@
+import { existsSync, realpathSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -16,15 +17,34 @@ function validatePath(requestedPath, context) {
 
   // If --root is set, enforce strict root restriction
   if (config.rootPath) {
-    const resolvedRoot = path.resolve(config.rootPath);
-    const relativePath = path.relative(resolvedRoot, resolved);
+    try {
+      // SECURITY: Resolve symlinks to prevent escape via symlink
+      // For non-existent paths (create operations), resolve the parent
+      const resolvedPath = existsSync(resolved)
+        ? realpathSync(resolved)
+        : (() => {
+            const parent = path.dirname(resolved);
+            const basename = path.basename(resolved);
+            return existsSync(parent)
+              ? path.join(realpathSync(parent), basename)
+              : resolved;
+          })();
 
-    // Check if path is within root (relative path shouldn't start with ..)
-    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-      throw new Error(`Access denied: path outside root (${config.rootPath})`);
+      const resolvedRoot = realpathSync(config.rootPath);
+      const relativePath = path.relative(resolvedRoot, resolvedPath);
+
+      // Check if path is within root (relative path shouldn't start with ..)
+      if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+        throw new Error(
+          `Access denied: path outside root (${config.rootPath})`,
+        );
+      }
+
+      return resolvedPath;
+    } catch (err) {
+      // If realpath fails, deny access
+      throw new Error(`Access denied: unable to resolve path (${err.message})`);
     }
-
-    return resolved;
   }
 
   // Default behavior (no --root set): Allow home directory and project

@@ -21,7 +21,8 @@
  * }
  */
 
-import { getProjectDisplayName, slugToPath } from '../config.js';
+import path from 'node:path';
+import { config, getProjectDisplayName, slugToPath } from '../config.js';
 import { getProjectsList } from '../lib/projects.js';
 import { getAllTitles } from '../lib/session-titles.js';
 import { getSessionsList } from '../lib/sessions.js';
@@ -33,6 +34,22 @@ export async function handler(ws, message, context) {
   if (!projectSlug || typeof projectSlug !== 'string') {
     send(ws, { type: 'error', message: 'Project path is required' });
     return;
+  }
+
+  // SECURITY: Validate that the project path is within root (if --root is set)
+  if (config.rootPath) {
+    const projectPath = slugToPath(projectSlug);
+    const resolvedProject = path.resolve(projectPath);
+    const resolvedRoot = path.resolve(config.rootPath);
+    const relativePath = path.relative(resolvedRoot, resolvedProject);
+
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+      send(ws, {
+        type: 'error',
+        message: `Access denied: project outside root (${config.rootPath})`,
+      });
+      return;
+    }
   }
 
   // Unwatch previous session if any (before resetting context)

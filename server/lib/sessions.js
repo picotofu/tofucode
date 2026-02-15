@@ -15,6 +15,20 @@ import { getSessionsDir } from '../config.js';
 import { loadTitles } from './session-titles.js';
 
 /**
+ * SECURITY: Validate sessionId format to prevent path traversal
+ * Session IDs must be valid UUIDs (alphanumeric + hyphens only)
+ * @param {string} sessionId
+ * @returns {boolean}
+ */
+export function isValidSessionId(sessionId) {
+  if (!sessionId || typeof sessionId !== 'string') return false;
+  // UUID format: 8-4-4-4-12 hexadecimal characters with hyphens
+  return /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
+    sessionId,
+  );
+}
+
+/**
  * Get sessions list for a project
  * Merges sessions from sessions-index.json with JSONL files in the directory
  * to catch newly created sessions that haven't been indexed yet
@@ -270,6 +284,16 @@ function parseEntry(entry) {
  * @returns {Promise<{messages: Array, hasOlderMessages: boolean, summaryCount: number, totalEntries: number}>}
  */
 export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
+  // SECURITY: Validate sessionId to prevent path traversal
+  if (!isValidSessionId(sessionId)) {
+    return {
+      messages: [],
+      hasOlderMessages: false,
+      summaryCount: 0,
+      totalEntries: 0,
+    };
+  }
+
   const sessionsDir = getSessionsDir(projectSlug);
   const jsonlPath = join(sessionsDir, `${sessionId}.jsonl`);
 

@@ -29,12 +29,26 @@ import { exec } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { slugToPath } from '../config.js';
 import { send } from '../lib/ws.js';
 
 const execAsync = promisify(exec);
 
-export async function handler(ws, message) {
-  const projectPath = message.projectPath || process.cwd();
+export async function handler(ws, _message, context) {
+  // SECURITY: Derive project path from context, never accept from client
+  const projectSlug = context.currentProjectPath;
+
+  if (!projectSlug) {
+    send(ws, {
+      type: 'git_diff',
+      files: [],
+      diffs: {},
+      error: 'No project selected',
+    });
+    return;
+  }
+
+  const projectPath = slugToPath(projectSlug);
 
   try {
     // Get list of changed files with status

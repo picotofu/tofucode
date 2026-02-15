@@ -28,6 +28,7 @@ import {
 import { join } from 'node:path';
 import { getSessionsDir } from '../config.js';
 import { deleteTitle } from '../lib/session-titles.js';
+import { isValidSessionId } from '../lib/sessions.js';
 import { broadcast, send } from '../lib/ws.js';
 
 export function handler(ws, message, context) {
@@ -39,6 +40,12 @@ export function handler(ws, message, context) {
   const { sessionId } = message;
   if (!sessionId) {
     send(ws, { type: 'error', message: 'sessionId is required' });
+    return;
+  }
+
+  // SECURITY: Validate sessionId format to prevent path traversal
+  if (!isValidSessionId(sessionId)) {
+    send(ws, { type: 'error', message: 'Invalid sessionId format' });
     return;
   }
 

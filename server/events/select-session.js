@@ -18,7 +18,7 @@
  * { type: 'session_history', messages: [...] }
  */
 
-import { loadSessionHistory } from '../lib/sessions.js';
+import { isValidSessionId, loadSessionHistory } from '../lib/sessions.js';
 import { clearCompletedTask, getOrCreateTask } from '../lib/tasks.js';
 import {
   broadcast,
@@ -33,6 +33,12 @@ export async function handler(ws, message, context) {
 
   if (!sessionId || typeof sessionId !== 'string') {
     send(ws, { type: 'error', message: 'Session ID is required' });
+    return;
+  }
+
+  // SECURITY: Validate sessionId format to prevent path traversal
+  if (!isValidSessionId(sessionId)) {
+    send(ws, { type: 'error', message: 'Invalid sessionId format' });
     return;
   }
 

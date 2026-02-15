@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from '../config.js';
+import { isValidSessionId } from './sessions.js';
 
 const TITLES_FILE = '.session-titles.json';
 
@@ -61,6 +62,12 @@ export function getTitle(projectSlug, sessionId) {
  * @returns {boolean} Success
  */
 export function setTitle(projectSlug, sessionId, title) {
+  // SECURITY: Validate sessionId format to prevent path traversal
+  if (!isValidSessionId(sessionId)) {
+    console.error(`Invalid sessionId format for setTitle: ${sessionId}`);
+    return false;
+  }
+
   try {
     const filePath = getTitlesFilePath(projectSlug);
     const titles = loadTitles(projectSlug);
