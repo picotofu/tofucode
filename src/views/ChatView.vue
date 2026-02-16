@@ -364,6 +364,24 @@ function handleKeydown(e) {
       cancelEditingSessionTitle();
       return;
     }
+    // Close quick access overlay and refocus chat input
+    if (quickAccessOpen.value) {
+      closeQuickAccess();
+      nextTick(() => {
+        const editable = editorEl.value?.querySelector('[contenteditable]');
+        if (editable) {
+          editable.focus();
+          // Move cursor to end
+          const range = document.createRange();
+          const sel = window.getSelection();
+          range.selectNodeContents(editable);
+          range.collapse(false); // false = collapse to end
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      });
+      return;
+    }
     // Fallback: blur active input
     document.activeElement?.blur();
     return;
@@ -405,6 +423,13 @@ function handleKeydown(e) {
         const searchInput = document.querySelector('.files-filter-input');
         searchInput?.focus();
       });
+      return;
+    }
+
+    // Ctrl+E or Cmd+E: Toggle quick access scratchpad
+    if (e.key === 'e') {
+      e.preventDefault();
+      toggleQuickAccess();
       return;
     }
 
@@ -1259,12 +1284,50 @@ function openQuickAccessFile() {
     type: 'files:read',
     path: fullPath,
   });
+
+  // Focus the editor once content loads
+  nextTick(() => {
+    // Wait a bit for FileEditor to mount and Monaco to initialize
+    setTimeout(() => {
+      const editorTextarea = document.querySelector(
+        '.quick-access-editor textarea',
+      );
+      if (editorTextarea) {
+        editorTextarea.focus();
+        // Move cursor to end
+        editorTextarea.selectionStart = editorTextarea.value.length;
+        editorTextarea.selectionEnd = editorTextarea.value.length;
+      }
+    }, 100);
+  });
 }
 
 function closeQuickAccess() {
   quickAccessOpen.value = false;
   quickAccessFile.value = null;
   quickAccessAttempt = null;
+}
+
+function toggleQuickAccess() {
+  if (quickAccessOpen.value) {
+    closeQuickAccess();
+    // Refocus chat input
+    nextTick(() => {
+      const editable = editorEl.value?.querySelector('[contenteditable]');
+      if (editable) {
+        editable.focus();
+        // Move cursor to end
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(editable);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    });
+  } else {
+    openQuickAccessFile();
+  }
 }
 
 function handleQuickAccessSave(data) {

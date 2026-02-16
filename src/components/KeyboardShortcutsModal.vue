@@ -36,6 +36,7 @@ const shortcuts = [
       { keys: ['⌘/^', '1'], description: 'Switch to Chat tab' },
       { keys: ['⌘/^', '2'], description: 'Switch to Terminal tab' },
       { keys: ['⌘/^', '3'], description: 'Switch to Files tab' },
+      { keys: ['⌘/^', 'E'], description: 'Toggle quick access scratchpad' },
       { keys: ['⌘/^', 'N'], description: 'New session from current project' },
       { keys: ['⌘/^', 'J'], description: 'Jump to next session' },
       { keys: ['⌘/^', 'L'], description: 'Scroll to bottom (clear view)' },
