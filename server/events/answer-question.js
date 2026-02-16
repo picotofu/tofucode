@@ -58,12 +58,41 @@ export async function handler(ws, message, context) {
 
   // Write tool_result to session JSONL file
   const { slugToPath } = await import('../config.js');
-  const { appendFileSync } = await import('node:fs');
+  const { appendFileSync, readFileSync, existsSync } = await import('node:fs');
   const { join } = await import('node:path');
 
   const projectPath = slugToPath(context.currentProjectPath);
   const claudeDir = join(projectPath, '.claude');
   const jsonlPath = join(claudeDir, `${pending.sessionId}.jsonl`);
+
+  // Wait for SDK to write the session file (including AskUserQuestion)
+  // The SDK writes to JSONL at the end of each stream completion
+  // We need to wait a bit for it to finish writing
+  let retries = 0;
+  while (retries < 20) {
+    // 20 retries = 10 seconds max
+    if (existsSync(jsonlPath)) {
+      const content = readFileSync(jsonlPath, 'utf8');
+      // Check if the AskUserQuestion tool_use is in the file
+      if (content.includes(toolUseId)) {
+        logger.log(
+          `[answer_question] Found AskUserQuestion ${toolUseId} in session file after ${retries} retries`,
+        );
+        break;
+      }
+    }
+    logger.log(
+      `[answer_question] Waiting for SDK to write session file (retry ${retries + 1}/20)...`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    retries++;
+  }
+
+  if (retries >= 20) {
+    logger.log(
+      '[answer_question] Warning: Session file not written after 10 seconds, appending anyway',
+    );
+  }
 
   // Append tool_result as a user message
   const toolResultEntry = {
