@@ -8,37 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **AskUserQuestion interactive modal** - Claude's questions now display as standalone messages with an "Answer" button that opens a modal with selectable option cards and custom text input
-  - Answers are converted to natural language user messages for reliable context
-  - Modal supports single-select (radio buttons) and multi-select (checkboxes) questions
-  - Custom text input available for "Other" option on any question
-  - Proper cleanup of pending questions when task is cancelled
-  - Cmd/Ctrl+Enter to submit, Escape to close modal
-- **Memo feature (Cmd+M)** - Quick access to TODO.md or custom file for notes and tasks
-  - Toggle memo overlay with Cmd+M keyboard shortcut or memo button beside mode tabs
-  - Always defaults to TODO.md if not configured in settings
-  - Auto-focus in memo editor at end of content when opened
-  - Escape key closes memo and refocuses chat input at end
-  - Enable/disable via checkbox in settings (enabled by default)
-  - Configurable memo file in settings (uses old quickAccessFile key for compatibility)
-- Plan content max-height reduced to 400px for better readability
+- **AskUserQuestion modal** - Interactive answer UI with option cards and text input
+- **Memo feature (Cmd+M)** - Quick-access overlay for TODO.md or custom notes file
+- Plan content max-height reduced to 400px
 
 ### Changed
-- Symbol toolbar setting changed from textarea to single-line text input with inline "Reset" button
-- Connection status pill now appears beside restart server button showing connecting/connected status (fades after 3 seconds)
+- Settings UI improvements (inline reset button, connection status pill)
 
 ### Fixed
-- Git diff modal now correctly uses scoped WebSocket connection with project context
-- Git changes viewer no longer shows "No project selected" error when clicking on git status indicator
-- Plan content now displays in chat UI when ExitPlanMode is called, making plans visible before approval
-- EnterPlanMode now shows clear indicator that Claude is entering planning phase
-- AskUserQuestion modal now opens correctly (fixed `navigator.platform` access error)
-- AskUserQuestion answers now properly resume sessions and provide correct context to Claude
-- Missing logger import in prompt.js that caused "logger is not defined" error
-- Error messages in answer-question handler now include sessionId to prevent filtering
-- Memo editor focus now works correctly with TinyMDE contenteditable element
-- Memo focus watcher initialization order fixed (no more ReferenceError on page load)
-- Memo close button now correctly calls closeMemo function (regression fix)
+- Git diff modal project context
+- Plan mode display and indicators
+- AskUserQuestion session handling and answer delivery
+- Memo editor focus behavior
+- New session message visibility during route transition
 
 ### Removed
 - Screenshot generation scripts
@@ -46,53 +28,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.2] - 2026-02-15
 
 ### Added
-- Cmd+N keyboard shortcut to create new session from current project
-- Cmd+J keyboard shortcut to jump to next displayed recent session
-- Yellow badge indicator in sidebar showing running terminal count per session
-- Terminal tab badge now shows running process count immediately on page load
+- Cmd+N and Cmd+J keyboard shortcuts for session navigation
+- Terminal process count badges in sidebar and terminal tab
 
 ### Changed
-- Updated dependencies to latest compatible versions
-  - @anthropic-ai/claude-agent-sdk: 0.2.37 → 0.2.42
-  - @biomejs/biome: 2.3.13 → 2.3.15
-  - marked: 17.0.1 → 17.0.2
-  - tiny-markdown-editor: 0.2.18 → 0.2.19
-  - vue: 3.5.27 → 3.5.28
-  - qs: 6.14.1 → 6.15.0 (security fix)
-- Now tracking package-lock.json for reproducible Docker builds
-- Keyboard shortcuts modal now uses symbols (⌘/^) instead of text (Ctrl/Cmd)
-- Restart server button moved from sidebar to settings modal
-- Terminal count badges now use global WebSocket broadcast for real-time updates
+- Updated dependencies (Claude SDK 0.2.42, security fixes)
+- Keyboard shortcuts modal UI improvements
+- Restart server moved to settings modal
 
 ### Fixed
 - Security vulnerability in qs package (CVE-2026-2391)
-- Keyboard shortcut display corrected from Cmd+? to Cmd+/ (matches actual shortcut)
-- Terminal tab badge now displays correctly on page refresh without clicking terminal first
+- Terminal badge display on page refresh
 
 ## [1.0.1] - 2026-02-15
 
+### Added
+- **Docker support** - Multi-architecture images with flexible authentication
+- **Markdown table of contents** - Auto-generated navigation sidebar
+- File statistics in editor header
+- Android back button support
+- New tofu mascot logo
+
 ### Changed
 - Rebranded from cc-web to tofucode
-- Updated repository URL to https://github.com/picotofu/tofucode
-- Updated PWA manifest with new app name
-- Updated all branding references throughout UI and documentation
-- Files tab breadcrumb header moved above toolbar for cleaner layout
-- Changed dotfiles toggle icon to dot-circle for better clarity
-
-### Added
-- **Docker Support** - Multi-architecture images (amd64/arm64) with flexible volume mounting
-- **Markdown Table of Contents** - Auto-generated sidebar with click-to-scroll navigation for MD files
-- File statistics in editor header (size, lines, characters)
-- Android back button support for Files tab navigation
-- New tofu mascot logo (evening/morning variants)
-- Docker authentication options: credentials file, full .claude folder, or env var
-- Comprehensive Docker documentation with mount strategies and examples
+- Files tab UI improvements
 
 ### Fixed
-- Symbol toolbar now properly triggers auto-save
-- Symbol toolbar focus remains on cursor position after insertion
-- File statistics aligned to right side of editor header
-- Files tab header spacing and padding for consistent alignment
+- Symbol toolbar auto-save and cursor position
 
 ## [1.0.0] - 2026-02-15
 

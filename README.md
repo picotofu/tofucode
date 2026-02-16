@@ -180,15 +180,26 @@ Docker provides OS-level isolation that cannot be bypassed. See the [Docker Guid
 
 ## Features
 
-- **Chat Interface** - Full markdown rendering, syntax highlighting, collapsible tool outputs
-- **Terminal Mode** - Run shell commands with output streaming, command history
-- **Files Mode** - Browse and edit files with markdown, CSV spreadsheet, and image viewer support
-- **Session Management** - Multiple sessions, rename, quick switcher (Ctrl+K)
-- **Permission Modes** - Configure Claude's access: Default, Plan, Bypass, Skip
-- **Multi-tab Support** - Session warnings, per-tab isolation
-- **Authentication** - Password protection with session tokens (default enabled)
-- **Auto-Update** - Version checking with one-click upgrade for npm installs
-- **Progressive Web App** - Installable as standalone app, works on desktop and mobile
+### Core
+- **Chat Interface** - Markdown rendering, syntax highlighting, collapsible tool outputs
+- **Terminal Mode** - Shell commands with streaming output and history
+- **Files Mode** - Browse, edit, and preview files (markdown, CSV, images)
+- **Session Management** - Multiple sessions with quick switcher (Cmd+K)
+- **Permission Modes** - Control Claude's access (Default/Plan/Bypass/Skip)
+
+### Collaboration
+- **Interactive Questions** - Claude can ask questions with selectable answers
+- **Plan Mode** - Review implementation plans before execution
+- **Git Integration** - View diffs and file changes
+- **Memo Feature** - Quick-access notes (Cmd+M)
+
+### Platform
+- **Multi-tab Support** - Session isolation and conflict warnings
+- **Authentication** - Password protection (enabled by default)
+- **PWA Support** - Install as standalone app on desktop/mobile
+- **Auto-Update** - One-click upgrades for npm installs
+- **Docker Ready** - Multi-arch images with flexible mounting
+- **MCP Integration** - Auto-detection of Model Context Protocol servers
 
 ### Keyboard Shortcuts
 

@@ -833,9 +833,20 @@ watch(
           dangerouslySkipPermissions: permissionMode.value === 'skip',
         });
       } else if (session) {
-        // Clear messages immediately when switching sessions to prevent race condition
-        clearMessages();
-        selectSession(session);
+        // Check if we're transitioning from 'new' to the actual session ID
+        const isTransitionFromNew = prevSession === 'new';
+
+        if (isTransitionFromNew) {
+          // Transitioning from 'new' to actual session ID
+          // Session is already selected (created by newSession()), don't re-select
+          // Just update currentSession to match the new ID (should already be set by session_info)
+          // Don't clear messages or call selectSession - preserve the conversation
+        } else {
+          // Switching to a different session
+          // Clear messages immediately to prevent race condition
+          clearMessages();
+          selectSession(session);
+        }
       }
 
       // Reload terminal processes AFTER session selection to avoid race condition
