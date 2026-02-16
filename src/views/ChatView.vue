@@ -364,9 +364,9 @@ function handleKeydown(e) {
       cancelEditingSessionTitle();
       return;
     }
-    // Close quick access overlay and refocus chat input
+    // Close memo overlay and refocus chat input
     if (memoOpen.value) {
-      closeQuickAccess();
+      closeMemo();
       nextTick(() => {
         const editable = editorEl.value?.querySelector('[contenteditable]');
         if (editable) {
@@ -1263,7 +1263,7 @@ const memoOpen = ref(false);
 const memoFile = ref(null); // { path, content, loading }
 let memoAttempt = null;
 
-function openQuickAccessFile() {
+function openMemo() {
   const filename = settingsContext?.memoFile?.();
   if (!filename || !projectStatus.value?.cwd) {
     return;
@@ -1272,7 +1272,7 @@ function openQuickAccessFile() {
   // Construct full path (assuming file is in project root)
   const fullPath = `${projectStatus.value.cwd}/${filename}`;
 
-  // Mark this as a quick access attempt
+  // Mark this as a memo attempt
   memoAttempt = fullPath;
 
   // Open the modal/sidebar
@@ -1300,15 +1300,15 @@ function openQuickAccessFile() {
   });
 }
 
-function closeQuickAccess() {
+function closeMemo() {
   memoOpen.value = false;
   memoFile.value = null;
   memoAttempt = null;
 }
 
-function toggleQuickAccess() {
+function toggleMemo() {
   if (memoOpen.value) {
-    closeQuickAccess();
+    closeMemo();
     // Refocus chat input
     nextTick(() => {
       const editable = editorEl.value?.querySelector('[contenteditable]');
@@ -1324,11 +1324,11 @@ function toggleQuickAccess() {
       }
     });
   } else {
-    openQuickAccessFile();
+    openMemo();
   }
 }
 
-function handleQuickAccessSave(data) {
+function handleMemoSave(data) {
   send({
     type: 'files:write',
     path: data.path,
@@ -2571,7 +2571,7 @@ watch(
             :content="memoFile.content"
             :loading="memoFile.loading"
             :auto-save="autoSaveFilesEnabled"
-            @save="handleQuickAccessSave"
+            @save="handleMemoSave"
           />
         </div>
         <div class="memo-footer">
