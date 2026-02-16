@@ -180,14 +180,14 @@ function handleRestart() {
         <!-- Quick Access File Setting -->
         <div class="setting-item">
           <div class="setting-header">
-            <span class="setting-title">Quick Access File</span>
+            <span class="setting-title">Memo File</span>
           </div>
           <p class="setting-description">
-            Filename to quickly open in Files mode (e.g., TODO.md, NOTES.md). Leave empty to disable.
+            Filename for quick memo access (e.g., TODO.md, NOTES.md). Toggle with Cmd+M. Leave empty to disable.
           </p>
           <input
             type="text"
-            v-model="localSettings.quickAccessFile"
+            v-model="localSettings.memoFile"
             class="setting-input"
             placeholder="TODO.md"
           />

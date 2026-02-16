@@ -365,7 +365,7 @@ function handleKeydown(e) {
       return;
     }
     // Close quick access overlay and refocus chat input
-    if (quickAccessOpen.value) {
+    if (memoOpen.value) {
       closeQuickAccess();
       nextTick(() => {
         const editable = editorEl.value?.querySelector('[contenteditable]');
@@ -426,10 +426,10 @@ function handleKeydown(e) {
       return;
     }
 
-    // Ctrl+E or Cmd+E: Toggle quick access scratchpad
-    if (e.key === 'e') {
+    // Ctrl+M or Cmd+M: Toggle memo
+    if (e.key === 'm') {
       e.preventDefault();
-      toggleQuickAccess();
+      toggleMemo();
       return;
     }
 
@@ -1258,13 +1258,13 @@ function handleFileSelect(file) {
   });
 }
 
-// Quick access modal/sidebar state
-const quickAccessOpen = ref(false);
-const quickAccessFile = ref(null); // { path, content, loading }
-let quickAccessAttempt = null;
+// Memo modal/sidebar state
+const memoOpen = ref(false);
+const memoFile = ref(null); // { path, content, loading }
+let memoAttempt = null;
 
 function openQuickAccessFile() {
-  const filename = settingsContext?.quickAccessFile?.();
+  const filename = settingsContext?.memoFile?.();
   if (!filename || !projectStatus.value?.cwd) {
     return;
   }
@@ -1273,11 +1273,11 @@ function openQuickAccessFile() {
   const fullPath = `${projectStatus.value.cwd}/${filename}`;
 
   // Mark this as a quick access attempt
-  quickAccessAttempt = fullPath;
+  memoAttempt = fullPath;
 
   // Open the modal/sidebar
-  quickAccessOpen.value = true;
-  quickAccessFile.value = { path: fullPath, content: '', loading: true };
+  memoOpen.value = true;
+  memoFile.value = { path: fullPath, content: '', loading: true };
 
   // Request file content
   send({
@@ -1289,9 +1289,7 @@ function openQuickAccessFile() {
   nextTick(() => {
     // Wait a bit for FileEditor to mount and Monaco to initialize
     setTimeout(() => {
-      const editorTextarea = document.querySelector(
-        '.quick-access-editor textarea',
-      );
+      const editorTextarea = document.querySelector('.memo-editor textarea');
       if (editorTextarea) {
         editorTextarea.focus();
         // Move cursor to end
@@ -1303,13 +1301,13 @@ function openQuickAccessFile() {
 }
 
 function closeQuickAccess() {
-  quickAccessOpen.value = false;
-  quickAccessFile.value = null;
-  quickAccessAttempt = null;
+  memoOpen.value = false;
+  memoFile.value = null;
+  memoAttempt = null;
 }
 
 function toggleQuickAccess() {
-  if (quickAccessOpen.value) {
+  if (memoOpen.value) {
     closeQuickAccess();
     // Refocus chat input
     nextTick(() => {
@@ -1338,27 +1336,27 @@ function handleQuickAccessSave(data) {
   });
 }
 
-const quickAccessFileName = computed(() => {
-  if (!quickAccessFile.value?.path) return '';
-  return quickAccessFile.value.path.split('/').pop();
+const memoFileName = computed(() => {
+  if (!memoFile.value?.path) return '';
+  return memoFile.value.path.split('/').pop();
 });
 
-const quickAccessFileSize = computed(() => {
-  if (!quickAccessFile.value?.content) return '0 B';
-  const bytes = new Blob([quickAccessFile.value.content]).size;
+const memoFileSize = computed(() => {
+  if (!memoFile.value?.content) return '0 B';
+  const bytes = new Blob([memoFile.value.content]).size;
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 });
 
-const quickAccessTotalLines = computed(() => {
-  if (!quickAccessFile.value?.content) return 0;
-  return quickAccessFile.value.content.split('\n').length;
+const memoTotalLines = computed(() => {
+  if (!memoFile.value?.content) return 0;
+  return memoFile.value.content.split('\n').length;
 });
 
-const quickAccessTotalChars = computed(() => {
-  if (!quickAccessFile.value?.content) return 0;
-  return quickAccessFile.value.content.length;
+const memoTotalChars = computed(() => {
+  if (!memoFile.value?.content) return 0;
+  return memoFile.value.content.length;
 });
 
 function handleFileSave(data) {
@@ -1545,27 +1543,24 @@ function handleFileMessage(msg) {
         };
       }
       // Handle quick access file
-      if (quickAccessFile.value && quickAccessFile.value.path === msg.path) {
-        quickAccessFile.value = {
+      if (memoFile.value && memoFile.value.path === msg.path) {
+        memoFile.value = {
           path: msg.path,
           content: msg.content,
           loading: false,
         };
         // Clear quick access attempt flag on success
-        if (quickAccessAttempt === msg.path) {
-          quickAccessAttempt = null;
+        if (memoAttempt === msg.path) {
+          memoAttempt = null;
         }
       }
       break;
     case 'files:read:error':
       console.error('Read error:', msg.error);
       // If this was a quick access file that doesn't exist, create it
-      if (
-        quickAccessAttempt &&
-        quickAccessFile.value?.path === quickAccessAttempt
-      ) {
-        const path = quickAccessAttempt;
-        quickAccessAttempt = null; // Clear the attempt flag
+      if (memoAttempt && memoFile.value?.path === memoAttempt) {
+        const path = memoAttempt;
+        memoAttempt = null; // Clear the attempt flag
         // Create the file with empty content
         send({
           type: 'files:write',
@@ -1573,14 +1568,11 @@ function handleFileMessage(msg) {
           content: '',
         });
         // Open the newly created file in quick access
-        quickAccessFile.value = { path: path, content: '', loading: false };
-      } else if (
-        quickAccessAttempt &&
-        openedFile.value?.path === quickAccessAttempt
-      ) {
+        memoFile.value = { path: path, content: '', loading: false };
+      } else if (memoAttempt && openedFile.value?.path === memoAttempt) {
         // Legacy: handle old quick access logic for regular file editor
-        const path = quickAccessAttempt;
-        quickAccessAttempt = null;
+        const path = memoAttempt;
+        memoAttempt = null;
         send({
           type: 'files:write',
           path: path,
@@ -2172,12 +2164,12 @@ watch(
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
               </svg>
             </button>
-            <!-- Quick access file button (beside permission tabs) -->
+            <!-- Memo file button (beside permission tabs) -->
             <button
-              v-if="settingsContext?.quickAccessFile?.()"
-              class="quick-access-btn"
-              @click="openQuickAccessFile"
-              :title="`Quick access: ${settingsContext.quickAccessFile()}`"
+              v-if="settingsContext?.memoFile?.()"
+              class="memo-btn"
+              @click="openMemo"
+              :title="`Memo: ${settingsContext.memoFile()}`"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 20h9"/>
@@ -2569,27 +2561,27 @@ watch(
       :data="popoverData"
     />
 
-    <!-- Quick Access Modal/Sidebar -->
-    <div v-if="quickAccessOpen" class="quick-access-overlay">
-      <div class="quick-access-container">
-        <div class="quick-access-editor">
+    <!-- Memo Modal/Sidebar -->
+    <div v-if="memoOpen" class="memo-overlay">
+      <div class="memo-container">
+        <div class="memo-editor">
           <FileEditor
-            v-if="quickAccessFile"
-            :file-path="quickAccessFile.path"
-            :content="quickAccessFile.content"
-            :loading="quickAccessFile.loading"
+            v-if="memoFile"
+            :file-path="memoFile.path"
+            :content="memoFile.content"
+            :loading="memoFile.loading"
             :auto-save="autoSaveFilesEnabled"
             @save="handleQuickAccessSave"
           />
         </div>
-        <div class="quick-access-footer">
-          <div class="quick-access-info">
-            <span class="quick-access-filename">{{ quickAccessFileName }}</span>
-            <span class="quick-access-stats">
-              {{ quickAccessFileSize }} · {{ quickAccessTotalLines }} lines · {{ quickAccessTotalChars }} chars
+        <div class="memo-footer">
+          <div class="memo-info">
+            <span class="memo-filename">{{ memoFileName }}</span>
+            <span class="memo-stats">
+              {{ memoFileSize }} · {{ memoTotalLines }} lines · {{ memoTotalChars }} chars
             </span>
           </div>
-          <button class="quick-access-close-btn" @click="closeQuickAccess" title="Close">
+          <button class="memo-close-btn" @click="closeQuickAccess" title="Close">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
@@ -3366,7 +3358,7 @@ watch(
   color: var(--text-primary);
 }
 
-.quick-access-btn {
+.memo-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3381,7 +3373,7 @@ watch(
   flex-shrink: 0;
 }
 
-.quick-access-btn:hover {
+.memo-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
 }
@@ -4280,8 +4272,8 @@ watch(
   display: inline;
 }
 
-/* Quick Access Modal/Sidebar */
-.quick-access-overlay {
+/* Memo Modal/Sidebar */
+.memo-overlay {
   position: fixed;
   top: 0;
   right: 0;
@@ -4294,7 +4286,7 @@ watch(
   align-items: stretch;
 }
 
-.quick-access-container {
+.memo-container {
   background: var(--bg-primary);
   display: flex;
   flex-direction: column;
@@ -4303,13 +4295,13 @@ watch(
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
-.quick-access-editor {
+.memo-editor {
   flex: 1;
   overflow: auto;
   padding: 16px;
 }
 
-.quick-access-footer {
+.memo-footer {
   border-top: 1px solid var(--border-color);
   padding: 12px 16px;
   display: flex;
@@ -4320,7 +4312,7 @@ watch(
   background: var(--bg-secondary);
 }
 
-.quick-access-info {
+.memo-info {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -4329,7 +4321,7 @@ watch(
   min-width: 0;
 }
 
-.quick-access-filename {
+.memo-filename {
   font-weight: 600;
   color: var(--text-primary);
   overflow: hidden;
@@ -4337,7 +4329,7 @@ watch(
   white-space: nowrap;
 }
 
-.quick-access-stats {
+.memo-stats {
   color: var(--text-secondary);
   font-size: 11px;
   overflow: hidden;
@@ -4345,7 +4337,7 @@ watch(
   white-space: nowrap;
 }
 
-.quick-access-close-btn {
+.memo-close-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4361,24 +4353,24 @@ watch(
   flex-shrink: 0;
 }
 
-.quick-access-close-btn:hover {
+.memo-close-btn:hover {
   background: var(--bg-active);
   border-color: var(--border-hover);
 }
 
-.quick-access-close-btn svg {
+.memo-close-btn svg {
   width: 16px;
   height: 16px;
 }
 
 /* Tablet and Desktop: Right sidebar (>600px) */
 @media (min-width: 601px) {
-  .quick-access-overlay {
+  .memo-overlay {
     background: transparent;
     pointer-events: none;
   }
 
-  .quick-access-container {
+  .memo-container {
     width: 450px;
     box-shadow:
       -2px 0 8px rgba(0, 0, 0, 0.2),
