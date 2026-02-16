@@ -85,14 +85,14 @@ export async function handler(ws, message, context) {
   appendFileSync(jsonlPath, `${JSON.stringify(toolResultEntry)}\n`, 'utf8');
   logger.log(`[answer_question] Appended tool_result to ${jsonlPath}`);
 
-  // Trigger prompt handler to resume the session with empty prompt
-  // This will pick up the tool_result from the session file
+  // Trigger prompt handler to resume the session
+  // Send a minimal prompt to continue - SDK will pick up tool_result from session
   const { handler: promptHandler } = await import('./prompt.js');
   await promptHandler(
     ws,
     {
       type: 'prompt',
-      prompt: '', // Empty prompt to just resume
+      prompt: 'continue', // Minimal prompt to resume (empty string causes API error with cache_control)
       sessionId: pending.sessionId,
       projectPath: context.currentProjectPath,
     },
