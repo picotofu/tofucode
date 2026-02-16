@@ -956,6 +956,31 @@ watch(inputValue, () => {
   }
 });
 
+// Focus memo editor when content loads
+watch(
+  () => quickAccessFile.value,
+  (newVal, oldVal) => {
+    // Only focus when content just loaded (loading: false)
+    if (newVal && !newVal.loading && oldVal?.loading && memoOpen.value) {
+      nextTick(() => {
+        // Wait for FileEditor/Monaco to fully render
+        setTimeout(() => {
+          const editorTextarea = document.querySelector(
+            '.memo-editor textarea',
+          );
+          if (editorTextarea) {
+            editorTextarea.focus();
+            // Move cursor to end
+            editorTextarea.selectionStart = editorTextarea.value.length;
+            editorTextarea.selectionEnd = editorTextarea.value.length;
+          }
+        }, 100);
+      });
+    }
+  },
+  { deep: true },
+);
+
 // Format file changes for display
 const fileChangesText = computed(() => {
   const changes = projectStatus.value.gitChanges;
@@ -1260,14 +1285,16 @@ function handleFileSelect(file) {
 
 // Memo modal/sidebar state
 const memoOpen = ref(false);
-const memoFile = ref(null); // { path, content, loading }
+const quickAccessFile = ref(null); // { path, content, loading }
 let memoAttempt = null;
 
 function openMemo() {
-  const filename = settingsContext?.memoFile?.();
-  if (!filename || !projectStatus.value?.cwd) {
+  if (!projectStatus.value?.cwd) {
     return;
   }
+
+  // Always default to TODO.md if not configured
+  const filename = settingsContext?.quickAccessFile?.() || 'TODO.md';
 
   // Construct full path (assuming file is in project root)
   const fullPath = `${projectStatus.value.cwd}/${filename}`;
@@ -1277,32 +1304,18 @@ function openMemo() {
 
   // Open the modal/sidebar
   memoOpen.value = true;
-  memoFile.value = { path: fullPath, content: '', loading: true };
+  quickAccessFile.value = { path: fullPath, content: '', loading: true };
 
   // Request file content
   send({
     type: 'files:read',
     path: fullPath,
   });
-
-  // Focus the editor once content loads
-  nextTick(() => {
-    // Wait a bit for FileEditor to mount and Monaco to initialize
-    setTimeout(() => {
-      const editorTextarea = document.querySelector('.memo-editor textarea');
-      if (editorTextarea) {
-        editorTextarea.focus();
-        // Move cursor to end
-        editorTextarea.selectionStart = editorTextarea.value.length;
-        editorTextarea.selectionEnd = editorTextarea.value.length;
-      }
-    }, 100);
-  });
 }
 
 function closeMemo() {
   memoOpen.value = false;
-  memoFile.value = null;
+  quickAccessFile.value = null;
   memoAttempt = null;
 }
 
@@ -1336,27 +1349,27 @@ function handleMemoSave(data) {
   });
 }
 
-const memoFileName = computed(() => {
-  if (!memoFile.value?.path) return '';
-  return memoFile.value.path.split('/').pop();
+const quickAccessFileName = computed(() => {
+  if (!quickAccessFile.value?.path) return '';
+  return quickAccessFile.value.path.split('/').pop();
 });
 
-const memoFileSize = computed(() => {
-  if (!memoFile.value?.content) return '0 B';
-  const bytes = new Blob([memoFile.value.content]).size;
+const quickAccessFileSize = computed(() => {
+  if (!quickAccessFile.value?.content) return '0 B';
+  const bytes = new Blob([quickAccessFile.value.content]).size;
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 });
 
 const memoTotalLines = computed(() => {
-  if (!memoFile.value?.content) return 0;
-  return memoFile.value.content.split('\n').length;
+  if (!quickAccessFile.value?.content) return 0;
+  return quickAccessFile.value.content.split('\n').length;
 });
 
 const memoTotalChars = computed(() => {
-  if (!memoFile.value?.content) return 0;
-  return memoFile.value.content.length;
+  if (!quickAccessFile.value?.content) return 0;
+  return quickAccessFile.value.content.length;
 });
 
 function handleFileSave(data) {
@@ -1543,8 +1556,8 @@ function handleFileMessage(msg) {
         };
       }
       // Handle quick access file
-      if (memoFile.value && memoFile.value.path === msg.path) {
-        memoFile.value = {
+      if (quickAccessFile.value && quickAccessFile.value.path === msg.path) {
+        quickAccessFile.value = {
           path: msg.path,
           content: msg.content,
           loading: false,
@@ -1558,7 +1571,7 @@ function handleFileMessage(msg) {
     case 'files:read:error':
       console.error('Read error:', msg.error);
       // If this was a quick access file that doesn't exist, create it
-      if (memoAttempt && memoFile.value?.path === memoAttempt) {
+      if (memoAttempt && quickAccessFile.value?.path === memoAttempt) {
         const path = memoAttempt;
         memoAttempt = null; // Clear the attempt flag
         // Create the file with empty content
@@ -1568,7 +1581,7 @@ function handleFileMessage(msg) {
           content: '',
         });
         // Open the newly created file in quick access
-        memoFile.value = { path: path, content: '', loading: false };
+        quickAccessFile.value = { path: path, content: '', loading: false };
       } else if (memoAttempt && openedFile.value?.path === memoAttempt) {
         // Legacy: handle old quick access logic for regular file editor
         const path = memoAttempt;
@@ -2166,10 +2179,9 @@ watch(
             </button>
             <!-- Memo file button (beside permission tabs) -->
             <button
-              v-if="settingsContext?.memoFile?.()"
               class="memo-btn"
               @click="openMemo"
-              :title="`Memo: ${settingsContext.memoFile()}`"
+              :title="`Memo: ${settingsContext?.quickAccessFile?.() || 'TODO.md'}`"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 20h9"/>
@@ -2566,19 +2578,19 @@ watch(
       <div class="memo-container">
         <div class="memo-editor">
           <FileEditor
-            v-if="memoFile"
-            :file-path="memoFile.path"
-            :content="memoFile.content"
-            :loading="memoFile.loading"
+            v-if="quickAccessFile"
+            :file-path="quickAccessFile.path"
+            :content="quickAccessFile.content"
+            :loading="quickAccessFile.loading"
             :auto-save="autoSaveFilesEnabled"
             @save="handleMemoSave"
           />
         </div>
         <div class="memo-footer">
           <div class="memo-info">
-            <span class="memo-filename">{{ memoFileName }}</span>
+            <span class="memo-filename">{{ quickAccessFileName }}</span>
             <span class="memo-stats">
-              {{ memoFileSize }} · {{ memoTotalLines }} lines · {{ memoTotalChars }} chars
+              {{ quickAccessFileSize }} · {{ memoTotalLines }} lines · {{ memoTotalChars }} chars
             </span>
           </div>
           <button class="memo-close-btn" @click="closeQuickAccess" title="Close">

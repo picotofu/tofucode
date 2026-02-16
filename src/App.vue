@@ -23,7 +23,7 @@ const settings = ref({
   debugMode: false,
   autoSaveFiles: true,
   symbolToolbar: '` ~ ! @ # $ % ^ & * ( ) - _ = + /',
-  memoFile: 'TODO.md',
+  quickAccessFile: 'TODO.md',
 });
 
 function openSettings() {
@@ -134,7 +134,7 @@ provide('settings', {
   debugMode: () => settings.value.debugMode,
   autoSaveFiles: () => settings.value.autoSaveFiles,
   symbolToolbar: () => settings.value.symbolToolbar,
-  memoFile: () => settings.value.memoFile,
+  quickAccessFile: () => settings.value.quickAccessFile,
 });
 
 onMounted(() => {

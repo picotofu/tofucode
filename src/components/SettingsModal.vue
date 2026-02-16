@@ -183,11 +183,11 @@ function handleRestart() {
             <span class="setting-title">Memo File</span>
           </div>
           <p class="setting-description">
-            Filename for quick memo access (e.g., TODO.md, NOTES.md). Toggle with Cmd+M. Leave empty to disable.
+            Filename for quick memo access. Defaults to TODO.md if not set. Toggle with Cmd+M.
           </p>
           <input
             type="text"
-            v-model="localSettings.memoFile"
+            v-model="localSettings.quickAccessFile"
             class="setting-input"
             placeholder="TODO.md"
           />

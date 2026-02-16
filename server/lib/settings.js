@@ -10,7 +10,7 @@ const DEFAULT_SETTINGS = {
   debugMode: false,
   autoSaveFiles: true, // Auto-save file edits after 1 second of inactivity
   symbolToolbar: '` ~ ! @ # $ % ^ & * ( ) - _ = + /',
-  memoFile: 'TODO.md', // Memo file for Cmd+M quick access
+  quickAccessFile: 'TODO.md', // Memo file for Cmd+M quick access (keep old key name)
 };
 
 export function loadSettings() {
@@ -20,12 +20,6 @@ export function loadSettings() {
     }
     const data = readFileSync(SETTINGS_FILE, 'utf8');
     const loaded = { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
-
-    // Migrate old quickAccessFile setting to memoFile
-    if (loaded.quickAccessFile && !loaded.memoFile) {
-      loaded.memoFile = loaded.quickAccessFile;
-      delete loaded.quickAccessFile;
-    }
 
     return loaded;
   } catch (err) {
