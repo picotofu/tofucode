@@ -117,16 +117,21 @@ export async function handler(ws, message, context) {
   // Trigger prompt handler to resume the session
   // Send a minimal prompt to continue - SDK will pick up tool_result from session
   const { handler: promptHandler } = await import('./prompt.js');
+
+  // Update context to point to the session we're resuming
+  const _previousSessionId = context.currentSessionId;
+  context.currentSessionId = pending.sessionId;
+
   await promptHandler(
     ws,
     {
       type: 'prompt',
       prompt: 'continue', // Minimal prompt to resume (empty string causes API error with cache_control)
-      sessionId: pending.sessionId,
-      projectPath: context.currentProjectPath,
     },
     context,
   );
+
+  // Don't restore previous sessionId - the handler will update it to the new session
 
   pendingQuestions.delete(toolUseId);
   logger.log(
