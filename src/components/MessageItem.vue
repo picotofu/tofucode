@@ -8,6 +8,8 @@ const props = defineProps({
   message: Object,
 });
 
+const emit = defineEmits(['answer-question']);
+
 const resultExpanded = ref(false);
 const finalResultExpanded = ref(false);
 
@@ -126,6 +128,50 @@ const isEditTool = computed(() => {
   );
 });
 
+// Check if this is ExitPlanMode with plan content
+const isExitPlanMode = computed(() => {
+  return (
+    messageType.value === 'tool_use' &&
+    props.message.tool === 'ExitPlanMode' &&
+    props.message.input?.plan
+  );
+});
+
+// Check if this is EnterPlanMode
+const isEnterPlanMode = computed(() => {
+  return (
+    messageType.value === 'tool_use' && props.message.tool === 'EnterPlanMode'
+  );
+});
+
+// Render plan content as markdown
+const renderedPlan = computed(() => {
+  if (isExitPlanMode.value && props.message.input?.plan) {
+    return renderMarkdown(props.message.input.plan);
+  }
+  return '';
+});
+
+// State for plan expansion
+const planExpanded = ref(true); // Default to expanded so users see the plan
+
+// Check if this is AskUserQuestion with questions
+const isAskUserQuestion = computed(() => {
+  return (
+    messageType.value === 'tool_use' &&
+    props.message.tool === 'AskUserQuestion' &&
+    props.message.input?.questions?.length > 0
+  );
+});
+
+// Extract questions for display
+const askUserQuestions = computed(() => {
+  if (isAskUserQuestion.value) {
+    return props.message.input.questions;
+  }
+  return [];
+});
+
 const toolResultContent = computed(() => {
   if (messageType.value !== 'tool_result') return '';
   const content = props.message.content;
@@ -144,6 +190,10 @@ function toggleResultExpand() {
 
 function toggleFinalResultExpand() {
   finalResultExpanded.value = !finalResultExpanded.value;
+}
+
+function togglePlanExpand() {
+  planExpanded.value = !planExpanded.value;
 }
 </script>
 
@@ -190,6 +240,37 @@ function toggleFinalResultExpand() {
           :new-content="message.input.new_string"
           :filename="message.input.file_path"
         />
+      </div>
+
+      <!-- Show plan content for ExitPlanMode -->
+      <div v-if="isExitPlanMode" class="tool-plan-section">
+        <div class="plan-header" @click="togglePlanExpand">
+          <span class="plan-label">📋 Implementation Plan</span>
+          <span class="plan-toggle">{{ planExpanded ? '▼' : '▶' }}</span>
+        </div>
+        <div v-if="planExpanded" class="plan-content markdown-body" v-html="renderedPlan"></div>
+      </div>
+
+      <!-- Show indicator for EnterPlanMode -->
+      <div v-if="isEnterPlanMode" class="tool-plan-enter">
+        <span class="plan-enter-icon">📋</span>
+        <span class="plan-enter-text">Entering plan mode - exploring codebase and designing implementation approach</span>
+      </div>
+
+      <!-- Show AskUserQuestion UI -->
+      <div v-if="isAskUserQuestion" class="tool-question-section">
+        <div class="question-preview">
+          <div v-for="(q, idx) in askUserQuestions" :key="idx" class="question-preview-item">
+            <span class="question-header-chip">{{ q.header }}</span>
+            <span class="question-summary">{{ q.question }}</span>
+          </div>
+        </div>
+        <button class="answer-btn" @click="emit('answer-question', message)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          Answer {{ askUserQuestions.length }} Question{{ askUserQuestions.length > 1 ? 's' : '' }}
+        </button>
       </div>
     </div>
 
@@ -556,6 +637,138 @@ function toggleFinalResultExpand() {
 .tool-diff-section :deep(.diff-viewer) {
   margin: 0;
   border-radius: 0;
+}
+
+/* Tool plan section (ExitPlanMode) */
+.tool-plan-section {
+  border-top: 1px solid var(--border-color);
+}
+
+.plan-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.plan-header:hover {
+  background: var(--bg-hover);
+}
+
+.plan-label {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.plan-toggle {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.plan-content {
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-color);
+}
+
+.plan-content :deep(h1),
+.plan-content :deep(h2),
+.plan-content :deep(h3) {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.plan-content :deep(h1:first-child),
+.plan-content :deep(h2:first-child),
+.plan-content :deep(h3:first-child) {
+  margin-top: 0;
+}
+
+/* Tool plan enter indicator (EnterPlanMode) */
+.tool-plan-enter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(34, 197, 94, 0.1);
+  border-top: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.plan-enter-icon {
+  font-size: 14px;
+}
+
+.plan-enter-text {
+  font-size: 12px;
+  color: var(--success-color);
+  font-weight: 500;
+}
+
+/* AskUserQuestion section */
+.tool-question-section {
+  border-top: 1px solid rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.05);
+  padding: 12px;
+}
+
+.question-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.question-preview-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.question-header-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.question-summary {
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.answer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #3b82f6;
+  border: none;
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.answer-btn:hover {
+  background: #2563eb;
 }
 
 /* Tool result */

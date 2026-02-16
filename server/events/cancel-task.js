@@ -10,6 +10,7 @@
 
 import { cancelTask, getOrCreateTask } from '../lib/tasks.js';
 import { send } from '../lib/ws.js';
+import { pendingQuestions } from './answer-question.js';
 
 export async function handler(ws, _message, context) {
   if (!context.currentSessionId) {
@@ -22,6 +23,12 @@ export async function handler(ws, _message, context) {
   if (task.status !== 'running') {
     send(ws, { type: 'error', message: 'No running task to cancel' });
     return;
+  }
+
+  // Reject any pending questions so the Promise doesn't leak
+  for (const [toolUseId, pending] of pendingQuestions) {
+    pending.reject(new Error('Task cancelled'));
+    pendingQuestions.delete(toolUseId);
   }
 
   const success = cancelTask(context.currentSessionId);

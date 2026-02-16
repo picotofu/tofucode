@@ -38,12 +38,24 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['load-full-history', 'load-older-messages']);
+const emit = defineEmits([
+  'load-full-history',
+  'load-older-messages',
+  'answer-question',
+]);
 
 const messagesEl = ref(null);
 const userScrolledUp = ref(false);
 const turnRefs = ref([]); // Array of refs for each conversation turn
 const currentTurnIndex = ref(-1); // Currently visible turn (for navigation)
+
+// Plan mode tools should render standalone (not grouped) so their special
+// content (plan markdown, enter indicator) is visible in MessageItem
+const STANDALONE_TOOLS = new Set([
+  'ExitPlanMode',
+  'EnterPlanMode',
+  'AskUserQuestion',
+]);
 
 // Group consecutive tool_use and tool_result messages together
 function groupToolMessages(messages) {
@@ -52,17 +64,26 @@ function groupToolMessages(messages) {
 
   for (const msg of messages) {
     if (msg.type === 'tool_use') {
-      // Start or continue a tool group
-      if (!currentToolGroup) {
-        currentToolGroup = { type: 'tool_group', items: [] };
+      if (STANDALONE_TOOLS.has(msg.tool)) {
+        // Flush any pending tool group before standalone tool
+        if (currentToolGroup) {
+          result.push(currentToolGroup);
+          currentToolGroup = null;
+        }
+        result.push(msg);
+      } else {
+        // Start or continue a tool group
+        if (!currentToolGroup) {
+          currentToolGroup = { type: 'tool_group', items: [] };
+        }
+        currentToolGroup.items.push(msg);
       }
-      currentToolGroup.items.push(msg);
     } else if (msg.type === 'tool_result') {
       // Add to existing tool group
       if (currentToolGroup) {
         currentToolGroup.items.push(msg);
       } else {
-        // Orphan tool_result, show as-is
+        // Orphan tool_result (or result after standalone tool), show as-is
         result.push(msg);
       }
     } else {
@@ -301,7 +322,7 @@ defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn });
           <!-- Grouped responses (text, tool groups, results, errors) -->
           <template v-for="(msg, msgIndex) in turn.groupedResponses" :key="`${turnIndex}-${msgIndex}`">
             <ToolGroup v-if="msg.type === 'tool_group'" :items="msg.items" />
-            <MessageItem v-else :message="msg" />
+            <MessageItem v-else :message="msg" @answer-question="emit('answer-question', $event)" />
           </template>
         </div>
       </div>

@@ -10,6 +10,7 @@ import {
   watch,
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import AskUserQuestionModal from '../components/AskUserQuestionModal.vue';
 import ChatMessages from '../components/ChatMessages.vue';
 import DebugPopover from '../components/DebugPopover.vue';
 import FileEditor from '../components/FileEditor.vue';
@@ -62,6 +63,8 @@ const {
   listProcesses,
   clearTerminal,
   clearTaskStatus,
+  pendingQuestion,
+  answerQuestion,
   send,
   sendAndWait,
   onMessage,
@@ -194,7 +197,11 @@ const showGitDiffModal = ref(false);
 
 function openGitDiffModal() {
   // Only open if we have git changes and a valid project path
-  if (projectStatus.value.gitChanges && fileChangesText.value && projectStatus.value.cwd) {
+  if (
+    projectStatus.value.gitChanges &&
+    fileChangesText.value &&
+    projectStatus.value.cwd
+  ) {
     showGitDiffModal.value = true;
   }
 }
@@ -202,6 +209,41 @@ function openGitDiffModal() {
 function closeGitDiffModal() {
   showGitDiffModal.value = false;
 }
+
+// AskUserQuestion Modal
+const showQuestionModal = ref(false);
+const questionModalData = ref(null); // { toolUseId, questions }
+
+function handleAnswerQuestion(message) {
+  questionModalData.value = {
+    toolUseId: message.id || pendingQuestion.value?.toolUseId,
+    questions:
+      message.input?.questions || pendingQuestion.value?.questions || [],
+  };
+  showQuestionModal.value = true;
+}
+
+function handleQuestionSubmit(toolUseId, answers) {
+  answerQuestion(toolUseId, answers);
+  showQuestionModal.value = false;
+  questionModalData.value = null;
+}
+
+function closeQuestionModal() {
+  showQuestionModal.value = false;
+  questionModalData.value = null;
+}
+
+// Auto-open question modal when server sends ask_user_question
+watch(pendingQuestion, (question) => {
+  if (question) {
+    questionModalData.value = {
+      toolUseId: question.toolUseId,
+      questions: question.questions,
+    };
+    showQuestionModal.value = true;
+  }
+});
 
 // Mobile terminal - cycle through Active/History on tap
 function handleTerminalTabClick() {
@@ -1763,6 +1805,7 @@ watch(
       :loaded-turns="loadedTurns"
       @load-full-history="loadFullHistory"
       @load-older-messages="loadOlderMessages"
+      @answer-question="handleAnswerQuestion"
     />
 
     <!-- Terminal Mode -->
@@ -2444,6 +2487,15 @@ watch(
       :project-path="projectStatus.cwd"
       :send-and-wait="sendAndWait"
       @close="closeGitDiffModal"
+    />
+
+    <!-- AskUserQuestion Modal -->
+    <AskUserQuestionModal
+      :show="showQuestionModal"
+      :questions="questionModalData?.questions || []"
+      :tool-use-id="questionModalData?.toolUseId"
+      @submit="handleQuestionSubmit"
+      @close="closeQuestionModal"
     />
 
     <!-- Debug Popover -->

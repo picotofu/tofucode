@@ -32,6 +32,7 @@ import {
   send,
   watchSession,
 } from '../lib/ws.js';
+import { waitForQuestionAnswer } from './answer-question.js';
 
 // Helper to send to client and broadcast to other session watchers
 function sendAndBroadcast(ws, sessionId, message) {
@@ -207,6 +208,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
       `Calling SDK query() with prompt: "${prompt.substring(0, 50)}..."`,
     );
     stream = query({ prompt, options: queryOptions });
+    task.stream = stream; // Store Query object for streamInput() access
     console.log('Query returned:', typeof stream, stream ? 'truthy' : 'falsy');
   } catch (error) {
     // Handle stream creation errors
@@ -357,6 +359,59 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
             };
             addTaskResult(task, result);
             sendAndBroadcast(ws, taskSessionId, result);
+
+            // Intercept AskUserQuestion: pause stream and wait for user answers
+            if (
+              block.name === 'AskUserQuestion' &&
+              block.input?.questions?.length
+            ) {
+              // Signal frontend that we're waiting for answers
+              sendAndBroadcast(ws, taskSessionId, {
+                type: 'ask_user_question',
+                toolUseId: block.id,
+                questions: block.input.questions,
+                sessionId: taskSessionId,
+              });
+
+              try {
+                // Block stream iteration until user answers
+                // No timeout - user must answer or cancel the task via AbortController
+                const answers = await waitForQuestionAnswer(block.id);
+                logger.log(`Received answers for AskUserQuestion ${block.id}`);
+
+                // Inject the tool_result back into the SDK via streamInput()
+                await stream.streamInput(
+                  (async function* () {
+                    yield {
+                      type: 'user',
+                      message: {
+                        role: 'user',
+                        content: [
+                          {
+                            type: 'tool_result',
+                            tool_use_id: block.id,
+                            content: JSON.stringify(answers),
+                          },
+                        ],
+                      },
+                      parent_tool_use_id: null,
+                      session_id: taskSessionId,
+                    };
+                  })(),
+                );
+
+                sendAndBroadcast(ws, taskSessionId, {
+                  type: 'question_answered',
+                  toolUseId: block.id,
+                  sessionId: taskSessionId,
+                });
+              } catch (err) {
+                // This triggers if user cancels the task while question is pending
+                logger.log(
+                  `AskUserQuestion ${block.id} cancelled: ${err.message}`,
+                );
+              }
+            }
           } else {
             console.log(
               'Unhandled assistant content block:',

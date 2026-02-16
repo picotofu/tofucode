@@ -471,6 +471,9 @@ export function useChatWebSocket() {
   // This prevents sending prompts before server has our context after reconnect
   const contextReady = ref(false);
 
+  // Pending AskUserQuestion waiting for user response
+  const pendingQuestion = ref(null); // { toolUseId, questions }
+
   // Terminal state
   const terminalProcesses = ref([]); // Array of process entries
 
@@ -700,6 +703,28 @@ export function useChatWebSocket() {
       case 'terminal:error':
         console.error('Terminal error:', msg.error);
         break;
+
+      // AskUserQuestion events
+      case 'ask_user_question':
+        if (msg.sessionId === currentSession.value) {
+          pendingQuestion.value = {
+            toolUseId: msg.toolUseId,
+            questions: msg.questions,
+          };
+        }
+        break;
+
+      case 'question_answered':
+        if (msg.sessionId === currentSession.value) {
+          pendingQuestion.value = null;
+        }
+        break;
+
+      case 'question_timeout':
+        if (msg.sessionId === currentSession.value) {
+          pendingQuestion.value = null;
+        }
+        break;
     }
   }
 
@@ -840,6 +865,11 @@ export function useChatWebSocket() {
     send({ type: 'terminal:clear', processId });
   }
 
+  function answerQuestion(toolUseId, answers) {
+    send({ type: 'answer_question', toolUseId, answers });
+    pendingQuestion.value = null;
+  }
+
   function clearTaskStatus() {
     taskStatus.value = 'idle';
   }
@@ -893,6 +923,7 @@ export function useChatWebSocket() {
     loadingOlderMessages: readonly(loadingOlderMessages),
     totalTurns: readonly(totalTurns),
     loadedTurns: readonly(loadedTurns),
+    pendingQuestion: readonly(pendingQuestion),
 
     // Connection
     connect,
@@ -920,6 +951,9 @@ export function useChatWebSocket() {
 
     // Task status
     clearTaskStatus,
+
+    // Question answering
+    answerQuestion,
 
     // Direct send
     send,

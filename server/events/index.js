@@ -5,6 +5,7 @@
  * Event files are self-documenting with JSDoc comments.
  */
 
+import { handler as answerQuestion } from './answer-question.js';
 import { handler as browseFolder } from './browse-folder.js';
 import { handler as cancelTask } from './cancel-task.js';
 import { handler as deleteSession } from './delete-session.js';
@@ -42,6 +43,7 @@ import { handler as updateSettings } from './update-settings.js';
 import { handleUpgrade } from './upgrade.js';
 
 export const handlers = {
+  answer_question: answerQuestion,
   get_projects: getProjects,
   select_project: selectProject,
   browse_folder: browseFolder,
