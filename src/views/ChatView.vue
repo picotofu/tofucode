@@ -426,8 +426,8 @@ function handleKeydown(e) {
       return;
     }
 
-    // Ctrl+M or Cmd+M: Toggle memo
-    if (e.key === 'm') {
+    // Ctrl+M or Cmd+M: Toggle memo (if enabled)
+    if (e.key === 'm' && settingsContext?.enableMemo?.()) {
       e.preventDefault();
       toggleMemo();
       return;
@@ -2178,6 +2178,7 @@ watch(
             </button>
             <!-- Memo file button (beside permission tabs) -->
             <button
+              v-if="settingsContext?.enableMemo?.()"
               class="memo-btn"
               @click="openMemo"
               :title="`Memo: ${settingsContext?.quickAccessFile?.() || 'TODO.md'}`"

@@ -177,13 +177,27 @@ function handleRestart() {
           </button>
         </div>
 
-        <!-- Quick Access File Setting -->
+        <!-- Enable Memo Feature -->
         <div class="setting-item">
+          <div class="setting-header">
+            <span class="setting-title">Enable Memo</span>
+            <label class="toggle">
+              <input type="checkbox" v-model="localSettings.enableMemo" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <p class="setting-description">
+            Enable quick memo access with Cmd+M. Shows memo button beside mode tabs.
+          </p>
+        </div>
+
+        <!-- Quick Access File Setting -->
+        <div class="setting-item" v-if="localSettings.enableMemo">
           <div class="setting-header">
             <span class="setting-title">Memo File</span>
           </div>
           <p class="setting-description">
-            Filename for quick memo access. Defaults to TODO.md if not set. Toggle with Cmd+M.
+            Filename for quick memo access. Defaults to TODO.md if not set.
           </p>
           <input
             type="text"

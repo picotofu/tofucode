@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS = {
   autoSaveFiles: true, // Auto-save file edits after 1 second of inactivity
   symbolToolbar: '` ~ ! @ # $ % ^ & * ( ) - _ = + /',
   quickAccessFile: 'TODO.md', // Memo file for Cmd+M quick access (keep old key name)
+  enableMemo: true, // Enable memo feature (Cmd+M quick access)
 };
 
 export function loadSettings() {
