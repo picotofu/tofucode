@@ -9,13 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **AskUserQuestion interactive modal** - Claude's questions now display as standalone messages with an "Answer" button that opens a modal with selectable option cards and custom text input
-- Server-side AskUserQuestion interception - pauses SDK stream, waits for user answers, injects tool_result back via `streamInput()`
+  - Server-side stream interception pauses SDK, waits for user answers, injects tool_result back via `streamInput()`
+  - No timeout - user must answer or cancel task (prevents unexpected stream termination)
+  - Proper cleanup of pending questions when task is cancelled
+- **Memo feature (Cmd+M)** - Quick access to TODO.md or custom file for notes and tasks
+  - Toggle memo overlay with Cmd+M keyboard shortcut or memo button beside mode tabs
+  - Always defaults to TODO.md if not configured in settings
+  - Auto-focus in memo editor at end of content when opened
+  - Escape key closes memo and refocuses chat input at end
+  - Enable/disable via checkbox in settings (enabled by default)
+  - Configurable memo file in settings (uses old quickAccessFile key for compatibility)
 - Plan content max-height reduced to 400px for better readability
 
 ### Changed
-- **AskUserQuestion wait removed timeout** - Stream now waits indefinitely for user answer instead of timing out after 5 minutes
-- User must either answer the question or cancel the task (via Cancel button) - no arbitrary timeouts
-- Pending questions are now properly cleaned up when task is cancelled
+- Symbol toolbar setting changed from textarea to single-line text input
 
 ### Fixed
 - Git diff modal now correctly uses scoped WebSocket connection with project context
@@ -23,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plan content now displays in chat UI when ExitPlanMode is called, making plans visible before approval
 - EnterPlanMode now shows clear indicator that Claude is entering planning phase
 - AskUserQuestion modal now opens correctly (fixed `navigator.platform` access error)
+- Memo editor focus now works correctly with TinyMDE contenteditable element
+- Memo focus watcher initialization order fixed (no more ReferenceError on page load)
+
+### Removed
+- Screenshot generation scripts
 
 ## [1.0.2] - 2026-02-15
 
