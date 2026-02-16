@@ -297,6 +297,14 @@ The PWA updates independently from the backend npm package. For full updates (ba
 - Auth data in `~/.tofucode/.auth.json`
 - Full system access matching Claude Code permissions
 
+### Security Reports
+
+Independent security assessments are conducted before each release to ensure user safety:
+
+- **[v1.0.3 Security Report](./docs/security_report_v1.0.3.md)** - WebSocket auth, file access, CORS, penetration testing
+
+All security reports are publicly available in the `docs/` folder for transparency.
+
 ---
 
 ## Contributing
