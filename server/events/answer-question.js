@@ -65,32 +65,32 @@ export async function handler(ws, message, context) {
   const claudeDir = join(projectPath, '.claude');
   const jsonlPath = join(claudeDir, `${pending.sessionId}.jsonl`);
 
-  // Wait for SDK to write the session file (including AskUserQuestion)
-  // The SDK writes to JSONL at the end of each stream completion
-  // We need to wait a bit for it to finish writing
-  let retries = 0;
-  while (retries < 20) {
-    // 20 retries = 10 seconds max
-    if (existsSync(jsonlPath)) {
-      const content = readFileSync(jsonlPath, 'utf8');
-      // Check if the AskUserQuestion tool_use is in the file
-      if (content.includes(toolUseId)) {
-        logger.log(
-          `[answer_question] Found AskUserQuestion ${toolUseId} in session file after ${retries} retries`,
-        );
-        break;
-      }
-    }
-    logger.log(
-      `[answer_question] Waiting for SDK to write session file (retry ${retries + 1}/20)...`,
-    );
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    retries++;
+  // Check if SDK has written the session file (including AskUserQuestion)
+  // For new sessions, SDK doesn't write until the end, so we need to write it ourselves
+  let toolUseInFile = false;
+  if (existsSync(jsonlPath)) {
+    const content = readFileSync(jsonlPath, 'utf8');
+    toolUseInFile = content.includes(toolUseId);
   }
 
-  if (retries >= 20) {
+  if (!toolUseInFile) {
     logger.log(
-      '[answer_question] Warning: Session file not written after 10 seconds, appending anyway',
+      `[answer_question] AskUserQuestion ${toolUseId} not in session file, writing it now`,
+    );
+    // Write the tool_use first (we stored it when the question was asked)
+    if (pending.toolUse) {
+      appendFileSync(jsonlPath, `${JSON.stringify(pending.toolUse)}\n`, 'utf8');
+      logger.log(
+        `[answer_question] Wrote AskUserQuestion tool_use to ${jsonlPath}`,
+      );
+    } else {
+      logger.log(
+        `[answer_question] Warning: No tool_use stored for ${toolUseId}`,
+      );
+    }
+  } else {
+    logger.log(
+      `[answer_question] Found AskUserQuestion ${toolUseId} already in session file`,
     );
   }
 
