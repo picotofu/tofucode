@@ -956,30 +956,6 @@ watch(inputValue, () => {
   }
 });
 
-// Focus memo editor when content loads
-watch(
-  () => quickAccessFile.value?.loading,
-  (isLoading, wasLoading) => {
-    // When loading changes from true to false, content just loaded
-    if (wasLoading && !isLoading && memoOpen.value && quickAccessFile.value) {
-      nextTick(() => {
-        // Wait for FileEditor/Monaco to fully render
-        setTimeout(() => {
-          const editorTextarea = document.querySelector(
-            '.memo-editor textarea',
-          );
-          if (editorTextarea) {
-            editorTextarea.focus();
-            // Move cursor to end
-            editorTextarea.selectionStart = editorTextarea.value.length;
-            editorTextarea.selectionEnd = editorTextarea.value.length;
-          }
-        }, 150);
-      });
-    }
-  },
-);
-
 // Format file changes for display
 const fileChangesText = computed(() => {
   const changes = projectStatus.value.gitChanges;
@@ -1370,6 +1346,30 @@ const memoTotalChars = computed(() => {
   if (!quickAccessFile.value?.content) return 0;
   return quickAccessFile.value.content.length;
 });
+
+// Focus memo editor when content loads
+watch(
+  () => quickAccessFile.value?.loading,
+  (isLoading, wasLoading) => {
+    // When loading changes from true to false, content just loaded
+    if (wasLoading && !isLoading && memoOpen.value && quickAccessFile.value) {
+      nextTick(() => {
+        // Wait for FileEditor/Monaco to fully render
+        setTimeout(() => {
+          const editorTextarea = document.querySelector(
+            '.memo-editor textarea',
+          );
+          if (editorTextarea) {
+            editorTextarea.focus();
+            // Move cursor to end
+            editorTextarea.selectionStart = editorTextarea.value.length;
+            editorTextarea.selectionEnd = editorTextarea.value.length;
+          }
+        }, 150);
+      });
+    }
+  },
+);
 
 function handleFileSave(data) {
   send({
