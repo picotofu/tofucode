@@ -163,12 +163,12 @@ function handleRestart() {
           <p class="setting-description">
             Customize symbols shown in the text editor toolbar. Enter symbols separated by spaces.
           </p>
-          <textarea
+          <input
+            type="text"
             v-model="localSettings.symbolToolbar"
-            class="setting-textarea"
-            placeholder="Enter symbols (e.g., ` ~ ! @ # $ % ^ & * ( ) - _ = + /)"
-            rows="3"
-          ></textarea>
+            class="setting-input"
+            placeholder="` ~ ! @ # $ % ^ & * ( ) - _ = + /"
+          />
           <button
             class="reset-btn"
             @click="localSettings.symbolToolbar = '` ~ ! @ # $ % ^ & * ( ) - _ = + /'"
