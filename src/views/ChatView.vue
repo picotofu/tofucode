@@ -1354,16 +1354,21 @@ watch(
     // When loading changes from true to false, content just loaded
     if (wasLoading && !isLoading && memoOpen.value && quickAccessFile.value) {
       nextTick(() => {
-        // Wait for FileEditor/Monaco to fully render
+        // Wait for FileEditor/TinyMDE to fully render
         setTimeout(() => {
-          const editorTextarea = document.querySelector(
-            '.memo-editor textarea',
+          // TinyMDE uses contenteditable div, not textarea
+          const editorDiv = document.querySelector(
+            '.memo-editor .TinyMDE[contenteditable]',
           );
-          if (editorTextarea) {
-            editorTextarea.focus();
-            // Move cursor to end
-            editorTextarea.selectionStart = editorTextarea.value.length;
-            editorTextarea.selectionEnd = editorTextarea.value.length;
+          if (editorDiv) {
+            editorDiv.focus();
+            // Move cursor to end of contenteditable
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.selectNodeContents(editorDiv);
+            range.collapse(false); // false = collapse to end
+            sel.removeAllRanges();
+            sel.addRange(range);
           }
         }, 150);
       });
