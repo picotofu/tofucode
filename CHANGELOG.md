@@ -9,9 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **AskUserQuestion interactive modal** - Claude's questions now display as standalone messages with an "Answer" button that opens a modal with selectable option cards and custom text input
-  - Server-side stream interception pauses SDK, waits for user answers, injects tool_result back via `streamInput()`
-  - No timeout - user must answer or cancel task (prevents unexpected stream termination)
+  - Answers are converted to natural language user messages for reliable context
+  - Modal supports single-select (radio buttons) and multi-select (checkboxes) questions
+  - Custom text input available for "Other" option on any question
   - Proper cleanup of pending questions when task is cancelled
+  - Cmd/Ctrl+Enter to submit, Escape to close modal
 - **Memo feature (Cmd+M)** - Quick access to TODO.md or custom file for notes and tasks
   - Toggle memo overlay with Cmd+M keyboard shortcut or memo button beside mode tabs
   - Always defaults to TODO.md if not configured in settings
@@ -22,7 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plan content max-height reduced to 400px for better readability
 
 ### Changed
-- Symbol toolbar setting changed from textarea to single-line text input
+- Symbol toolbar setting changed from textarea to single-line text input with inline "Reset" button
+- Connection status pill now appears beside restart server button showing connecting/connected status (fades after 3 seconds)
 
 ### Fixed
 - Git diff modal now correctly uses scoped WebSocket connection with project context
@@ -30,8 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plan content now displays in chat UI when ExitPlanMode is called, making plans visible before approval
 - EnterPlanMode now shows clear indicator that Claude is entering planning phase
 - AskUserQuestion modal now opens correctly (fixed `navigator.platform` access error)
+- AskUserQuestion answers now properly resume sessions and provide correct context to Claude
+- Missing logger import in prompt.js that caused "logger is not defined" error
+- Error messages in answer-question handler now include sessionId to prevent filtering
 - Memo editor focus now works correctly with TinyMDE contenteditable element
 - Memo focus watcher initialization order fixed (no more ReferenceError on page load)
+- Memo close button now correctly calls closeMemo function (regression fix)
 
 ### Removed
 - Screenshot generation scripts
