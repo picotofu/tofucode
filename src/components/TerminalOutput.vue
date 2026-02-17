@@ -27,6 +27,9 @@ const emit = defineEmits([
 
 const historyContentRef = ref(null);
 const activeContentRef = ref(null);
+const commandRefs = ref([]); // Refs for each command in history (for navigation)
+const currentCommandIndex = ref(-1); // Currently visible command (for navigation)
+const isNavigating = ref(false); // Flag to prevent scroll handler from overriding during navigation
 
 // Local expanded state - new processes start expanded
 const localExpandedState = ref(new Map());
@@ -66,13 +69,19 @@ function scrollHistoryToBottom() {
 
 // Scroll to bottom on mount and when processes change
 onMounted(() => {
-  nextTick(scrollHistoryToBottom);
+  nextTick(() => {
+    scrollHistoryToBottom();
+    updateCurrentCommandIndex();
+  });
 });
 
 watch(
   () => props.processes.length,
   () => {
-    nextTick(scrollHistoryToBottom);
+    nextTick(() => {
+      scrollHistoryToBottom();
+      updateCurrentCommandIndex();
+    });
   },
 );
 
@@ -81,10 +90,107 @@ watch(
   () => props.activeTab,
   (tab) => {
     if (tab === 'history') {
-      nextTick(scrollHistoryToBottom);
+      nextTick(() => {
+        scrollHistoryToBottom();
+        updateCurrentCommandIndex();
+      });
     }
   },
 );
+
+// Update current command index when processes change
+watch(
+  () => allProcesses.value.length,
+  (newLength) => {
+    // Auto-navigate to newest command when new commands are added
+    if (
+      currentCommandIndex.value === -1 ||
+      currentCommandIndex.value >= newLength - 1
+    ) {
+      currentCommandIndex.value = Math.max(0, newLength - 1);
+    }
+  },
+  { immediate: true },
+);
+
+// Handle scroll to update current command index
+function handleScroll() {
+  // Skip updates during programmatic navigation
+  if (isNavigating.value) return;
+  updateCurrentCommandIndex();
+}
+
+// Update which command is currently in view based on scroll position
+function updateCurrentCommandIndex() {
+  if (!historyContentRef.value || commandRefs.value.length === 0) return;
+  if (isNavigating.value) return; // Don't update during navigation
+
+  const containerTop = historyContentRef.value.scrollTop;
+  const containerHeight = historyContentRef.value.clientHeight;
+  const viewportMiddle = containerTop + containerHeight / 3; // Upper third of viewport
+
+  // Find the command whose top is closest to (but not below) the viewport middle
+  let closestIndex = 0;
+  for (let i = 0; i < commandRefs.value.length; i++) {
+    const el = commandRefs.value[i];
+    if (el) {
+      const commandTop = el.offsetTop;
+      if (commandTop <= viewportMiddle) {
+        closestIndex = i;
+      }
+    }
+  }
+  currentCommandIndex.value = closestIndex;
+}
+
+// Command navigation functions (similar to chat turn navigation)
+function goToPreviousCommand() {
+  const targetIndex = Math.max(0, currentCommandIndex.value - 1);
+  scrollToCommand(targetIndex);
+}
+
+function goToNextCommand() {
+  const targetIndex = Math.min(
+    allProcesses.value.length - 1,
+    currentCommandIndex.value + 1,
+  );
+  scrollToCommand(targetIndex);
+}
+
+function scrollToCommand(index) {
+  const el = commandRefs.value[index];
+  if (el && historyContentRef.value) {
+    // Set navigation flag to prevent scroll handler from overriding
+    isNavigating.value = true;
+    currentCommandIndex.value = index;
+
+    // Find the command-line element within the terminal-block
+    const commandLineEl = el.querySelector('.command-line');
+    if (commandLineEl) {
+      // Calculate absolute position: parent offset + child offset
+      const scrollTop = el.offsetTop + commandLineEl.offsetTop - 16;
+      historyContentRef.value.scrollTo({
+        top: scrollTop,
+        behavior: 'smooth',
+      });
+    } else {
+      // Fallback to terminal-block if command-line not found
+      historyContentRef.value.scrollTo({
+        top: el.offsetTop - 16,
+        behavior: 'smooth',
+      });
+    }
+
+    // Clear navigation flag after scroll completes (smooth scroll takes ~300-500ms)
+    setTimeout(() => {
+      isNavigating.value = false;
+    }, 600);
+  }
+}
+
+function setCommandRef(index, el) {
+  commandRefs.value[index] = el;
+}
 
 function formatCwd(cwd) {
   if (!cwd) return '';
@@ -162,9 +268,11 @@ async function copyOutput(proc, e) {
   }
 }
 
-// Expose scrollHistoryToBottom for parent component
+// Expose navigation functions for parent component
 defineExpose({
   scrollHistoryToBottom,
+  goToPreviousCommand,
+  goToNextCommand,
 });
 </script>
 
@@ -210,11 +318,12 @@ defineExpose({
     </div>
 
     <!-- History Tab Content -->
-    <div class="tab-content" v-if="activeTab === 'history'" ref="historyContentRef">
+    <div class="tab-content" v-if="activeTab === 'history'" ref="historyContentRef" @scroll="handleScroll">
       <div v-if="allProcesses.length > 0" class="process-list history">
         <div
-          v-for="proc in allProcesses"
+          v-for="(proc, index) in allProcesses"
           :key="proc.id"
+          :ref="(el) => setCommandRef(index, el)"
           class="terminal-block"
           :class="{ running: proc.status === 'running', expanded: isExpanded(proc.id) }"
         >
@@ -277,6 +386,31 @@ defineExpose({
         <p class="hint">Type a command below to execute</p>
       </div>
     </div>
+
+    <!-- Command navigation buttons (bottom-right, only in history tab) -->
+    <div class="command-navigation" v-if="activeTab === 'history' && allProcesses.length > 1">
+      <button
+        class="command-nav-btn"
+        :disabled="currentCommandIndex <= 0"
+        @click="goToPreviousCommand"
+        title="Previous command"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 15l-6-6-6 6"/>
+        </svg>
+      </button>
+      <span class="command-counter">{{ currentCommandIndex + 1 }}/{{ allProcesses.length }}</span>
+      <button
+        class="command-nav-btn"
+        :disabled="currentCommandIndex >= allProcesses.length - 1"
+        @click="goToNextCommand"
+        title="Next command"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -285,6 +419,7 @@ defineExpose({
   display: flex;
   flex-direction: column;
   height: 100%;
+  position: relative;
   font-family: var(--font-mono);
   font-size: 13px;
 }
@@ -581,5 +716,52 @@ defineExpose({
   margin-top: 8px;
   font-size: 13px;
   color: var(--text-muted);
+}
+
+/* Command navigation buttons (matches chat turn navigation) */
+.command-navigation {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 4px;
+  z-index: 10;
+  box-shadow: var(--shadow-md);
+}
+
+.command-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  background: transparent;
+  transition: background 0.15s, color 0.15s;
+}
+
+.command-nav-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.command-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.command-counter {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 0 4px;
+  min-width: 36px;
+  text-align: center;
 }
 </style>

@@ -454,17 +454,25 @@ function handleKeydown(e) {
       return;
     }
 
-    // Cmd+Up: Navigate to previous turn in chat mode
-    if (e.key === 'ArrowUp' && currentMode.value === 'chat') {
+    // Cmd+Up: Navigate to previous turn/command
+    if (e.key === 'ArrowUp') {
       e.preventDefault();
-      chatMessagesRef.value?.goToPreviousTurn();
+      if (currentMode.value === 'chat') {
+        chatMessagesRef.value?.goToPreviousTurn();
+      } else if (currentMode.value === 'terminal') {
+        terminalOutputRef.value?.goToPreviousCommand();
+      }
       return;
     }
 
-    // Cmd+Down: Navigate to next turn in chat mode
-    if (e.key === 'ArrowDown' && currentMode.value === 'chat') {
+    // Cmd+Down: Navigate to next turn/command
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
-      chatMessagesRef.value?.goToNextTurn();
+      if (currentMode.value === 'chat') {
+        chatMessagesRef.value?.goToNextTurn();
+      } else if (currentMode.value === 'terminal') {
+        terminalOutputRef.value?.goToNextCommand();
+      }
       return;
     }
 
