@@ -102,7 +102,7 @@ const renderer = {
     return `<div class="code-block-wrapper">
       <div class="code-block-header">
         <span class="code-block-lang">${langLabel}</span>
-        <button class="code-copy-btn" data-code-id="${id}" onclick="window.copyCodeBlock('${id}')">
+        <button class="code-copy-btn" data-code-id="${id}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -131,8 +131,8 @@ marked.use({ renderer });
 export function renderMarkdown(text) {
   if (!text) return '';
   const html = marked.parse(text);
-  // Allow onclick for copy buttons (we control the content - it's our own generated code)
+  // Allow data-code-id for copy button functionality (handled via event delegation)
   return DOMPurify.sanitize(html, {
-    ADD_ATTR: ['onclick', 'data-code-id'],
+    ADD_ATTR: ['data-code-id'],
   });
 }

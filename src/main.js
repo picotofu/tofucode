@@ -9,32 +9,35 @@ import AppHeader from './components/AppHeader.vue';
 import MessageItem from './components/MessageItem.vue';
 import ToolGroup from './components/ToolGroup.vue';
 
-// Global function for copying code blocks
-window.copyCodeBlock = async (id) => {
-  const el = document.getElementById(id);
+// Event delegation for code block copy buttons (no inline onclick needed)
+document.addEventListener('click', async (event) => {
+  const btn = event.target.closest('.code-copy-btn');
+  if (!btn) return;
+
+  const codeId = btn.getAttribute('data-code-id');
+  if (!codeId) return;
+
+  const el = document.getElementById(codeId);
   if (!el) return;
 
   const code = el.textContent || '';
   try {
     await navigator.clipboard.writeText(code);
     // Update button to show "Copied!"
-    const btn = document.querySelector(`[data-code-id="${id}"]`);
-    if (btn) {
-      const textSpan = btn.querySelector('.copy-text');
-      if (textSpan) {
-        const originalText = textSpan.textContent;
-        textSpan.textContent = 'Copied!';
-        btn.classList.add('copied');
-        setTimeout(() => {
-          textSpan.textContent = originalText;
-          btn.classList.remove('copied');
-        }, 2000);
-      }
+    const textSpan = btn.querySelector('.copy-text');
+    if (textSpan) {
+      const originalText = textSpan.textContent;
+      textSpan.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        textSpan.textContent = originalText;
+        btn.classList.remove('copied');
+      }, 2000);
     }
   } catch (err) {
     console.error('Failed to copy:', err);
   }
-};
+});
 
 const app = createApp(App);
 

@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clean up SDK stream reference after task completion (prevents memory retention)
 - Properly clean up tab key event listeners on component unmount
 - Removed unauthenticated debug endpoint (`/api/debug/ws-config`)
+- Refactored code copy buttons to use event delegation (removed `onclick` from DOMPurify whitelist)
 
 ### Removed
 - Screenshot generation scripts
