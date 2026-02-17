@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.5] - Unreleased
 
+### Added
+- **Tab key handling in chat input** - Tab/Shift+Tab to indent/dedent list items in chat markdown editor (matches file editor behavior)
+- **Cmd+2 terminal tab toggle** - Subsequent Cmd+2 presses toggle between active/history tabs when already in terminal mode
+- **Folder path search in file picker** - File picker now shows files inside folders that match the search query
+
 ### Changed
 - **CLI subcommands** - Use `tofucode start|stop|restart|status` instead of `--stop`, `--restart`, `--status` flags (legacy flags still supported for backwards compatibility)
 - Log file location now consistently uses `~/.tofucode/tofucode.log` (was split between cwd and ~/.tofucode)
@@ -22,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Race condition fixed: Session selection now waits for project selection using `nextTick()`
   - Skeleton loaders now switch to empty state once `contextReady` is true
   - Empty sessions show "Start a conversation" message instead of loading indefinitely
+- **Session message count now excludes system messages** - Session list displays accurate message count by only counting displayable messages (user, assistant, tool_result)
+  - Fixes sessions showing "2 messages" when they appear empty (were only system messages)
+  - Applied to both indexed sessions and unindexed sessions scanned from JSONL files
 
 ## [1.0.4] - 2026-02-17
 

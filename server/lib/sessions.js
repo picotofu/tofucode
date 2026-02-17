@@ -51,18 +51,53 @@ export async function getSessionsList(projectSlug) {
       for (const entry of data.entries || []) {
         const jsonlPath = join(sessionsDir, `${entry.sessionId}.jsonl`);
         let modified = entry.modified;
+        let messageCount = entry.messageCount || 0;
+
         if (existsSync(jsonlPath)) {
           try {
             const stats = statSync(jsonlPath);
             modified = stats.mtime.toISOString();
+
+            // Recount displayable messages from JSONL (SDK includes system messages in index)
+            messageCount = 0;
+            await new Promise((resolve, reject) => {
+              const rl = createInterface({
+                input: createReadStream(jsonlPath),
+                crlfDelay: Number.POSITIVE_INFINITY,
+              });
+
+              rl.on('line', (line) => {
+                if (line.trim()) {
+                  try {
+                    const msgEntry = JSON.parse(line);
+                    // Only count displayable message types
+                    if (
+                      msgEntry.type === 'user' ||
+                      msgEntry.type === 'human' ||
+                      msgEntry.type === 'assistant' ||
+                      msgEntry.type === 'tool_result'
+                    ) {
+                      messageCount++;
+                    }
+                  } catch {
+                    // Skip malformed lines
+                  }
+                }
+              });
+
+              rl.on('close', () => resolve());
+              rl.on('error', reject);
+            });
           } catch {
-            // Fall back to index modified if stat fails
+            // Fall back to index values if streaming fails
+            messageCount = entry.messageCount || 0;
           }
         }
+
         sessionsMap.set(entry.sessionId, {
           sessionId: entry.sessionId,
           firstPrompt: entry.firstPrompt?.substring(0, 100) || 'No prompt',
-          messageCount: entry.messageCount || 0,
+          messageCount,
           created: entry.created,
           modified,
           // Use .session-titles.json (SDK overwrites sessions-index.json customTitle)
@@ -87,23 +122,33 @@ export async function getSessionsList(projectSlug) {
               let messageCount = 0;
 
               try {
-                // Use streaming to count lines and get first line
+                // Use streaming to count displayable messages and get first user prompt
                 await new Promise((resolve, reject) => {
                   const rl = createInterface({
                     input: createReadStream(jsonlPath),
                     crlfDelay: Number.POSITIVE_INFINITY,
                   });
 
-                  let firstLine = null;
+                  let firstUserPromptFound = false;
                   rl.on('line', (line) => {
                     if (line.trim()) {
-                      messageCount++;
-                      if (!firstLine) {
-                        firstLine = line;
-                        // Parse first line for prompt text
-                        try {
-                          const entry = JSON.parse(line);
-                          if (entry.type === 'user' && entry.message?.content) {
+                      try {
+                        const entry = JSON.parse(line);
+                        // Only count displayable message types (exclude system, summary, etc.)
+                        if (
+                          entry.type === 'user' ||
+                          entry.type === 'human' ||
+                          entry.type === 'assistant' ||
+                          entry.type === 'tool_result'
+                        ) {
+                          messageCount++;
+
+                          // Get first user prompt for display
+                          if (
+                            !firstUserPromptFound &&
+                            (entry.type === 'user' || entry.type === 'human') &&
+                            entry.message?.content
+                          ) {
                             const contentText =
                               typeof entry.message.content === 'string'
                                 ? entry.message.content
@@ -112,12 +157,15 @@ export async function getSessionsList(projectSlug) {
                                       .filter((b) => b.type === 'text')
                                       .map((b) => b.text)
                                       .join(' ')
-                                  : 'New session';
-                            firstPrompt = contentText.substring(0, 100);
+                                  : '';
+                            if (contentText.trim()) {
+                              firstPrompt = contentText.substring(0, 100);
+                              firstUserPromptFound = true;
+                            }
                           }
-                        } catch {
-                          // Couldn't parse first line, keep default
                         }
+                      } catch {
+                        // Skip malformed lines
                       }
                     }
                   });
