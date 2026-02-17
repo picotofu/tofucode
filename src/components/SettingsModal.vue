@@ -109,6 +109,44 @@ function handleRestart() {
     emit('restart');
   }
 }
+
+// PWA update functionality
+const isUpdatingPWA = ref(false);
+
+async function handleClearCacheAndUpdate() {
+  if (isUpdatingPWA.value) return;
+
+  const confirmed = confirm(
+    'Clear cache and update PWA?\n\nThis will:\n- Unregister the service worker\n- Clear all caches\n- Reload the page with the latest version',
+  );
+
+  if (!confirmed) return;
+
+  isUpdatingPWA.value = true;
+
+  try {
+    // Unregister all service workers
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        await registration.unregister();
+      }
+    }
+
+    // Clear all caches
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map((name) => caches.delete(name)));
+    }
+
+    // Reload the page to get fresh content
+    window.location.reload(true);
+  } catch (error) {
+    console.error('Failed to clear cache:', error);
+    alert('Failed to clear cache. Please try manually clearing browser data.');
+    isUpdatingPWA.value = false;
+  }
+}
 </script>
 
 <template>
@@ -219,6 +257,34 @@ function handleRestart() {
         </div>
 
         <hr class="divider" />
+
+        <!-- Clear Cache & Update PWA -->
+        <div class="setting-item">
+          <div class="setting-header">
+            <span class="setting-title">PWA & Cache</span>
+          </div>
+          <p class="setting-description">
+            Force clear service worker cache and reload with the latest version. Use this if the app is not updating properly.
+          </p>
+          <div class="restart-container">
+            <button
+              class="restart-btn"
+              @click="handleClearCacheAndUpdate"
+              :disabled="isUpdatingPWA"
+            >
+              <svg v-if="!isUpdatingPWA" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                <path d="M21 3v5h-5"/>
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                <path d="M3 21v-5h5"/>
+              </svg>
+              <svg v-else width="14" height="14" viewBox="0 0 24 24" class="spin">
+                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+              </svg>
+              <span>{{ isUpdatingPWA ? 'Clearing...' : 'Clear Cache & Update' }}</span>
+            </button>
+          </div>
+        </div>
 
         <!-- Restart Server -->
         <div class="setting-item">

@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.4] - Unreleased
 
 ### Added
+- **Fuzzy file picker (Cmd+P)** - Quick file search and navigation with folder support and glob patterns
+- **PWA cache clear button** - Force clear service worker cache and update to latest version
 - **AskUserQuestion modal** - Interactive answer UI with option cards and text input
 - **Memo feature (Cmd+M)** - Quick-access overlay for TODO.md or custom notes file
 
