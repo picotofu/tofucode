@@ -39,6 +39,8 @@ export async function restartWithInvertedSpawn(reason, newVersion = null) {
     console.log(
       `[RESTART] Upgrade: spawning tofucode command: ${spawnCmd} ${spawnArgs.join(' ')}`,
     );
+    console.log(`[RESTART] Original argv: ${JSON.stringify(process.argv)}`);
+    console.log(`[RESTART] Parsed args to pass: ${JSON.stringify(spawnArgs)}`);
   } else {
     // Regular restart: re-run same script
     spawnCmd = process.execPath;
@@ -60,6 +62,15 @@ export async function restartWithInvertedSpawn(reason, newVersion = null) {
       UPGRADE_RETRY_INTERVAL: process.env.UPGRADE_RETRY_INTERVAL || '1000',
     },
   };
+
+  // Log key env vars being passed
+  console.log('[RESTART] Key env vars being passed:');
+  console.log(`[RESTART]   PORT: ${spawnOptions.env.PORT}`);
+  console.log(`[RESTART]   HOST: ${spawnOptions.env.HOST}`);
+  console.log(`[RESTART]   DEBUG: ${spawnOptions.env.DEBUG}`);
+  console.log(`[RESTART]   AUTH_DISABLED: ${spawnOptions.env.AUTH_DISABLED}`);
+  console.log(`[RESTART]   PID_FILE: ${spawnOptions.env.PID_FILE}`);
+  console.log(`[RESTART]   ALLOW_SOURCE_UPGRADE: ${spawnOptions.env.ALLOW_SOURCE_UPGRADE}`);
 
   // For upgrades, need shell to resolve 'tofucode' command in PATH
   if (reason === 'upgrade') {
