@@ -11,13 +11,14 @@
  * 5. New process's retry succeeds and takes over
  */
 
-import { exec, spawn } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
   canAutoUpgrade,
   getInstallationType,
   getUpgradeCommand,
 } from '../lib/installation.js';
+import { restartWithInvertedSpawn } from '../lib/restart.js';
 import { broadcast } from '../lib/ws.js';
 
 const execAsync = promisify(exec);
@@ -64,8 +65,21 @@ export async function handleUpgrade(_ws, message, _context) {
     // Wait for message to be sent
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Step 2: Restart with inverted spawn
-    await restartWithInvertedSpawn();
+    // Step 2: Restart with inverted spawn (from shared lib)
+    await restartWithInvertedSpawn('upgrade', version);
+
+    // Broadcast success before exiting
+    broadcast({
+      type: 'upgrade_success',
+      message: 'Server upgraded successfully. Reconnecting...',
+    });
+
+    // Wait for message to be sent
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Exit old process - new process will take over
+    console.log('Exiting old process, new process will take over...');
+    process.exit(0);
   } catch (error) {
     console.error('Upgrade failed:', error);
     broadcast({
@@ -106,53 +120,4 @@ async function installUpdate(version = 'latest') {
 
     throw new Error(`npm install failed: ${error.message}`);
   }
-}
-
-/**
- * Restart server using inverted spawn strategy
- * (Same proven logic from restart.js POC)
- */
-async function restartWithInvertedSpawn() {
-  const nodeExecutable = process.argv[0];
-  const args = process.argv.slice(1);
-
-  console.log(`Current process: ${process.pid}`);
-  console.log(`Spawning: ${nodeExecutable} ${args.join(' ')}`);
-
-  // Spawn NEW process with retry flag
-  const child = spawn(nodeExecutable, args, {
-    detached: true,
-    stdio: 'ignore',
-    env: {
-      ...process.env,
-      UPGRADE_RETRY_BIND: 'true',
-      UPGRADE_MAX_RETRIES: process.env.UPGRADE_MAX_RETRIES || '20',
-      UPGRADE_RETRY_INTERVAL: process.env.UPGRADE_RETRY_INTERVAL || '1000',
-    },
-  });
-
-  child.unref();
-
-  console.log(`Spawned new process: PID ${child.pid}`);
-
-  // Wait for child to start
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  // Verify child is running
-  try {
-    process.kill(child.pid, 0);
-    console.log(`Child process ${child.pid} is running`);
-  } catch (err) {
-    throw new Error(`Child process failed to start: ${err.message}`);
-  }
-
-  // Broadcast success before exiting
-  broadcast({
-    type: 'upgrade_success',
-    message: 'Server upgraded successfully. Reconnecting...',
-  });
-
-  // Exit this process
-  console.log('Exiting old process, new process will take over...');
-  process.exit(0);
 }

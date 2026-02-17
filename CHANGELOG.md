@@ -5,6 +5,11 @@ All notable changes to tofucode.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - Unreleased
+
+### Fixed
+- One-click upgrade now properly restarts server (uses shared restart logic with correct PID file handling)
+
 ## [1.0.4] - 2026-02-17
 
 ### Added
