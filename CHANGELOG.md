@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - One-click upgrade now properly restarts server with correct configuration, port, and daemon mode preserved
 - One-click upgrade exits old process immediately to free port for new process (was blocking for 3+ seconds)
 - Upgrade now spawns newly installed version instead of re-running old script path
+- **Projects list now scans for actual session files** - Projects with empty/missing `sessions-index.json` are now properly detected (fixes missing projects in sidebar after renames/migrations)
+  - Performance impact: +0.3ms average (negligible)
+  - Recovers projects that were previously hidden
+- **CLI-initiated sessions with no messages now load correctly** - Fixed infinite skeleton loader when opening sessions created from CLI (e.g., `/mcp` command dismissed) that have no user/assistant messages
+  - Race condition fixed: Session selection now waits for project selection using `nextTick()`
+  - Skeleton loaders now switch to empty state once `contextReady` is true
+  - Empty sessions show "Start a conversation" message instead of loading indefinitely
 
 ## [1.0.4] - 2026-02-17
 

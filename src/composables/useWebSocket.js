@@ -534,10 +534,20 @@ export function useChatWebSocket() {
         break;
 
       case 'session_selected':
+        console.log(
+          '[useChatWebSocket] Received session_selected:',
+          `sessionId=${msg.sessionId}`,
+          `currentSession=${currentSession.value}`,
+          `hasHistory=${msg.hasHistory}`,
+          `projectPath=${msg.projectPath}`,
+        );
         // Handle new session flow first (both null)
         if (msg.sessionId === null && currentSession.value === null) {
           // Both null - new session flow - no history to wait for
           contextReady.value = true;
+          console.log(
+            '[useChatWebSocket] New session flow - contextReady set to true',
+          );
         } else if (msg.sessionId === currentSession.value) {
           // Session match - update state
           sessionActiveElsewhere.value = msg.isActiveElsewhere || false;
@@ -548,6 +558,11 @@ export function useChatWebSocket() {
           if (msg.hasHistory === false) {
             // Brand new session with no history - ready immediately
             contextReady.value = true;
+            console.log(
+              '[useChatWebSocket] No history - contextReady set to true',
+            );
+          } else {
+            console.log('[useChatWebSocket] Waiting for session_history...');
           }
           // Otherwise, don't set contextReady yet - wait for session_history to load first
         } else {
@@ -569,6 +584,13 @@ export function useChatWebSocket() {
 
       case 'session_history':
         // Only accept history if it matches current session (prevents race condition)
+        console.log(
+          '[useChatWebSocket] Received session_history:',
+          `sessionId=${msg.sessionId}`,
+          `currentSession=${currentSession.value}`,
+          `messages=${msg.messages?.length || 0}`,
+          `totalEntries=${msg.totalEntries}`,
+        );
         if (!msg.sessionId || msg.sessionId === currentSession.value) {
           messages.value = msg.messages || [];
           hasOlderMessages.value = msg.hasOlderMessages || false;
@@ -580,6 +602,7 @@ export function useChatWebSocket() {
           // History loaded - NOW context is fully ready
           // This ensures: history loads → then typing indicator (if running) → then UI is interactive
           contextReady.value = true;
+          console.log('[useChatWebSocket] contextReady set to true');
         } else {
           console.warn(
             `[useChatWebSocket] Ignoring session_history for different session. History sessionId: ${msg.sessionId}, Current sessionId: ${currentSession.value}`,

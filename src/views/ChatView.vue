@@ -830,8 +830,11 @@ watch(
 
       if (session === 'new') {
         clearMessages();
-        newSession({
-          dangerouslySkipPermissions: permissionMode.value === 'skip',
+        // Wait for project selection to complete before creating new session
+        nextTick(() => {
+          newSession({
+            dangerouslySkipPermissions: permissionMode.value === 'skip',
+          });
         });
       } else if (session) {
         // Check if we're transitioning from 'new' to the actual session ID
@@ -846,7 +849,9 @@ watch(
           // Switching to a different session
           // Clear messages immediately to prevent race condition
           clearMessages();
-          selectSession(session);
+          // Wait for project selection to complete before selecting session
+          // This prevents race condition where select_session arrives before project is selected
+          nextTick(() => selectSession(session));
         }
       }
 
@@ -1982,6 +1987,7 @@ watch(
       :messages="messages"
       :is-running="isRunning"
       :is-new-session="isNewSession"
+      :context-ready="contextReady"
       :has-older-messages="hasOlderMessages"
       :summary-count="summaryCount"
       :loading-older-messages="loadingOlderMessages"

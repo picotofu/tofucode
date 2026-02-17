@@ -90,6 +90,12 @@ export async function handler(ws, message, context) {
       });
       return;
     }
+  } else if (sessionId) {
+    // DEBUG: Project not selected yet when trying to load session
+    console.warn(
+      `[select-session] Project not selected yet for session ${sessionId}. ` +
+        `currentProjectPath: ${context.currentProjectPath || 'undefined'}`,
+    );
   }
 
   send(ws, {

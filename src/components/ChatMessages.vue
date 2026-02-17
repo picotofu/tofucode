@@ -16,6 +16,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  contextReady: {
+    type: Boolean,
+    default: false,
+  },
   hasOlderMessages: {
     type: Boolean,
     default: false,
@@ -326,11 +330,11 @@ defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn });
           </template>
         </div>
       </div>
-      <div class="empty" v-else-if="!isRunning && isNewSession">
+      <div class="empty" v-else-if="!isRunning && (isNewSession || contextReady)">
         <p>Start a conversation</p>
         <p class="empty-hint">Type a message below to begin.</p>
       </div>
-      <div class="loading-skeleton" v-else-if="!isRunning && !isNewSession">
+      <div class="loading-skeleton" v-else-if="!isRunning && !contextReady">
         <div class="skeleton-message">
           <div class="skeleton-avatar"></div>
           <div class="skeleton-content">
