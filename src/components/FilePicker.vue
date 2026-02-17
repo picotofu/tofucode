@@ -9,7 +9,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['close', 'select']);
+const emit = defineEmits(['close', 'select', 'reference']);
 
 const route = useRoute();
 
@@ -129,6 +129,19 @@ watch(results, () => {
   selectedIndex.value = 0;
 });
 
+// Scroll selected item into view when navigating with keyboard
+watch(selectedIndex, () => {
+  nextTick(() => {
+    const selectedElement = document.querySelector('.picker-item.selected');
+    if (selectedElement) {
+      selectedElement.scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth',
+      });
+    }
+  });
+});
+
 function handleKeydown(e) {
   if (e.key === 'Escape') {
     e.preventDefault();
@@ -166,6 +179,13 @@ function selectFile(file) {
   if (!file) return;
   emit('select', file);
   // Don't close here - let parent handle closing after navigation
+}
+
+function handleReference(event, file) {
+  event.stopPropagation(); // Prevent triggering file selection
+  if (!file || file.isDirectory) return;
+  emit('reference', file);
+  emit('close'); // Close picker after referencing
 }
 
 // Highlight matching characters in filename
@@ -256,6 +276,20 @@ function highlightMatch(text, query) {
 							</div>
 							<div class="picker-item-path">{{ file.directory }}</div>
 						</div>
+
+						<!-- Reference button (only for files, not folders) -->
+						<button
+							v-if="!file.isDirectory"
+							class="picker-ref-btn"
+							title="Reference this file"
+							@click="handleReference($event, file)"
+						>
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+								<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+							</svg>
+						</button>
+
 						<!-- Folder icon -->
 						<svg
 							v-if="file.isDirectory"
@@ -447,6 +481,35 @@ function highlightMatch(text, query) {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	font-family: var(--font-mono);
+}
+
+.picker-ref-btn {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	margin-right: 4px;
+	background: transparent;
+	color: var(--text-muted);
+	border: 1px solid transparent;
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	transition: all 0.15s;
+	opacity: 0;
+}
+
+.picker-item:hover .picker-ref-btn,
+.picker-item.selected .picker-ref-btn {
+	opacity: 1;
+}
+
+.picker-ref-btn:hover {
+	background: var(--bg-secondary);
+	color: var(--accent-color);
+	border-color: var(--accent-color);
 }
 
 .picker-item-icon {

@@ -26,6 +26,10 @@ const router = useRouter();
 const selectedFilePath = ref(null);
 provide('selectedFilePath', selectedFilePath);
 
+// Provide file reference for ChatView to pick up
+const fileReference = ref(null);
+provide('fileReference', fileReference);
+
 // Settings state
 const showSettings = ref(false);
 const settings = ref({
@@ -162,6 +166,14 @@ function handleFileSelect(file) {
   }
 }
 
+function handleFileReference(file) {
+  // Set the file reference for ChatView to pick up
+  fileReference.value = file.path;
+
+  // Close the file picker
+  closeFilePicker();
+}
+
 // Sidebar state - shared across all pages
 const isDesktop = window.innerWidth > 768;
 const storedSidebarState = localStorage.getItem('sidebarOpen');
@@ -230,6 +242,7 @@ onUnmounted(() => {
       :show="showFilePicker"
       @close="closeFilePicker"
       @select="handleFileSelect"
+      @reference="handleFileReference"
     />
     <SettingsModal
       :show="showSettings"

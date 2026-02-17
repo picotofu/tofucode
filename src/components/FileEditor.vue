@@ -193,6 +193,85 @@ function scrollToHeading(heading) {
   });
 }
 
+// Handle Tab key for markdown editor
+function handleMarkdownTab(event) {
+  if (!tinyMdeInstance) return;
+
+  const selection = tinyMdeInstance.getSelection();
+  if (!selection) return;
+
+  const content = tinyMdeInstance.getContent();
+  const lines = content.split('\n');
+  const currentLine = lines[selection.row];
+
+  // Check if current line is a list item
+  const listMatch = currentLine.match(/^(\s*)([+*-]|\d+[.)])\s/);
+
+  if (event.shiftKey) {
+    // Shift+Tab: Dedent
+    if (listMatch) {
+      // Dedent list item (remove up to 2 spaces from beginning)
+      const leadingSpaces = listMatch[1];
+      if (leadingSpaces.length >= 2) {
+        const newLine = currentLine.replace(/^ {2}/, '');
+        lines[selection.row] = newLine;
+        tinyMdeInstance.setContent(lines.join('\n'));
+
+        // Restore cursor position (adjusted for removed spaces)
+        const newCol = Math.max(0, selection.col - 2);
+        tinyMdeInstance.setSelection({ row: selection.row, col: newCol });
+      }
+    } else {
+      // Not a list - remove up to 2 spaces from beginning
+      if (currentLine.startsWith('  ')) {
+        const newLine = currentLine.replace(/^ {2}/, '');
+        lines[selection.row] = newLine;
+        tinyMdeInstance.setContent(lines.join('\n'));
+
+        // Restore cursor position
+        const newCol = Math.max(0, selection.col - 2);
+        tinyMdeInstance.setSelection({ row: selection.row, col: newCol });
+      }
+    }
+  } else {
+    // Tab: Indent
+    if (listMatch) {
+      // Indent list item (add 2 spaces at beginning)
+      const newLine = `  ${currentLine}`;
+      lines[selection.row] = newLine;
+      tinyMdeInstance.setContent(lines.join('\n'));
+
+      // Restore cursor position (adjusted for added spaces)
+      tinyMdeInstance.setSelection({
+        row: selection.row,
+        col: selection.col + 2,
+      });
+    } else {
+      // Not a list - insert 2 spaces at cursor
+      tinyMdeInstance.paste('  ');
+    }
+  }
+
+  // Mark as dirty
+  isDirty.value = true;
+  editorContent.value = tinyMdeInstance.getContent();
+}
+
+// Setup tab key handling for markdown editor
+function setupMarkdownTabHandling() {
+  if (!mdEditorRef.value) return;
+
+  const editorElement = mdEditorRef.value.querySelector('.TinyMDE');
+  if (!editorElement) return;
+
+  editorElement.addEventListener('keydown', (event) => {
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      handleMarkdownTab(event);
+    }
+  });
+}
+
 // Watch for content changes from parent (new file loaded)
 watch(
   () => props.content,
@@ -232,6 +311,9 @@ watch(
             isDirty.value = true;
           }
         });
+
+        // Add tab key handling for markdown editor
+        setupMarkdownTabHandling();
       }
     }
   },

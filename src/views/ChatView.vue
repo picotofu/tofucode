@@ -25,6 +25,7 @@ import { getShortPath } from '../utils/format.js';
 // Get sidebar and settings from App.vue
 const sidebar = inject('sidebar');
 const settingsContext = inject('settings');
+const fileReference = inject('fileReference');
 
 const router = useRouter();
 const route = useRoute();
@@ -983,6 +984,58 @@ function scrollToBottom() {
 watch(connected, (isConnected) => {
   if (isConnected && currentMode.value === 'terminal') {
     listProcesses();
+  }
+});
+
+// Watch for file reference from FilePicker (Cmd+P -> Reference button)
+watch(fileReference, (path) => {
+  if (path) {
+    const reference = `@${path}`;
+    const currentContent = inputValue.value;
+
+    // Check if we need to add a space before the reference
+    let needsSpace = false;
+    if (currentContent.length > 0) {
+      const lastChar = currentContent[currentContent.length - 1];
+      // Add space if the last character is not a whitespace or newline
+      needsSpace = lastChar !== ' ' && lastChar !== '\n' && lastChar !== '\t';
+    }
+
+    // Append the reference
+    const newContent = currentContent + (needsSpace ? ' ' : '') + reference;
+    inputValue.value = newContent;
+
+    // Update TinyMDE editor (chat input always uses TinyMDE)
+    if (editorInstance.value) {
+      editorInstance.value.setContent(newContent);
+    }
+
+    // Save to localStorage
+    saveChatInput();
+
+    // Switch to chat mode if not already there
+    if (currentMode.value !== 'chat') {
+      currentMode.value = 'chat';
+    }
+
+    // Focus the input
+    nextTick(() => {
+      // Chat input always uses TinyMDE (contenteditable div)
+      const editorDiv = editorEl.value?.querySelector('.TinyMDE');
+      if (editorDiv) {
+        editorDiv.focus();
+        // Move cursor to end
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(editorDiv);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    });
+
+    // Clear the reference after processing
+    fileReference.value = null;
   }
 });
 
