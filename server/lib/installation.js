@@ -17,43 +17,68 @@ const rootDir = join(__dirname, '..', '..');
  * @returns {'global'|'local'|'npx'|'docker'|'source'|'unknown'}
  */
 export function getInstallationType() {
+  console.log('[INSTALL-DETECT] === Detecting installation type ===');
+  console.log(`[INSTALL-DETECT] rootDir: ${rootDir}`);
+  console.log(`[INSTALL-DETECT] process.cwd(): ${process.cwd()}`);
+  console.log(`[INSTALL-DETECT] process.argv[1]: ${process.argv[1]}`);
+
   // Docker: Check for /.dockerenv
-  if (existsSync('/.dockerenv')) {
+  const isDocker = existsSync('/.dockerenv');
+  console.log(
+    `[INSTALL-DETECT] Docker check (/.dockerenv exists): ${isDocker}`,
+  );
+  if (isDocker) {
+    console.log('[INSTALL-DETECT] Result: docker');
     return 'docker';
   }
 
   // Source: Check if we're running from a git repo
-  if (existsSync(join(rootDir, '.git'))) {
+  const gitPath = join(rootDir, '.git');
+  const isSource = existsSync(gitPath);
+  console.log(`[INSTALL-DETECT] Source check (${gitPath} exists): ${isSource}`);
+  if (isSource) {
+    console.log('[INSTALL-DETECT] Result: source');
     return 'source';
   }
 
   // npx: Check if running from npx cache
   // npx installs to ~/.npm/_npx/... or similar
-  if (
+  const isNpx =
     process.argv[1]?.includes('/_npx/') ||
-    process.argv[1]?.includes('\\_npx\\')
-  ) {
+    process.argv[1]?.includes('\\_npx\\');
+  console.log(`[INSTALL-DETECT] npx check (argv[1] contains _npx): ${isNpx}`);
+  if (isNpx) {
+    console.log('[INSTALL-DETECT] Result: npx');
     return 'npx';
   }
 
   // Global vs Local: Check if node_modules exists in parent dirs
-  const hasLocalNodeModules = existsSync(
-    join(process.cwd(), 'node_modules', 'tofucode'),
+  const localModulesPath = join(process.cwd(), 'node_modules', 'tofucode');
+  const hasLocalNodeModules = existsSync(localModulesPath);
+  console.log(
+    `[INSTALL-DETECT] Local check (${localModulesPath} exists): ${hasLocalNodeModules}`,
   );
 
   if (hasLocalNodeModules) {
+    console.log('[INSTALL-DETECT] Result: local');
     return 'local';
   }
 
   // Check if installed in global node_modules
   // Global install: process.argv[1] typically in /usr/local/lib/node_modules or similar
-  if (
+  const isGlobal =
     process.argv[1]?.includes('/node_modules/tofucode') ||
-    process.argv[1]?.includes('\\node_modules\\tofucode')
-  ) {
+    process.argv[1]?.includes('\\node_modules\\tofucode');
+  console.log(
+    `[INSTALL-DETECT] Global check (argv[1] contains node_modules/tofucode): ${isGlobal}`,
+  );
+
+  if (isGlobal) {
+    console.log('[INSTALL-DETECT] Result: global');
     return 'global';
   }
 
+  console.log('[INSTALL-DETECT] Result: unknown');
   return 'unknown';
 }
 

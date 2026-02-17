@@ -32,12 +32,23 @@ const execAsync = promisify(exec);
 export async function handleUpgrade(_ws, message, _context) {
   const version = message.version || 'latest';
 
-  console.log(`Upgrade request received (target version: ${version})`);
+  console.log('=== UPGRADE DEBUG START ===');
+  console.log(`[UPGRADE] Request received (target version: ${version})`);
+  console.log(`[UPGRADE] process.argv[0]: ${process.argv[0]}`);
+  console.log(`[UPGRADE] process.argv[1]: ${process.argv[1]}`);
+  console.log(`[UPGRADE] process.cwd(): ${process.cwd()}`);
+  console.log(`[UPGRADE] process.pid: ${process.pid}`);
 
   // Check if auto-upgrade is supported
-  if (!canAutoUpgrade()) {
-    const installType = getInstallationType();
+  const installType = getInstallationType();
+  console.log(`[UPGRADE] Detected installation type: ${installType}`);
+
+  const canUpgrade = canAutoUpgrade();
+  console.log(`[UPGRADE] Can auto-upgrade: ${canUpgrade}`);
+
+  if (!canUpgrade) {
     const command = getUpgradeCommand(version);
+    console.log('[UPGRADE] Auto-upgrade NOT supported - rejecting');
 
     broadcast({
       type: 'upgrade_error',
@@ -46,7 +57,12 @@ export async function handleUpgrade(_ws, message, _context) {
     return;
   }
 
+  console.log('[UPGRADE] Auto-upgrade supported - proceeding');
+  const upgradeCommand = getUpgradeCommand(version);
+  console.log(`[UPGRADE] Will run command: ${upgradeCommand}`);
+
   // Broadcast upgrade started
+  console.log(`[UPGRADE] Broadcasting 'upgrade_started' to all clients`);
   broadcast({
     type: 'upgrade_started',
     message: 'Downloading and installing update...',
@@ -54,38 +70,53 @@ export async function handleUpgrade(_ws, message, _context) {
 
   try {
     // Step 1: Run npm install
+    console.log('[UPGRADE] Step 1: Running npm install...');
     await installUpdate(version);
+    console.log('[UPGRADE] Step 1 complete: npm install succeeded');
 
     // Broadcast install success
+    console.log(`[UPGRADE] Broadcasting 'upgrade_installing' to all clients`);
     broadcast({
       type: 'upgrade_installing',
       message: 'Update installed. Restarting server...',
     });
 
     // Wait for message to be sent
+    console.log('[UPGRADE] Waiting 500ms for message to be sent...');
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Step 2: Restart with inverted spawn (from shared lib)
+    console.log(
+      `[UPGRADE] Step 2: Calling restartWithInvertedSpawn('upgrade', '${version}')...`,
+    );
     await restartWithInvertedSpawn('upgrade', version);
+    console.log('[UPGRADE] Step 2 complete: restartWithInvertedSpawn returned');
 
     // Broadcast success before exiting
+    console.log(`[UPGRADE] Broadcasting 'upgrade_success' to all clients`);
     broadcast({
       type: 'upgrade_success',
       message: 'Server upgraded successfully. Reconnecting...',
     });
 
     // Wait for message to be sent
+    console.log('[UPGRADE] Waiting 500ms for message to be sent...');
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Exit old process - new process will take over
-    console.log('Exiting old process, new process will take over...');
+    console.log(
+      `[UPGRADE] About to call process.exit(0) - PID ${process.pid} exiting now...`,
+    );
+    console.log('=== UPGRADE DEBUG END (old process exiting) ===');
     process.exit(0);
   } catch (error) {
-    console.error('Upgrade failed:', error);
+    console.error('[UPGRADE] ERROR in upgrade flow:', error);
+    console.error('[UPGRADE] Error stack:', error.stack);
     broadcast({
       type: 'upgrade_error',
       message: `Upgrade failed: ${error.message}`,
     });
+    console.log('=== UPGRADE DEBUG END (error) ===');
   }
 }
 
@@ -96,18 +127,36 @@ export async function handleUpgrade(_ws, message, _context) {
 async function installUpdate(version = 'latest') {
   const command = getUpgradeCommand(version);
 
-  console.log(`Installing update: ${command}`);
+  console.log('[UPGRADE-INSTALL] Starting npm install...');
+  console.log(`[UPGRADE-INSTALL] Command: ${command}`);
+  console.log('[UPGRADE-INSTALL] Timeout: 120000ms (2 minutes)');
 
   try {
+    const startTime = Date.now();
     const { stdout, stderr } = await execAsync(command, {
       timeout: 120000, // 2 minute timeout
     });
+    const duration = Date.now() - startTime;
 
-    if (stdout) console.log('npm stdout:', stdout);
-    if (stderr) console.error('npm stderr:', stderr);
+    console.log(`[UPGRADE-INSTALL] Command completed in ${duration}ms`);
 
-    console.log('Update installed successfully');
+    if (stdout) {
+      console.log('[UPGRADE-INSTALL] npm stdout:');
+      console.log(stdout);
+    }
+    if (stderr) {
+      console.log('[UPGRADE-INSTALL] npm stderr:');
+      console.log(stderr);
+    }
+
+    console.log('[UPGRADE-INSTALL] Update installed successfully');
   } catch (error) {
+    console.error('[UPGRADE-INSTALL] ERROR: Command failed');
+    console.error(`[UPGRADE-INSTALL] Error code: ${error.code}`);
+    console.error(`[UPGRADE-INSTALL] Error message: ${error.message}`);
+    console.error(`[UPGRADE-INSTALL] Error stdout: ${error.stdout}`);
+    console.error(`[UPGRADE-INSTALL] Error stderr: ${error.stderr}`);
+
     // Handle permission errors specifically
     if (
       error.message.includes('EACCES') ||

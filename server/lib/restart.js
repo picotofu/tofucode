@@ -18,11 +18,24 @@ import { logger } from './logger.js';
  * @returns {Promise<string>} Token for the new process
  */
 export async function restartWithInvertedSpawn(reason, newVersion = null) {
+  console.log('[RESTART] === Starting restart with inverted spawn ===');
+  console.log(`[RESTART] Reason: ${reason}`);
+  console.log(`[RESTART] New version: ${newVersion || 'N/A'}`);
+  console.log(`[RESTART] Current PID: ${process.pid}`);
+  console.log(`[RESTART] Current execPath: ${process.execPath}`);
+  console.log(`[RESTART] Current argv: ${JSON.stringify(process.argv)}`);
+
   // Generate unique restart token
   const restartToken = randomBytes(16).toString('hex');
+  console.log(`[RESTART] Generated restart token: ${restartToken}`);
 
   // Spawn new server process (detached, will outlive this process)
-  const newProc = spawn(process.execPath, process.argv.slice(1), {
+  const spawnArgs = process.argv.slice(1);
+  console.log(
+    `[RESTART] About to spawn: ${process.execPath} ${spawnArgs.join(' ')}`,
+  );
+
+  const newProc = spawn(process.execPath, spawnArgs, {
     detached: true,
     stdio: 'ignore',
     env: {
@@ -37,33 +50,56 @@ export async function restartWithInvertedSpawn(reason, newVersion = null) {
 
   newProc.unref(); // Allow this process to exit independently
 
+  console.log(`[RESTART] New process spawned with PID: ${newProc.pid}`);
   logger.log(
     `New server process spawned (PID: ${newProc.pid}, reason: ${reason}${newVersion ? `, version: ${newVersion}` : ''})`,
   );
 
   // Update PID file if it exists (for daemon mode)
   const pidFile = getPidFile();
+  console.log('[RESTART] Checking for PID file...');
+  console.log(
+    `[RESTART] PID file path: ${pidFile || 'null (not in daemon mode)'}`,
+  );
+
   if (pidFile && existsSync(pidFile)) {
+    console.log(
+      `[RESTART] PID file exists, updating to new PID ${newProc.pid}`,
+    );
     try {
       writeFileSync(pidFile, newProc.pid.toString(), 'utf8');
+      console.log('[RESTART] PID file updated successfully');
       logger.log(`Updated PID file: ${pidFile} -> ${newProc.pid}`);
     } catch (err) {
+      console.error('[RESTART] Failed to update PID file:', err);
       logger.log(`Warning: Failed to update PID file: ${err.message}`);
     }
+  } else {
+    console.log('[RESTART] No PID file to update (not in daemon mode)');
   }
 
   // Wait for new server to be ready (verify it started)
+  console.log('[RESTART] Waiting 2 seconds for new process to start...');
   await new Promise((resolve) => setTimeout(resolve, 2000));
 
   // Verify new process is still running
+  console.log(
+    `[RESTART] Verifying new process (PID ${newProc.pid}) is still running...`,
+  );
   try {
     // Send signal 0 to check if process exists (doesn't actually signal it)
     process.kill(newProc.pid, 0);
+    console.log(
+      `[RESTART] ✅ New process verified running (PID: ${newProc.pid})`,
+    );
     logger.log(`Verified new server process is running (PID: ${newProc.pid})`);
   } catch (_err) {
+    console.error(`[RESTART] ❌ New process NOT running (PID: ${newProc.pid})`);
     throw new Error(`New server process failed to start (PID: ${newProc.pid})`);
   }
 
+  console.log(`[RESTART] Restart token: ${restartToken}`);
+  console.log('[RESTART] === restartWithInvertedSpawn() returning ===');
   return restartToken;
 }
 
@@ -72,17 +108,31 @@ export async function restartWithInvertedSpawn(reason, newVersion = null) {
  * @returns {string|null} PID file path or null if not in daemon mode
  */
 function getPidFile() {
+  console.log('[RESTART-PID] Checking for PID file...');
+  console.log(
+    `[RESTART-PID] PID_FILE env var: ${process.env.PID_FILE || 'not set'}`,
+  );
+
   // Check environment variable (set by CLI)
   if (process.env.PID_FILE) {
-    return resolve(process.env.PID_FILE);
+    const resolved = resolve(process.env.PID_FILE);
+    console.log(`[RESTART-PID] Using PID_FILE from env: ${resolved}`);
+    return resolved;
   }
 
   // Check default location only if we think we're in daemon mode
   // (heuristic: if we were started with detached stdio, likely daemon)
   const defaultPidFile = join(homedir(), '.tofucode', 'tofucode.pid');
+  console.log(`[RESTART-PID] Checking default location: ${defaultPidFile}`);
+  console.log(
+    `[RESTART-PID] Default PID file exists: ${existsSync(defaultPidFile)}`,
+  );
+
   if (existsSync(defaultPidFile)) {
+    console.log(`[RESTART-PID] Using default PID file: ${defaultPidFile}`);
     return defaultPidFile;
   }
 
+  console.log('[RESTART-PID] No PID file found (not in daemon mode)');
   return null;
 }
