@@ -90,7 +90,9 @@ export function canAutoUpgrade() {
   // TEMPORARY: Allow source upgrades for local testing
   // Remove this before release!
   if (process.env.ALLOW_SOURCE_UPGRADE === 'true') {
-    console.log('[INSTALL-DETECT] ⚠️  ALLOW_SOURCE_UPGRADE enabled - allowing upgrade from source');
+    console.log(
+      '[INSTALL-DETECT] ⚠️  ALLOW_SOURCE_UPGRADE enabled - allowing upgrade from source',
+    );
     return true;
   }
 
@@ -108,7 +110,9 @@ export function canAutoUpgrade() {
 export function getUpgradeCommand(version = 'latest') {
   // TEMPORARY: Treat as global install when testing from source
   if (process.env.ALLOW_SOURCE_UPGRADE === 'true') {
-    console.log('[INSTALL-DETECT] ⚠️  Using global upgrade command for source testing');
+    console.log(
+      '[INSTALL-DETECT] ⚠️  Using global upgrade command for source testing',
+    );
     return `npm install -g tofucode@${version}`;
   }
 

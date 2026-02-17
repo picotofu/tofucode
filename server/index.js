@@ -407,7 +407,7 @@ async function startServer() {
           `❌ Port ${config.port} is already in use. Stop the existing process first.`,
         );
         logger.error(`   Check with: lsof -i :${config.port}`);
-        logger.error(`   Or try: tofucode stop`);
+        logger.error('   Or try: tofucode stop');
         process.exit(1);
       } else {
         logger.error(`❌ Server error: ${err.message}`);

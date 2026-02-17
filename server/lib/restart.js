@@ -80,7 +80,8 @@ export async function restartWithInvertedSpawn(reason, newVersion = null) {
 
   // For upgrades, spawn the 'tofucode' command to use newly installed version
   // For regular restarts, re-run the same script
-  let spawnCmd, spawnArgs;
+  let spawnCmd;
+  let spawnArgs;
   if (reason === 'upgrade') {
     // Spawn 'tofucode' command (which now points to upgraded version)
     // Reconstruct CLI args from env vars (CLI converts flags to env)
@@ -89,7 +90,9 @@ export async function restartWithInvertedSpawn(reason, newVersion = null) {
     console.log(
       `[RESTART] Upgrade: spawning tofucode command: ${spawnCmd} ${spawnArgs.join(' ')}`,
     );
-    console.log(`[RESTART] Reconstructed CLI args from env: ${JSON.stringify(spawnArgs)}`);
+    console.log(
+      `[RESTART] Reconstructed CLI args from env: ${JSON.stringify(spawnArgs)}`,
+    );
   } else {
     // Regular restart: re-run same script
     spawnCmd = process.execPath;
@@ -119,7 +122,9 @@ export async function restartWithInvertedSpawn(reason, newVersion = null) {
   console.log(`[RESTART]   DEBUG: ${spawnOptions.env.DEBUG}`);
   console.log(`[RESTART]   AUTH_DISABLED: ${spawnOptions.env.AUTH_DISABLED}`);
   console.log(`[RESTART]   PID_FILE: ${spawnOptions.env.PID_FILE}`);
-  console.log(`[RESTART]   ALLOW_SOURCE_UPGRADE: ${spawnOptions.env.ALLOW_SOURCE_UPGRADE}`);
+  console.log(
+    `[RESTART]   ALLOW_SOURCE_UPGRADE: ${spawnOptions.env.ALLOW_SOURCE_UPGRADE}`,
+  );
 
   // For upgrades, need shell to resolve 'tofucode' command in PATH
   if (reason === 'upgrade') {
@@ -175,13 +180,21 @@ export async function restartWithInvertedSpawn(reason, newVersion = null) {
       console.log(
         `[RESTART] ✅ New process verified running (PID: ${newProc.pid})`,
       );
-      logger.log(`Verified new server process is running (PID: ${newProc.pid})`);
+      logger.log(
+        `Verified new server process is running (PID: ${newProc.pid})`,
+      );
     } catch (_err) {
-      console.error(`[RESTART] ❌ New process NOT running (PID: ${newProc.pid})`);
-      throw new Error(`New server process failed to start (PID: ${newProc.pid})`);
+      console.error(
+        `[RESTART] ❌ New process NOT running (PID: ${newProc.pid})`,
+      );
+      throw new Error(
+        `New server process failed to start (PID: ${newProc.pid})`,
+      );
     }
   } else {
-    console.log('[RESTART] Upgrade mode: skipping verification, new process will retry binding');
+    console.log(
+      '[RESTART] Upgrade mode: skipping verification, new process will retry binding',
+    );
   }
 
   console.log(`[RESTART] Restart token: ${restartToken}`);
