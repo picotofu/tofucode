@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tab key handling in chat input** - Tab/Shift+Tab to indent/dedent list items in chat markdown editor (matches file editor behavior)
 - **Cmd+2 terminal tab toggle** - Subsequent Cmd+2 presses toggle between active/history tabs when already in terminal mode
 - **Folder path search in file picker** - File picker now shows files inside folders that match the search query
+- **Cmd+L to scroll terminal to bottom** - Jump to bottom of terminal output in both active and history tabs
+- **Terminal command navigation** - Navigate through terminal history with Cmd+Up/Down arrows or on-screen buttons with command counter (e.g., "3/15")
 
 ### Changed
 - **CLI subcommands** - Use `tofucode start|stop|restart|status` instead of `--stop`, `--restart`, `--status` flags (legacy flags still supported for backwards compatibility)
