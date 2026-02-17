@@ -52,6 +52,17 @@ async function gracefulShutdown(signal) {
       logger.log('Cleaned up process manager');
     }
 
+    // Stop Discord bot
+    if (process.env.DISCORD_ENABLED === 'true') {
+      try {
+        const { stopDiscordBot } = await import('./discord/bot.js');
+        await stopDiscordBot();
+        logger.log('Discord bot stopped');
+      } catch (err) {
+        logger.error('Error stopping Discord bot:', err);
+      }
+    }
+
     // Close HTTP server
     if (httpServer) {
       httpServer.close(() => {
@@ -418,7 +429,7 @@ async function startServer() {
   }
 }
 
-function onServerReady() {
+async function onServerReady() {
   logger.log(
     `tofucode v${getCurrentVersion()} running on http://localhost:${config.port}`,
   );
@@ -435,6 +446,19 @@ function onServerReady() {
   }
   if (process.env.DEBUG === 'true') {
     logger.log('🐛 DEBUG mode enabled - logging to tofucode.log');
+  }
+
+  // Start Discord bot
+  if (process.env.DISCORD_ENABLED === 'true') {
+    try {
+      const { startDiscordBot } = await import('./discord/bot.js');
+      const discordClient = await startDiscordBot();
+      if (discordClient) {
+        logger.log('Discord bot started');
+      }
+    } catch (err) {
+      logger.error('Error starting Discord bot:', err);
+    }
   }
 }
 

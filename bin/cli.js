@@ -64,6 +64,7 @@ const options = {
   config: null,
   bypassToken: null,
   root: null,
+  discord: false,
 };
 
 // Parse options from commandArgs (after removing subcommand if present)
@@ -91,6 +92,8 @@ for (let i = 0; i < commandArgs.length; i++) {
     options.bypassToken = commandArgs[++i];
   } else if (arg === '--root') {
     options.root = resolve(commandArgs[++i]);
+  } else if (arg === '--discord') {
+    options.discord = true;
   } else if (arg === '--help') {
     console.log(`
 tofucode - Web UI for Claude Code
@@ -113,6 +116,7 @@ Options (for start command):
   -c, --config <path>        Load configuration from JSON file
   --bypass-token <token>     Set bypass token for auth-free access (automation/testing)
   --root <path>              Restrict access to specified directory (best effort)
+  --discord                  Enable Discord bot integration
   -v, --version              Show version number
   --help                     Show this help message
 
@@ -252,6 +256,10 @@ if (options.models) {
   if (options.models.opus) {
     env.MODEL_OPUS_SLUG = options.models.opus;
   }
+}
+
+if (options.discord) {
+  env.DISCORD_ENABLED = 'true';
 }
 
 // Pass PID file path to server (for restart to update it)
