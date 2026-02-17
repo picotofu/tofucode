@@ -94,7 +94,7 @@ Options:
   -d, --daemon               Run as background daemon
   --debug                    Enable debug logging
   -q, --quiet                Suppress output (except errors)
-  --log-file <path>          Custom log file path (default: tofucode.log)
+  --log-file <path>          Custom log file path (default: ~/.tofucode/tofucode.log)
   --pid-file <path>          Custom PID file path (default: ~/.tofucode/tofucode.pid)
   -c, --config <path>        Load configuration from JSON file
   --bypass-token <token>     Set bypass token for auth-free access (automation/testing)
@@ -215,7 +215,8 @@ const serverPath = join(rootDir, 'server', 'index.js');
 
 if (options.daemon) {
   // Daemon mode: detached process
-  const logPath = options.logFile ? resolve(options.logFile) : join(process.cwd(), 'tofucode.log');
+  const defaultLogPath = join(homedir(), '.tofucode', 'tofucode.log');
+  const logPath = options.logFile ? resolve(options.logFile) : defaultLogPath;
   const { openSync, closeSync, mkdirSync } = await import('fs');
 
   // Ensure PID file directory exists
