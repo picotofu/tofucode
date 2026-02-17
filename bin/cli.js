@@ -454,7 +454,8 @@ async function handleStatus() {
 
   if (!existsSync(pidFile)) {
     console.log('Status: Not running (no PID file found)');
-    console.log(`PID file: ${pidFile}`);
+    console.log(`Expected PID file: ${pidFile}`);
+    console.log(`Default log file: ${join(homedir(), '.tofucode', 'tofucode.log')}`);
     process.exit(1);
   }
 
@@ -464,9 +465,55 @@ async function handleStatus() {
     // Check if process exists
     try {
       process.kill(pid, 0);
-      console.log('Status: Running');
-      console.log(`PID: ${pid}`);
-      console.log(`PID file: ${pidFile}`);
+      console.log('Status: Running ✓');
+      console.log('');
+      console.log('Process Information:');
+      console.log(`  PID: ${pid}`);
+      console.log(`  PID file: ${pidFile}`);
+
+      // Try to read process environment (Linux only)
+      const envPath = `/proc/${pid}/environ`;
+      if (existsSync(envPath)) {
+        try {
+          const environ = readFileSync(envPath, 'utf8');
+          const env = {};
+          environ.split('\0').forEach(line => {
+            const [key, ...valueParts] = line.split('=');
+            if (key) env[key] = valueParts.join('=');
+          });
+
+          console.log('');
+          console.log('Configuration:');
+          console.log(`  Port: ${env.PORT || '3000'}`);
+          console.log(`  Host: ${env.HOST || '0.0.0.0'}`);
+          console.log(`  Auth: ${env.AUTH_DISABLED === 'true' ? 'Disabled' : 'Enabled'}`);
+          console.log(`  Debug: ${env.DEBUG === 'true' ? 'Enabled' : 'Disabled'}`);
+
+          if (env.ROOT_PATH) {
+            console.log(`  Root path: ${env.ROOT_PATH}`);
+          }
+
+          const logFile = env.LOG_FILE || join(homedir(), '.tofucode', 'tofucode.log');
+          console.log(`  Log file: ${logFile}`);
+
+          if (env.DEBUG_TOKEN) {
+            console.log(`  Bypass token: ${env.DEBUG_TOKEN.slice(0, 8)}...`);
+          }
+        } catch (err) {
+          // Permission denied or other error reading environ
+          console.log('');
+          console.log('Configuration: (unable to read process environment)');
+          console.log(`  Default port: 3000`);
+          console.log(`  Default log file: ${join(homedir(), '.tofucode', 'tofucode.log')}`);
+        }
+      } else {
+        // Not Linux or /proc not available
+        console.log('');
+        console.log('Configuration: (platform-specific details unavailable)');
+        console.log(`  Default port: 3000`);
+        console.log(`  Default log file: ${join(homedir(), '.tofucode', 'tofucode.log')}`);
+      }
+
       process.exit(0);
     } catch (err) {
       console.log('Status: Not running (stale PID file)');
