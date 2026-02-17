@@ -2828,6 +2828,8 @@ watch(
   font-size: 13px;
   line-height: 1.5;
   padding: 0;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .TinyMDE.TinyMDE_empty::before {
