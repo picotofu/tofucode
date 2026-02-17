@@ -1,6 +1,6 @@
 {
   "name": "tofucode",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Web UI for Claude Code - run Claude Agent SDK with a browser interface",
   "type": "module",
   "bin": {
