@@ -6,6 +6,7 @@
 
 import { logger } from '../../lib/logger.js';
 import { handleCancel } from '../commands/cancel.js';
+import { handleResume } from '../commands/resume.js';
 import { handleSession } from '../commands/session.js';
 import { handleSetup } from '../commands/setup.js';
 
@@ -24,6 +25,9 @@ export async function handleInteraction(interaction) {
         break;
       case 'cancel':
         await handleCancel(interaction);
+        break;
+      case 'resume':
+        await handleResume(interaction);
         break;
       default:
         await interaction.reply({

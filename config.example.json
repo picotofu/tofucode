@@ -8,6 +8,11 @@
   "logFile": null,
   "pidFile": null,
   "bypassToken": null,
+  "root": null,
+  "discord": false,
+  "discordToken": null,
+  "discordGuildId": null,
+  "discordStatus": null,
   "models": {
     "haiku": "claude-haiku-4-5",
     "sonnet": "claude-sonnet-4-6",

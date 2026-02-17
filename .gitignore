@@ -15,6 +15,9 @@ dist/
 .env.test.local
 .env.production.local
 
+# Config
+config.json
+
 # Auth credentials (password hash + sessions)
 .auth.json
 

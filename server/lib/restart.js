@@ -50,6 +50,10 @@ function buildCliArgsFromEnv() {
     args.push('--root', process.env.ROOT_PATH);
   }
 
+  if (process.env.DISCORD_ENABLED === 'true') {
+    args.push('--discord');
+  }
+
   // If PID_FILE is set, we're in daemon mode
   if (process.env.PID_FILE) {
     args.push('-d');

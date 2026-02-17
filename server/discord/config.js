@@ -8,6 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { logger } from '../lib/logger.js';
 
 // Discord configuration from environment variables
 export const discordConfig = {
@@ -48,7 +49,7 @@ export function loadChannelMappings() {
       return JSON.parse(data);
     }
   } catch (error) {
-    console.error('Error loading channel mappings:', error.message);
+    logger.error('[Discord] Error loading channel mappings:', error.message);
   }
   return {};
 }
@@ -98,7 +99,7 @@ export function loadSessionMappings() {
       return JSON.parse(data);
     }
   } catch (error) {
-    console.error('Error loading session mappings:', error.message);
+    logger.error('[Discord] Error loading session mappings:', error.message);
   }
   return {};
 }

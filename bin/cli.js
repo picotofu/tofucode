@@ -65,6 +65,9 @@ const options = {
   bypassToken: null,
   root: null,
   discord: false,
+  discordToken: null,
+  discordGuildId: null,
+  discordStatus: null,
 };
 
 // Parse options from commandArgs (after removing subcommand if present)
@@ -151,7 +154,10 @@ Configuration File:
     "auth": false,
     "debug": true,
     "bypassToken": "your-secret-token",
-    "root": "/path/to/project"
+    "root": "/path/to/project",
+    "discord": true,
+    "discordToken": "your-discord-bot-token",
+    "discordGuildId": "your-guild-id"
   }
 
 Examples:
@@ -262,6 +268,18 @@ if (options.discord) {
   env.DISCORD_ENABLED = 'true';
 }
 
+if (options.discordToken) {
+  env.DISCORD_BOT_TOKEN = options.discordToken;
+}
+
+if (options.discordGuildId) {
+  env.DISCORD_GUILD_ID = options.discordGuildId;
+}
+
+if (options.discordStatus) {
+  env.DISCORD_STATUS = options.discordStatus;
+}
+
 // Pass PID file path to server (for restart to update it)
 if (options.pidFile) {
   env.PID_FILE = resolve(options.pidFile);
@@ -278,6 +296,9 @@ if (!options.quiet) {
   }
   if (options.root) {
     console.log(`Restricted mode: ${options.root} (best effort)`);
+  }
+  if (options.discord) {
+    console.log('Discord bot integration enabled');
   }
   console.log('');
 }
@@ -401,6 +422,18 @@ async function loadConfig(options) {
     }
     if (config.root !== undefined && !argSet.has('--root')) {
       options.root = resolve(config.root);
+    }
+    if (config.discord !== undefined && !argSet.has('--discord')) {
+      options.discord = config.discord;
+    }
+    if (config.discordToken !== undefined) {
+      options.discordToken = config.discordToken;
+    }
+    if (config.discordGuildId !== undefined) {
+      options.discordGuildId = config.discordGuildId;
+    }
+    if (config.discordStatus !== undefined) {
+      options.discordStatus = config.discordStatus;
     }
 
     // Model configuration (store for later env setup)

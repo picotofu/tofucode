@@ -61,19 +61,8 @@ export async function handleSetup(interaction) {
 
   const projectSlug = pathToSlug(projectPath);
 
-  // Check if already configured
+  // Save mapping (overwrite if exists)
   const existingMapping = getChannelMapping(channelId);
-  if (existingMapping) {
-    await interaction.reply({
-      content:
-        '⚠️ This channel is already configured:\n\n' +
-        `**Current Project**: \`${existingMapping.projectPath}\`\n` +
-        `**Current Slug**: \`${existingMapping.projectSlug}\`\n\n` +
-        'Run this command again to overwrite.',
-      flags: 64, // ephemeral
-    });
-    // Allow overwrite - proceed to save
-  }
 
   saveChannelMapping(channelId, {
     projectPath,
@@ -83,10 +72,14 @@ export async function handleSetup(interaction) {
     configuredAt: new Date().toISOString(),
   });
 
+  const overwriteNote = existingMapping
+    ? `\n\n_Previously mapped to \`${existingMapping.projectPath}\`_`
+    : '';
+
   await interaction.reply(
     '✅ Channel configured!\n' +
       `**Project**: \`${projectPath}\`\n` +
-      `**Slug**: \`${projectSlug}\`\n\n` +
+      `**Slug**: \`${projectSlug}\`${overwriteNote}\n\n` +
       'Create threads in this channel to start sessions with Claude Code.\n' +
       'Use `/session` to list existing sessions.',
   );

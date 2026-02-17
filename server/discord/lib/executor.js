@@ -5,11 +5,11 @@
  * structured events for Discord consumption. This is the Discord equivalent
  * of server/events/prompt.js but without any WebSocket dependencies.
  *
- * Architecture: Discord → executor.js → SDK query() → Claude API
- *                                ↓
+ * Architecture: Discord -> executor.js -> SDK query() -> Claude API
+ *                                |
  *                         Structured events
- *                                ↓
- *                         Discord formatter → Discord API
+ *                                |
+ *                         Discord formatter -> Discord API
  */
 
 import path from 'node:path';
@@ -29,10 +29,11 @@ import { addTaskResult, getOrCreateTask, tasks } from '../../lib/tasks.js';
  * @param {Object} [params.options] - { permissionMode, model }
  *
  * @yields {Object} events:
- *   { type: 'session_init', sessionId, isNew }
+ *   { type: 'session_init', sessionId, isNew, projectPath }
  *   { type: 'text', content, model }
  *   { type: 'tool_use', tool, input, id, model }
  *   { type: 'tool_result', toolUseId, content, isError }
+ *   { type: 'ask_user_question', toolUseId, questions }
  *   { type: 'result', subtype, result, cost, duration }
  *   { type: 'error', message }
  *   { type: 'task_status', status, taskId }
@@ -47,7 +48,6 @@ export async function* executePrompt({
   let taskSessionId = sessionId;
 
   // SECURITY: Validate that projectPath is within root (if --root is set)
-  // Same check as server/events/prompt.js lines 94-106
   if (config.rootPath) {
     const resolvedProject = path.resolve(projectPath);
     const resolvedRoot = path.resolve(config.rootPath);
@@ -62,12 +62,25 @@ export async function* executePrompt({
     }
   }
 
-  // Determine permission mode (same logic as server/events/prompt.js lines 110-121)
+  // Concurrent task guard: prevent double-prompting on the same session
+  if (taskSessionId) {
+    const existingTask = tasks.get(taskSessionId);
+    if (existingTask?.status === 'running') {
+      yield {
+        type: 'error',
+        message:
+          'A task is already running on this session. Please wait for it to complete or cancel it first.',
+      };
+      return;
+    }
+  }
+
+  // Determine permission mode (same logic as server/events/prompt.js)
   const permissionMode = options.permissionMode || config.permissionMode;
   const allowDangerouslySkipPermissions =
     permissionMode === 'bypassPermissions';
 
-  // Load MCP servers (same as server/events/prompt.js lines 124-138)
+  // Load MCP servers
   const mcpServers = loadMcpServers(projectPath);
 
   const queryOptions = {
@@ -79,7 +92,7 @@ export async function* executePrompt({
     ...(Object.keys(mcpServers).length > 0 && { mcpServers }),
   };
 
-  // Set model if specified (opus defaults to 4.6, same as server/events/prompt.js lines 142-145)
+  // Set model if specified (opus defaults to 4.6)
   if (options.model) {
     queryOptions.model =
       options.model === 'opus' ? 'claude-opus-4-6' : options.model;
@@ -96,7 +109,6 @@ export async function* executePrompt({
   );
 
   // Initialize task tracking (reuses server/lib/tasks.js)
-  // Same as server/events/prompt.js lines 159-182
   const task = taskSessionId
     ? getOrCreateTask(taskSessionId)
     : {
@@ -106,6 +118,7 @@ export async function* executePrompt({
         error: null,
         startTime: null,
         abortController: null,
+        stream: null,
       };
 
   const abortController = new AbortController();
@@ -116,17 +129,33 @@ export async function* executePrompt({
   task.abortController = abortController;
   queryOptions.abortController = abortController;
 
+  // Add user message to task results (matches prompt.js behavior)
+  const userMessage = {
+    type: 'user',
+    content: prompt,
+    timestamp: new Date().toISOString(),
+    sessionId: taskSessionId,
+  };
+  addTaskResult(task, userMessage);
+
   yield { type: 'task_status', status: 'running', taskId: task.id };
 
   let stream;
   try {
     stream = query({ prompt, options: queryOptions });
+    task.stream = stream; // Store Query object for streamInput() access
   } catch (error) {
     task.status = 'error';
     task.error = error.message;
     logger.error('[Discord] Query creation error:', error);
-    yield { type: 'error', message: mapApiError(error.message) };
-    yield { type: 'task_status', status: 'error' };
+    const errorResult = {
+      type: 'error',
+      message: mapApiError(error.message),
+      timestamp: new Date().toISOString(),
+    };
+    addTaskResult(task, errorResult);
+    yield errorResult;
+    yield { type: 'task_status', status: 'error', taskId: task.id };
     return;
   }
 
@@ -136,11 +165,19 @@ export async function* executePrompt({
       if (abortController.signal.aborted) {
         logger.log(`[Discord] Task ${task.id} was cancelled`);
         task.status = 'cancelled';
-        yield { type: 'task_status', status: 'cancelled' };
+        yield { type: 'task_status', status: 'cancelled', taskId: task.id };
         return;
       }
 
-      // Capture session ID from init message (same as server/events/prompt.js lines 298-317)
+      // Log SDK error messages
+      if (message.type === 'error') {
+        logger.error(
+          '[Discord] SDK Error message:',
+          JSON.stringify(message, null, 2),
+        );
+      }
+
+      // Capture session ID from init message
       if (message.type === 'system' && message.subtype === 'init') {
         const newSessionId = message.session_id;
         if (newSessionId) {
@@ -149,11 +186,16 @@ export async function* executePrompt({
             taskSessionId = newSessionId;
             tasks.set(taskSessionId, task);
           }
-          yield { type: 'session_init', sessionId: newSessionId, isNew };
+          yield {
+            type: 'session_init',
+            sessionId: newSessionId,
+            isNew,
+            projectPath,
+          };
         }
       }
 
-      // Process assistant messages (same as server/events/prompt.js lines 320-366)
+      // Process assistant messages
       if (message.type === 'assistant') {
         const content = message.message?.content || [];
         const modelName = extractModelName(message.message?.model);
@@ -164,6 +206,7 @@ export async function* executePrompt({
               type: 'text',
               content: block.text,
               model: modelName,
+              timestamp: new Date().toISOString(),
             };
             addTaskResult(task, result);
             yield result;
@@ -174,14 +217,34 @@ export async function* executePrompt({
               input: block.input,
               id: block.id,
               model: modelName,
+              timestamp: new Date().toISOString(),
             };
             addTaskResult(task, result);
             yield result;
+
+            // Handle AskUserQuestion tool (matches prompt.js behavior)
+            // Discord can't interactively answer, so we yield it for the handler
+            // to display as an informational message
+            if (
+              block.name === 'AskUserQuestion' &&
+              block.input?.questions?.length
+            ) {
+              yield {
+                type: 'ask_user_question',
+                toolUseId: block.id,
+                questions: block.input.questions,
+              };
+            }
+          } else {
+            logger.log(
+              '[Discord] Unhandled assistant content block:',
+              JSON.stringify(block).substring(0, 200),
+            );
           }
         }
       }
 
-      // Process tool results (same as server/events/prompt.js lines 367-391)
+      // Process tool results
       if (message.type === 'user') {
         const msgContent = message.message?.content;
         if (Array.isArray(msgContent)) {
@@ -200,6 +263,7 @@ export async function* executePrompt({
                 toolUseId: block.tool_use_id,
                 content,
                 isError: block.is_error || false,
+                timestamp: new Date().toISOString(),
               };
               addTaskResult(task, result);
               yield result;
@@ -208,7 +272,7 @@ export async function* executePrompt({
         }
       }
 
-      // Process result (same as server/events/prompt.js lines 394-406)
+      // Process result
       if (message.type === 'result') {
         const result = {
           type: 'result',
@@ -216,6 +280,7 @@ export async function* executePrompt({
           result: message.result,
           cost: message.total_cost_usd,
           duration: message.duration_ms,
+          timestamp: new Date().toISOString(),
         };
         addTaskResult(task, result);
         yield result;
@@ -223,14 +288,22 @@ export async function* executePrompt({
     }
 
     task.status = 'completed';
-    yield { type: 'task_status', status: 'completed' };
+    task.stream = null; // Release stream reference to free memory
+    yield { type: 'task_status', status: 'completed', taskId: task.id };
     logger.log(`[Discord] Task ${task.id} completed`);
   } catch (error) {
     task.status = 'error';
     task.error = error.message;
+    task.stream = null; // Release stream reference on error too
     logger.error(`[Discord] Task ${task.id} error:`, error);
-    yield { type: 'error', message: mapApiError(error.message) };
-    yield { type: 'task_status', status: 'error' };
+    const errorResult = {
+      type: 'error',
+      message: mapApiError(error.message),
+      timestamp: new Date().toISOString(),
+    };
+    addTaskResult(task, errorResult);
+    yield errorResult;
+    yield { type: 'task_status', status: 'error', taskId: task.id };
   }
 }
 
@@ -249,7 +322,6 @@ function extractModelName(fullModel) {
 
 /**
  * Map API error messages to user-friendly text
- * Same as server/events/prompt.js lines 229-252 and 439-462
  * @param {string} message - Error message
  * @returns {string} User-friendly message
  */
@@ -271,6 +343,9 @@ function mapApiError(message) {
   }
   if (message.includes('API Error: 400')) {
     return `Invalid request: ${message}`;
+  }
+  if (message.includes('process exited with code')) {
+    return 'Claude Code process crashed unexpectedly. Check server logs for details.';
   }
   return `Error: ${message}`;
 }

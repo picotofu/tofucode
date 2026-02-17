@@ -44,10 +44,21 @@
 - Result summaries (duration, cost)
 - Task cancellation via `/cancel` command
 - Session listing via `/session` command
+- Session resume via `/resume` command (manual sync MVP - create Discord thread for existing session)
 - CLI flag: `--discord` to enable bot
 - Environment variables: `DISCORD_ENABLED`, `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`
+- Reusable sync utilities (`server/discord/lib/sync.js`) for thread/message creation (Phase 2-ready)
 
-**Out of Scope (Phase 2+):**
+**Out of Scope (Phase 2 - Web UI → Adapter Sync):**
+- Internal event bus (`server/lib/event-bus.js`) for transport-agnostic event publishing
+  - `prompt.js` emits session/message events to the bus
+  - Adapters (Discord, future Telegram, etc.) subscribe independently
+  - Core code never imports adapter code — one-way dependency only
+- Web UI session creation → auto-create Discord thread in mapped channel
+- Web UI messages → mirror to corresponding Discord thread
+- Adapter interface: standardized subscribe/publish contract for new adapters
+
+**Out of Scope (Phase 3+):**
 - Rich embeds for tool outputs
 - Auto-thread creation from parent channel messages
 - Discord permission role → tofucode mode mapping (admin → bypass, etc.)
@@ -55,6 +66,8 @@
 - Image/file attachments for tool results
 - Voice channel integration
 - Multi-guild support with per-guild configs
+- Telegram bot adapter
+- Slack bot adapter
 
 ## Plan
 
@@ -81,6 +94,8 @@ Discord User → Discord Message → messageCreate.js → executor.js → query(
 9. **`server/discord/commands/setup.js`** - `/setup` command for channel mapping
 10. **`server/discord/commands/session.js`** - `/session` command to list sessions
 11. **`server/discord/commands/cancel.js`** - `/cancel` command to abort running task
+12. **`server/discord/commands/resume.js`** - `/resume` command to create thread from existing session (manual sync MVP)
+13. **`server/discord/lib/sync.js`** - Reusable thread/message sync utilities (used by `/resume` and future Phase 2 event bus)
 
 ### Mapping Strategy
 
@@ -281,14 +296,12 @@ server/discord/
 
 ## Status
 
-**Current:** Planning (not implemented)
+**Phase 1 (MVP):** Implemented, testing in progress
 
 **Next Steps:**
-1. Get user approval on plan
-2. Implement Phase 1 (MVP) following the 17-step sequence
-3. Test manually with real Discord bot
-4. Document user setup process in README
-5. Consider Phase 2 enhancements based on feedback
+1. Complete manual testing with real Discord bot
+2. Fix any issues found during testing
+3. Phase 2: Event bus for Web UI → adapter sync (Discord, Telegram, etc.)
 
 ## Dependencies
 

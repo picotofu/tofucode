@@ -2,11 +2,12 @@
  * Discord Message Handler
  *
  * Routes messages based on whether they are in a thread or parent channel.
- * Thread messages → execute prompt via SDK
- * Parent channel messages → redirect to create thread
+ * Thread messages -> execute prompt via SDK
+ * Parent channel messages -> redirect to create thread
  */
 
 import { logger } from '../../lib/logger.js';
+import { tasks } from '../../lib/tasks.js';
 import { discordConfig, getChannelMapping } from '../config.js';
 import { executePrompt } from '../lib/executor.js';
 import {
@@ -45,6 +46,11 @@ export async function handleMessage(message) {
     return;
   }
 
+  // Guard against empty message content
+  if (!message.content || message.content.trim().length === 0) {
+    return;
+  }
+
   const channel = message.channel;
 
   // Check if this is a thread
@@ -58,8 +64,8 @@ export async function handleMessage(message) {
         .reply(
           'Please create a thread to start a new session.\n\n' +
             '**How to create a thread:**\n' +
-            '• Right-click this message → "Create Thread"\n' +
-            '• Or click the 🧵 button below this message\n' +
+            '• Right-click this message -> "Create Thread"\n' +
+            '• Or click the thread button below this message\n' +
             "• Or use Discord's thread creation UI\n\n" +
             'Each thread = one Claude Code session.',
         )
@@ -82,7 +88,7 @@ async function handleThreadMessage(message) {
   if (threadLocks.get(threadId)) {
     await message
       .reply(
-        '⏳ A task is already running in this thread. Wait for it to finish or use `/cancel`.',
+        'A task is already running in this thread. Wait for it to finish or use `/cancel`.',
       )
       .catch((err) => logger.error('[Discord] Reply error:', err));
     return;
@@ -103,7 +109,7 @@ async function handleThreadMessage(message) {
 
   // Look up thread-session mapping
   const sessionMapping = getSession(threadId);
-  const sessionId = sessionMapping?.sessionId || null;
+  const sessionId = sessionMapping?.sessionId ?? null;
 
   // Lock this thread
   threadLocks.set(threadId, true);
@@ -116,7 +122,7 @@ async function handleThreadMessage(message) {
 
   try {
     // Send "thinking" indicator
-    thinkingMsg = await message.reply('⏳ Thinking...').catch((err) => {
+    thinkingMsg = await message.reply('Thinking...').catch((err) => {
       logger.error('[Discord] Reply error:', err);
       return null;
     });
@@ -143,7 +149,11 @@ async function handleThreadMessage(message) {
             logger.log(
               `[Discord] New session registered: ${newSessionId} for thread ${threadId}`,
             );
-          } else {
+          } else if (
+            newSessionId !== sessionId &&
+            sessionMapping?.sessionId !== newSessionId
+          ) {
+            // Only update if session ID actually changed
             updateSessionId(threadId, newSessionId);
           }
           break;
@@ -155,14 +165,7 @@ async function handleThreadMessage(message) {
           const now = Date.now();
           if (now - lastEditTime > discordConfig.streamingEditInterval) {
             lastEditTime = now;
-            const display = buildDisplayMessage(fullText, toolLines);
-            const chunks = chunkMessage(display);
-            // Edit the thinking message with first chunk
-            if (thinkingMsg) {
-              await thinkingMsg.edit(chunks[0]).catch((err) => {
-                logger.error('[Discord] Edit error:', err);
-              });
-            }
+            await editThinkingMessage(thinkingMsg, fullText, toolLines);
           }
           break;
         }
@@ -175,13 +178,7 @@ async function handleThreadMessage(message) {
             const now = Date.now();
             if (now - lastEditTime > discordConfig.streamingEditInterval) {
               lastEditTime = now;
-              const display = buildDisplayMessage(fullText, toolLines);
-              const chunks = chunkMessage(display);
-              if (thinkingMsg) {
-                await thinkingMsg.edit(chunks[0]).catch((err) => {
-                  logger.error('[Discord] Edit error:', err);
-                });
-              }
+              await editThinkingMessage(thinkingMsg, fullText, toolLines);
             }
           }
           break;
@@ -195,6 +192,20 @@ async function handleThreadMessage(message) {
           break;
         }
 
+        case 'ask_user_question': {
+          // Display the questions in Discord (informational, not interactive)
+          const questionLines = event.questions.map((q) => {
+            const optionList = q.options
+              ?.map((o) => `  - ${o.label}`)
+              .join('\n');
+            return `**${q.question}**\n${optionList || ''}`;
+          });
+          toolLines.push(
+            `> :question: **Question asked:**\n${questionLines.join('\n')}`,
+          );
+          break;
+        }
+
         case 'result': {
           const summary = formatResult(event);
           // Final update with complete text
@@ -202,12 +213,12 @@ async function handleThreadMessage(message) {
           const chunks = chunkMessage(display);
 
           // Edit first chunk into the thinking message
-          if (thinkingMsg) {
+          if (thinkingMsg && chunks[0]) {
             await thinkingMsg.edit(chunks[0]).catch((err) => {
               logger.error('[Discord] Edit error:', err);
             });
 
-            // Send remaining chunks as new messages
+            // Send remaining chunks as new messages with small delay
             for (let i = 1; i < chunks.length; i++) {
               await thread.send(chunks[i]).catch((err) => {
                 logger.error('[Discord] Send error:', err);
@@ -232,10 +243,29 @@ async function handleThreadMessage(message) {
         }
 
         case 'task_status': {
-          // Could show typing indicator on 'running', remove on completion
+          // Show typing indicator while running
           if (event.status === 'running') {
             // Discord typing indicator (lasts 10 seconds)
             thread.sendTyping().catch(() => {});
+          }
+          // Clean up task from memory when completed/errored
+          if (
+            event.status === 'completed' ||
+            event.status === 'error' ||
+            event.status === 'cancelled'
+          ) {
+            if (newSessionId) {
+              // Give a short delay before cleanup so cancel.js can still read status
+              setTimeout(() => {
+                const task = tasks.get(newSessionId);
+                if (
+                  task &&
+                  (task.status === 'completed' || task.status === 'error')
+                ) {
+                  tasks.delete(newSessionId);
+                }
+              }, 30000); // Clean up after 30 seconds
+            }
           }
           break;
         }
@@ -246,13 +276,15 @@ async function handleThreadMessage(message) {
     if (fullText && lastEditTime > 0 && thinkingMsg) {
       const display = buildDisplayMessage(fullText, toolLines);
       const chunks = chunkMessage(display);
-      await thinkingMsg.edit(chunks[0]).catch((err) => {
-        logger.error('[Discord] Edit error:', err);
-      });
-      for (let i = 1; i < chunks.length; i++) {
-        await thread.send(chunks[i]).catch((err) => {
-          logger.error('[Discord] Send error:', err);
+      if (chunks[0]) {
+        await thinkingMsg.edit(chunks[0]).catch((err) => {
+          logger.error('[Discord] Edit error:', err);
         });
+        for (let i = 1; i < chunks.length; i++) {
+          await thread.send(chunks[i]).catch((err) => {
+            logger.error('[Discord] Send error:', err);
+          });
+        }
       }
     }
   } catch (err) {
@@ -269,11 +301,31 @@ async function handleThreadMessage(message) {
 }
 
 /**
+ * Edit the thinking message with current content, handling empty content gracefully.
+ * @param {Message|null} thinkingMsg
+ * @param {string} fullText
+ * @param {string[]} toolLines
+ */
+async function editThinkingMessage(thinkingMsg, fullText, toolLines) {
+  if (!thinkingMsg) return;
+  const display = buildDisplayMessage(fullText, toolLines);
+  if (!display) return; // Don't edit with empty string
+  const chunks = chunkMessage(display);
+  if (chunks[0]) {
+    await thinkingMsg.edit(chunks[0]).catch((err) => {
+      logger.error('[Discord] Edit error:', err);
+    });
+  }
+}
+
+/**
  * Build the composite display message from text, tool lines, and optional summary.
+ * Returns null if all parts are empty (prevents Discord API error on empty edit).
+ *
  * @param {string} text - Full response text
  * @param {string[]} toolLines - Array of formatted tool lines
  * @param {string} [summary] - Optional result summary
- * @returns {string} Complete display message
+ * @returns {string|null} Complete display message, or null if empty
  */
 function buildDisplayMessage(text, toolLines, summary = null) {
   const parts = [];
@@ -286,5 +338,6 @@ function buildDisplayMessage(text, toolLines, summary = null) {
   if (summary) {
     parts.push(summary);
   }
-  return parts.join('\n\n');
+  const result = parts.join('\n\n');
+  return result.length > 0 ? result : null;
 }

@@ -6,7 +6,7 @@
  */
 
 import { SlashCommandBuilder } from 'discord.js';
-import { cancelTask, getOrCreateTask } from '../../lib/tasks.js';
+import { cancelTask, tasks } from '../../lib/tasks.js';
 import { getSession } from '../lib/sessions.js';
 
 export const data = new SlashCommandBuilder()
@@ -33,8 +33,9 @@ export async function handleCancel(interaction) {
     return;
   }
 
-  const task = getOrCreateTask(sessionMapping.sessionId);
-  if (task.status !== 'running') {
+  // Use tasks.get() instead of getOrCreateTask() to avoid creating phantom tasks
+  const task = tasks.get(sessionMapping.sessionId);
+  if (!task || task.status !== 'running') {
     await interaction.reply({
       content: 'No running task to cancel.',
       flags: 64, // ephemeral
@@ -44,7 +45,7 @@ export async function handleCancel(interaction) {
 
   const success = cancelTask(sessionMapping.sessionId);
   if (success) {
-    await interaction.reply('🛑 Task cancelled.');
+    await interaction.reply('Task cancelled.');
   } else {
     await interaction.reply({
       content: 'Failed to cancel task.',
