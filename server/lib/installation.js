@@ -83,19 +83,21 @@ export function getInstallationType() {
 }
 
 /**
+ * SECURITY: Validate version string to prevent command injection.
+ * Only allows 'latest' or semver format (e.g. "1.2.3").
+ * @param {string} version
+ * @returns {boolean}
+ */
+export function isValidVersion(version) {
+  if (typeof version !== 'string') return false;
+  return /^(latest|\d+\.\d+\.\d+)$/.test(version);
+}
+
+/**
  * Check if auto-upgrade is supported for current installation type
  * @returns {boolean}
  */
 export function canAutoUpgrade() {
-  // TEMPORARY: Allow source upgrades for local testing
-  // Remove this before release!
-  if (process.env.ALLOW_SOURCE_UPGRADE === 'true') {
-    console.log(
-      '[INSTALL-DETECT] ⚠️  ALLOW_SOURCE_UPGRADE enabled - allowing upgrade from source',
-    );
-    return true;
-  }
-
   const type = getInstallationType();
 
   // Only npm global and local installs support auto-upgrade
@@ -108,14 +110,6 @@ export function canAutoUpgrade() {
  * @returns {string}
  */
 export function getUpgradeCommand(version = 'latest') {
-  // TEMPORARY: Treat as global install when testing from source
-  if (process.env.ALLOW_SOURCE_UPGRADE === 'true') {
-    console.log(
-      '[INSTALL-DETECT] ⚠️  Using global upgrade command for source testing',
-    );
-    return `npm install -g tofucode@${version}`;
-  }
-
   const type = getInstallationType();
 
   switch (type) {

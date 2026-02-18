@@ -57,13 +57,21 @@ export async function handler(ws, message, context) {
 
   // Detect stale-running tasks: status is 'running' but the stream/abortController
   // is gone (server restarted, stream crashed, or loop already exited without cleanup).
+  // Also detect tasks that have been running for more than 30 minutes (hard timeout).
   // Reset to 'idle' so the client doesn't get stuck on an in-progress indicator.
-  if (task && task.status === 'running' && !task.abortController) {
-    console.warn(
-      `[select-session] Resetting stale-running task for session ${sessionId}`,
-    );
-    task.status = 'idle';
-    task.stream = null;
+  const STALE_TASK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+  if (task && task.status === 'running') {
+    const noController = !task.abortController;
+    const timedOut =
+      task.startTime && Date.now() - task.startTime > STALE_TASK_TIMEOUT_MS;
+    if (noController || timedOut) {
+      console.warn(
+        `[select-session] Resetting stale-running task for session ${sessionId}` +
+          ` (noController=${noController}, timedOut=${timedOut})`,
+      );
+      task.status = 'idle';
+      task.stream = null;
+    }
   }
 
   // Always load history from JSONL for accurate state

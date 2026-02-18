@@ -354,14 +354,30 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
     };
   }
 
-  const {
-    fullHistory = false,
-    limit = 100,
-    offset = 0,
-    maxBufferSize = 5000,
-    loadLastTurn = false, // New option: load from last user message to end
-    turnLimit = null, // If set, load by turn count instead of entry count
-  } = options;
+  const { fullHistory = false, loadLastTurn = false } = options;
+
+  // SECURITY: Sanitize and clamp pagination parameters to prevent abuse
+  const rawOffset = Number.isInteger(options.offset)
+    ? options.offset
+    : Number.parseInt(options.offset, 10) || 0;
+  const rawLimit = Number.isInteger(options.limit)
+    ? options.limit
+    : Number.parseInt(options.limit, 10) || 100;
+  const rawMaxBufferSize = Number.isInteger(options.maxBufferSize)
+    ? options.maxBufferSize
+    : Number.parseInt(options.maxBufferSize, 10) || 5000;
+  const rawTurnLimit =
+    options.turnLimit != null
+      ? Number.isInteger(options.turnLimit)
+        ? options.turnLimit
+        : Number.parseInt(options.turnLimit, 10)
+      : null;
+
+  const limit = Math.max(1, Math.min(rawLimit, 500));
+  const offset = Math.max(0, Math.min(rawOffset, 100000));
+  const maxBufferSize = Math.max(100, Math.min(rawMaxBufferSize, 10000));
+  const turnLimit =
+    rawTurnLimit != null ? Math.max(1, Math.min(rawTurnLimit, 50)) : null;
 
   // Use circular buffer to limit memory usage
   const buffer = [];

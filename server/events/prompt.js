@@ -140,6 +140,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
 
   // Set model if specified (sonnet, opus, haiku)
   // Map friendly names to specific model versions from config
+  // SECURITY: Validate model string to prevent arbitrary values being sent to SDK
   if (options.model) {
     if (options.model === 'opus') {
       queryOptions.model = config.models.opus;
@@ -147,9 +148,16 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
       queryOptions.model = config.models.sonnet;
     } else if (options.model === 'haiku') {
       queryOptions.model = config.models.haiku;
-    } else {
-      // Pass through full model strings (e.g., "claude-sonnet-4-5-20250929")
+    } else if (/^claude-[a-z0-9-]+$/.test(options.model)) {
+      // Only allow well-formed claude model strings (e.g., "claude-sonnet-4-5-20250929")
       queryOptions.model = options.model;
+    } else {
+      // Reject unknown/invalid model strings
+      send(ws, {
+        type: 'error',
+        message: `Invalid model: "${options.model}". Use "opus", "sonnet", "haiku", or a valid claude-* model string.`,
+      });
+      return sessionId;
     }
   }
 

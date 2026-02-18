@@ -17,6 +17,7 @@ import {
   canAutoUpgrade,
   getInstallationType,
   getUpgradeCommand,
+  isValidVersion,
 } from '../lib/installation.js';
 import { restartWithInvertedSpawn } from '../lib/restart.js';
 import { broadcast } from '../lib/ws.js';
@@ -30,7 +31,17 @@ const execAsync = promisify(exec);
  * @param {Object} _context - Connection context (unused)
  */
 export async function handleUpgrade(_ws, message, _context) {
-  const version = message.version || 'latest';
+  const rawVersion = message.version || 'latest';
+
+  // SECURITY: Validate version string to prevent command injection
+  if (!isValidVersion(rawVersion)) {
+    broadcast({
+      type: 'upgrade_error',
+      message: `Invalid version format: "${rawVersion}". Must be "latest" or a semver string (e.g. "1.2.3").`,
+    });
+    return;
+  }
+  const version = rawVersion;
 
   console.log('=== UPGRADE DEBUG START ===');
   console.log(`[UPGRADE] Request received (target version: ${version})`);

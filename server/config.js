@@ -44,6 +44,10 @@ export function getProjectDisplayName(slug) {
   return slug;
 }
 
+// SECURITY: Limits for slugToPath to prevent exponential complexity DoS
+const MAX_SLUG_PARTS = 30; // Reject slugs with too many dash-separated parts
+const MAX_SPAN_SIZE = 8; // Max parts combined into a single folder name (2^8=256 combos max per span)
+
 // Convert slug back to path (best effort - check if path exists)
 export function slugToPath(slug) {
   // Slug format: -home-ts-projects-claude-web
@@ -53,6 +57,12 @@ export function slugToPath(slug) {
   const normalized = slug.replace(/^-/, ''); // Remove leading dash
   const parts = normalized.split('-');
 
+  // SECURITY: Reject excessively long slugs to prevent DoS via exponential recursion
+  if (parts.length > MAX_SLUG_PARTS) {
+    // Fallback to simple replacement for oversized slugs
+    return `/${normalized.replace(/-/g, '/')}`;
+  }
+
   function findPath(currentPath, startIdx) {
     if (startIdx >= parts.length) {
       return existsSync(currentPath) ? currentPath : null;
@@ -61,7 +71,9 @@ export function slugToPath(slug) {
     // Try matching 1, 2, 3... consecutive parts as a single folder name.
     // For each span, try joining with '-' first, then also try all combinations
     // where any separator between adjacent parts could be '.' (e.g. picotofu.dev).
-    for (let endIdx = startIdx; endIdx < parts.length; endIdx++) {
+    // Cap span size to MAX_SPAN_SIZE to bound combinations per level.
+    const maxEnd = Math.min(parts.length - 1, startIdx + MAX_SPAN_SIZE - 1);
+    for (let endIdx = startIdx; endIdx <= maxEnd; endIdx++) {
       const span = parts.slice(startIdx, endIdx + 1);
 
       // Generate all separator combinations (each gap is '-' or '.')
