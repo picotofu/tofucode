@@ -52,6 +52,8 @@ const messagesEl = ref(null);
 const userScrolledUp = ref(false);
 const turnRefs = ref([]); // Array of refs for each conversation turn
 const currentTurnIndex = ref(-1); // Currently visible turn (for navigation)
+// 'top' = jump to first newly loaded turn after load, 'stay' = stay in place (up btn)
+const pendingOlderMessagesJump = ref(null);
 
 // Plan mode tools should render standalone (not grouped) so their special
 // content (plan markdown, enter indicator) is visible in MessageItem
@@ -216,13 +218,13 @@ function goToPreviousTurn() {
     }
   }
 
-  // If at first turn and there are older messages, load them
+  // If at first turn and there are older messages, load them (stay at current position)
   if (
     currentTurnIndex.value === 0 &&
     props.hasOlderMessages &&
     !props.loadingOlderMessages
   ) {
-    emit('load-older-messages');
+    loadOlderStay();
     return;
   }
 
@@ -258,6 +260,64 @@ function setTurnRef(index, el) {
   turnRefs.value[index] = el;
 }
 
+// Track state before loading older messages for scroll restoration
+let prevTurnCountBeforeLoad = 0;
+let anchorScrollOffset = 0; // px from top of anchor element to scroll container top
+
+function loadOlderWithJump() {
+  // 'top' mode: after load, jump to first newly prepended turn (turn index 0)
+  prevTurnCountBeforeLoad = conversationTurns.value.length;
+  pendingOlderMessagesJump.value = 'top';
+  emit('load-older-messages');
+}
+
+function loadOlderStay() {
+  // 'stay' mode: capture current scroll anchor so we can restore it after prepend,
+  // then advance one turn back naturally without visual jump
+  prevTurnCountBeforeLoad = conversationTurns.value.length;
+  // Anchor to the current first turn element to restore scroll position after prepend
+  const anchorEl = turnRefs.value[0];
+  if (anchorEl && messagesEl.value) {
+    anchorScrollOffset = anchorEl.offsetTop - messagesEl.value.scrollTop;
+  }
+  pendingOlderMessagesJump.value = 'stay';
+  emit('load-older-messages');
+}
+
+// After older messages finish loading, handle scroll behavior
+watch(
+  () => props.loadingOlderMessages,
+  (loading, wasLoading) => {
+    if (wasLoading && !loading && pendingOlderMessagesJump.value) {
+      const jumpMode = pendingOlderMessagesJump.value;
+      pendingOlderMessagesJump.value = null;
+      nextTick(() => {
+        if (jumpMode === 'top') {
+          // Jump to the first of the newly prepended turns
+          scrollToTurn(0);
+        } else if (jumpMode === 'stay') {
+          // Restore scroll so the previously-first turn stays at the same visual position,
+          // then immediately advance one turn back (no animation fighting prepend reflow)
+          const newTurns =
+            conversationTurns.value.length - prevTurnCountBeforeLoad;
+          const restoredAnchorIndex = newTurns; // previously-first turn is now at newTurns
+          const anchorEl = turnRefs.value[restoredAnchorIndex];
+          if (anchorEl && messagesEl.value) {
+            // Restore position instantly (no smooth) to eliminate the visual jump from prepend
+            messagesEl.value.scrollTo({
+              top: anchorEl.offsetTop - anchorScrollOffset,
+              behavior: 'instant',
+            });
+          }
+          // Now navigate one turn back from the restored anchor
+          const targetIndex = Math.max(0, restoredAnchorIndex - 1);
+          scrollToTurn(targetIndex);
+        }
+      });
+    }
+  },
+);
+
 // Auto-scroll on new messages
 watch(
   () => props.messages.length,
@@ -267,8 +327,13 @@ watch(
       userScrolledUp.value = false;
       nextTick(() => {
         scrollToBottom();
+        // Set turn index to last turn explicitly — scroll detection can miss short last turns
+        currentTurnIndex.value = conversationTurns.value.length - 1;
         // Double-check after a short delay to ensure DOM is fully rendered
-        setTimeout(scrollToBottom, 100);
+        setTimeout(() => {
+          scrollToBottom();
+          currentTurnIndex.value = conversationTurns.value.length - 1;
+        }, 100);
       });
     }
     // Otherwise only scroll if user hasn't scrolled up
@@ -304,7 +369,7 @@ defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn });
           <button
             class="load-older-btn"
             :disabled="loadingOlderMessages"
-            @click="emit('load-older-messages')"
+            @click="loadOlderWithJump"
           >
             <svg v-if="!loadingOlderMessages" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 19V5M5 12l7-7 7 7"/>
@@ -376,7 +441,7 @@ defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn });
           <path d="M18 15l-6-6-6 6"/>
         </svg>
       </button>
-      <span class="turn-counter">{{ totalTurns > 0 ? (totalTurns - conversationTurns.length + currentTurnIndex + 1) : (currentTurnIndex + 1) }}/{{ totalTurns > 0 ? totalTurns : conversationTurns.length }}</span>
+      <span class="turn-counter">{{ totalTurns > 0 ? Math.max(1, Math.min(totalTurns, totalTurns - loadedTurns + currentTurnIndex + 1)) : (currentTurnIndex + 1) }}/{{ totalTurns > 0 ? totalTurns : conversationTurns.length }}</span>
       <button
         class="turn-nav-btn"
         :disabled="currentTurnIndex >= conversationTurns.length - 1"

@@ -358,7 +358,7 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
     fullHistory = false,
     limit = 100,
     offset = 0,
-    maxBufferSize = 500,
+    maxBufferSize = 5000,
     loadLastTurn = false, // New option: load from last user message to end
     turnLimit = null, // If set, load by turn count instead of entry count
   } = options;
@@ -475,7 +475,10 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
           // Load from earliest found user message to searchEnd
           const startIdx = userIndices[userIndices.length - 1];
           entriesToParse = buffer.slice(startIdx, searchEnd);
-          effectiveOffset = buffer.length - searchEnd;
+          // effectiveOffset = how many entries from end of buffer are NOT yet loaded
+          // Next request should search up to startIdx, so offset = buffer.length - startIdx
+          // If startIdx === 0, we've reached the beginning of the buffer - no more to load
+          effectiveOffset = startIdx === 0 ? 0 : buffer.length - startIdx;
         } else {
           // No user turns found before searchEnd - load whatever remains (e.g. summary)
           // and signal no more older messages
@@ -501,17 +504,19 @@ export async function loadSessionHistory(projectSlug, sessionId, options = {}) {
         if (userIndices.length === 3) {
           const startIdx = userIndices[2]; // Third-to-last user message
           entriesToParse = buffer.slice(startIdx);
-          effectiveOffset = buffer.length - entriesToParse.length;
+          // effectiveOffset = entries from end to skip on next load = buffer.length - startIdx
+          // (next searchEnd = buffer.length - effectiveOffset = startIdx, searching [0..startIdx))
+          effectiveOffset = startIdx === 0 ? 0 : buffer.length - startIdx;
         } else if (userIndices.length > 0) {
-          // Less than 3 turns - load from earliest found
+          // Less than 3 turns total - loaded everything, no older messages
           const startIdx = userIndices[userIndices.length - 1];
           entriesToParse = buffer.slice(startIdx);
-          effectiveOffset = buffer.length - entriesToParse.length;
+          effectiveOffset = 0; // Loaded all turns, nothing older
         } else {
           // No user message found, fall back to limit-based loading
           const startIdx = Math.max(0, buffer.length - limit);
           entriesToParse = buffer.slice(startIdx);
-          effectiveOffset = buffer.length - entriesToParse.length;
+          effectiveOffset = startIdx === 0 ? 0 : buffer.length - startIdx;
         }
       } else {
         // ENTRY-BASED FALLBACK: Standard pagination by entry count

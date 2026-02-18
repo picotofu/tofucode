@@ -64,6 +64,7 @@ export async function handler(ws, message, context) {
   let totalEntries = 0;
   let totalTurns = 0;
   let loadedTurns = 0;
+  let effectiveOffset = 0;
   const offset = message.offset || 0; // Offset in terms of entries
 
   if (context.currentProjectPath && sessionId) {
@@ -81,6 +82,7 @@ export async function handler(ws, message, context) {
       totalEntries = result.totalEntries;
       totalTurns = result.totalTurns || 0;
       loadedTurns = result.loadedTurns || 0;
+      effectiveOffset = result.effectiveOffset || 0;
     } catch (err) {
       console.error('Failed to load session history:', err);
       send(ws, {
@@ -122,7 +124,7 @@ export async function handler(ws, message, context) {
     totalEntries,
     totalTurns,
     loadedTurns,
-    offset,
+    offset: effectiveOffset,
   });
 
   // Clear completed/error task from memory when user opens the session
