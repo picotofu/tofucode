@@ -438,18 +438,35 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
         };
         addTaskResult(task, result);
         sendAndBroadcast(ws, taskSessionId, result);
+
+        // Mark completed immediately on result — don't wait for the for-await loop to exit.
+        // The SDK may keep the stream open briefly after emitting result (e.g. cleanup),
+        // which causes the session to appear stuck in "running" state.
+        task.status = 'completed';
+        task.stream = null;
+        broadcastTaskStatus(taskSessionId, {
+          type: 'task_status',
+          taskId: task.id,
+          status: 'completed',
+          resultsCount: task.results.length,
+        });
+        console.log(`Task ${task.id} completed (result received)`);
       }
     }
 
-    task.status = 'completed';
-    task.stream = null; // Release stream reference to free memory
-    broadcastTaskStatus(taskSessionId, {
-      type: 'task_status',
-      taskId: task.id,
-      status: 'completed',
-      resultsCount: task.results.length,
-    });
-    console.log(`Task ${task.id} completed`);
+    // Loop exited naturally — ensure status is completed if not already set.
+    // Handles edge case where stream ends without a result message.
+    if (task.status === 'running') {
+      task.status = 'completed';
+      task.stream = null;
+      broadcastTaskStatus(taskSessionId, {
+        type: 'task_status',
+        taskId: task.id,
+        status: 'completed',
+        resultsCount: task.results.length,
+      });
+      console.log(`Task ${task.id} completed (stream ended without result)`);
+    }
   } catch (error) {
     task.status = 'error';
     task.error = error.message;

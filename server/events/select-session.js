@@ -55,6 +55,17 @@ export async function handler(ws, message, context) {
 
   const task = sessionId ? getOrCreateTask(sessionId) : null;
 
+  // Detect stale-running tasks: status is 'running' but the stream/abortController
+  // is gone (server restarted, stream crashed, or loop already exited without cleanup).
+  // Reset to 'idle' so the client doesn't get stuck on an in-progress indicator.
+  if (task && task.status === 'running' && !task.abortController) {
+    console.warn(
+      `[select-session] Resetting stale-running task for session ${sessionId}`,
+    );
+    task.status = 'idle';
+    task.stream = null;
+  }
+
   // Always load history from JSONL for accurate state
   // (in-memory task.results may be incomplete or stale)
   // Support turn-based pagination
