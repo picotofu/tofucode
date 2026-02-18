@@ -3,10 +3,9 @@
  *
  * Maps a Discord channel to a tofucode project folder.
  * Usage: /setup project:/absolute/path/to/project
- *        /setup project:/absolute/path/to/project force:true
  *
- * If channel is already configured, warns user and requires confirmation
- * via button click regardless of whether --force is used.
+ * If channel is already configured, shows a confirmation prompt with
+ * buttons — user must explicitly confirm before the mapping is overwritten.
  */
 
 import { existsSync } from 'node:fs';
@@ -28,19 +27,10 @@ export const data = new SlashCommandBuilder()
       .setName('project')
       .setDescription('Absolute project path (e.g., /home/user/projects/myapp)')
       .setRequired(true),
-  )
-  .addBooleanOption((option) =>
-    option
-      .setName('force')
-      .setDescription(
-        'Force override existing mapping (still requires confirmation)',
-      )
-      .setRequired(false),
   );
 
 export async function handleSetup(interaction) {
   const projectPath = interaction.options.getString('project');
-  const force = interaction.options.getBoolean('force') ?? false;
   const channelId = interaction.channelId;
   const guildId = interaction.guildId;
 
@@ -82,10 +72,6 @@ export async function handleSetup(interaction) {
 
   // If already configured, always require confirmation via button
   if (existingMapping) {
-    const forceNote = force
-      ? '\n_`force` flag detected — still requires confirmation._'
-      : '';
-
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('setup_confirm')
@@ -102,7 +88,7 @@ export async function handleSetup(interaction) {
         '⚠️ **This channel is already mapped to a project.**\n\n' +
         `**Current**: \`${existingMapping.projectPath}\`\n` +
         `**New**: \`${projectPath}\`\n\n` +
-        `Existing threads will run Claude in the new project directory after remapping.${forceNote}\n\n` +
+        'Existing threads will run Claude in the new project directory after remapping.\n\n' +
         'Are you sure you want to remap this channel?',
       components: [row],
       flags: 64, // ephemeral
