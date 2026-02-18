@@ -11,11 +11,12 @@ import { tasks } from '../../lib/tasks.js';
 import { discordConfig, getChannelMapping } from '../config.js';
 import { executePrompt } from '../lib/executor.js';
 import {
+  accumulateToolUse,
   chunkMessage,
   formatError,
-  formatResult,
+  formatFooter,
   formatToolResult,
-  formatToolUse,
+  formatToolStatus,
 } from '../lib/formatter.js';
 import {
   getSession,
@@ -116,13 +117,19 @@ async function handleThreadMessage(message) {
 
   let thinkingMsg = null;
   let fullText = '';
-  const toolLines = [];
+  const toolState = {
+    counts: {},
+    lastBash: null,
+    lastTool: null,
+    lastToolHint: null,
+  };
+  const errorLines = []; // tool errors shown inline in response
   let lastEditTime = 0;
   let newSessionId = null;
 
   try {
     // Send "thinking" indicator
-    thinkingMsg = await message.reply('Thinking...').catch((err) => {
+    thinkingMsg = await message.reply('⏳ Thinking…').catch((err) => {
       logger.error('[Discord] Reply error:', err);
       return null;
     });
@@ -138,7 +145,6 @@ async function handleThreadMessage(message) {
         case 'session_init': {
           newSessionId = event.sessionId;
           if (event.isNew) {
-            // Register new session
             registerSession(threadId, {
               sessionId: newSessionId,
               channelId: parentChannelId,
@@ -153,7 +159,6 @@ async function handleThreadMessage(message) {
             newSessionId !== sessionId &&
             sessionMapping?.sessionId !== newSessionId
           ) {
-            // Only update if session ID actually changed
             updateSessionId(threadId, newSessionId);
           }
           break;
@@ -161,64 +166,62 @@ async function handleThreadMessage(message) {
 
         case 'text': {
           fullText += event.content;
-          // Rate-limited edit (max every 1.5 seconds to stay within Discord limits)
+          // Rate-limited streaming edit
           const now = Date.now();
           if (now - lastEditTime > discordConfig.streamingEditInterval) {
             lastEditTime = now;
-            await editThinkingMessage(thinkingMsg, fullText, toolLines);
+            await editThinkingMessage(
+              thinkingMsg,
+              fullText,
+              toolState,
+              errorLines,
+            );
           }
           break;
         }
 
         case 'tool_use': {
-          const formatted = formatToolUse(event);
-          if (formatted) {
-            toolLines.push(formatted);
-            // Update display with tool info
-            const now = Date.now();
-            if (now - lastEditTime > discordConfig.streamingEditInterval) {
-              lastEditTime = now;
-              await editThinkingMessage(thinkingMsg, fullText, toolLines);
-            }
+          accumulateToolUse(toolState, event);
+          // Update status line while no text yet, or rate-limited
+          const now = Date.now();
+          if (now - lastEditTime > discordConfig.streamingEditInterval) {
+            lastEditTime = now;
+            await editThinkingMessage(
+              thinkingMsg,
+              fullText,
+              toolState,
+              errorLines,
+            );
           }
           break;
         }
 
         case 'tool_result': {
+          // Only capture errors — surfaced inline above the AI response
           const formatted = formatToolResult(event);
-          if (formatted) {
-            toolLines.push(formatted);
-          }
+          if (formatted) errorLines.push(formatted);
           break;
         }
 
         case 'ask_user_question': {
-          // Display the questions in Discord (informational, not interactive)
+          // Informational only — Claude is asking itself / the user in web UI
           const questionLines = event.questions.map((q) => {
-            const optionList = q.options
-              ?.map((o) => `  - ${o.label}`)
-              .join('\n');
+            const optionList = q.options?.map((o) => `· ${o.label}`).join('\n');
             return `**${q.question}**\n${optionList || ''}`;
           });
-          toolLines.push(
-            `> :question: **Question asked:**\n${questionLines.join('\n')}`,
-          );
+          errorLines.push(`> ❓ ${questionLines.join('\n')}`);
           break;
         }
 
         case 'result': {
-          const summary = formatResult(event);
-          // Final update with complete text
-          const display = buildDisplayMessage(fullText, toolLines, summary);
+          const footer = formatFooter(toolState, event);
+          const display = buildDisplayMessage(fullText, errorLines, footer);
           const chunks = chunkMessage(display);
 
-          // Edit first chunk into the thinking message
           if (thinkingMsg && chunks[0]) {
             await thinkingMsg.edit(chunks[0]).catch((err) => {
               logger.error('[Discord] Edit error:', err);
             });
-
-            // Send remaining chunks as new messages with small delay
             for (let i = 1; i < chunks.length; i++) {
               await thread.send(chunks[i]).catch((err) => {
                 logger.error('[Discord] Send error:', err);
@@ -226,7 +229,6 @@ async function handleThreadMessage(message) {
             }
           }
 
-          // Set session title from thread name (if new session)
           if (newSessionId && sessionMapping === null) {
             setSessionTitle(projectSlug, newSessionId, thread.name);
           }
@@ -243,19 +245,15 @@ async function handleThreadMessage(message) {
         }
 
         case 'task_status': {
-          // Show typing indicator while running
           if (event.status === 'running') {
-            // Discord typing indicator (lasts 10 seconds)
             thread.sendTyping().catch(() => {});
           }
-          // Clean up task from memory when completed/errored
           if (
             event.status === 'completed' ||
             event.status === 'error' ||
             event.status === 'cancelled'
           ) {
             if (newSessionId) {
-              // Give a short delay before cleanup so cancel.js can still read status
               setTimeout(() => {
                 const task = tasks.get(newSessionId);
                 if (
@@ -264,7 +262,7 @@ async function handleThreadMessage(message) {
                 ) {
                   tasks.delete(newSessionId);
                 }
-              }, 30000); // Clean up after 30 seconds
+              }, 30000);
             }
           }
           break;
@@ -272,9 +270,9 @@ async function handleThreadMessage(message) {
       }
     }
 
-    // If no result event was yielded (edge case), do final edit
+    // Edge case: no result event yielded
     if (fullText && lastEditTime > 0 && thinkingMsg) {
-      const display = buildDisplayMessage(fullText, toolLines);
+      const display = buildDisplayMessage(fullText, errorLines);
       const chunks = chunkMessage(display);
       if (chunks[0]) {
         await thinkingMsg.edit(chunks[0]).catch((err) => {
@@ -295,21 +293,39 @@ async function handleThreadMessage(message) {
         .catch(() => {});
     }
   } finally {
-    // Release lock
     threadLocks.delete(threadId);
   }
 }
 
 /**
- * Edit the thinking message with current content, handling empty content gracefully.
+ * Edit the thinking message during streaming.
+ *
+ * While tools are running but no text yet: shows a dynamic tool status line.
+ * Once text starts flowing: shows the text (tool noise disappears).
+ *
  * @param {Message|null} thinkingMsg
  * @param {string} fullText
- * @param {string[]} toolLines
+ * @param {Object} toolState - Accumulator from accumulateToolUse
+ * @param {string[]} errorLines - Tool error lines to show above response
  */
-async function editThinkingMessage(thinkingMsg, fullText, toolLines) {
+async function editThinkingMessage(
+  thinkingMsg,
+  fullText,
+  toolState,
+  errorLines,
+) {
   if (!thinkingMsg) return;
-  const display = buildDisplayMessage(fullText, toolLines);
-  if (!display) return; // Don't edit with empty string
+
+  let display;
+  if (!fullText) {
+    // No response text yet — show live tool status
+    display = formatToolStatus(toolState);
+  } else {
+    // Text is flowing — show partial response (errors above, no footer yet)
+    display = buildDisplayMessage(fullText, errorLines);
+  }
+
+  if (!display) return;
   const chunks = chunkMessage(display);
   if (chunks[0]) {
     await thinkingMsg.edit(chunks[0]).catch((err) => {
@@ -319,25 +335,25 @@ async function editThinkingMessage(thinkingMsg, fullText, toolLines) {
 }
 
 /**
- * Build the composite display message from text, tool lines, and optional summary.
- * Returns null if all parts are empty (prevents Discord API error on empty edit).
+ * Build the final display message.
  *
- * @param {string} text - Full response text
- * @param {string[]} toolLines - Array of formatted tool lines
- * @param {string} [summary] - Optional result summary
- * @returns {string|null} Complete display message, or null if empty
+ * Layout:
+ *   [error lines if any]
+ *
+ *   [AI response text]
+ *
+ *   [footer: tool summary + result status]
+ *
+ * @param {string} text - AI response text
+ * @param {string[]} errorLines - Tool errors or questions (shown above response)
+ * @param {string} [footer] - Footer line (tool summary + result)
+ * @returns {string|null}
  */
-function buildDisplayMessage(text, toolLines, summary = null) {
+function buildDisplayMessage(text, errorLines, footer = null) {
   const parts = [];
-  if (toolLines.length > 0) {
-    parts.push(toolLines.join('\n'));
-  }
-  if (text) {
-    parts.push(text);
-  }
-  if (summary) {
-    parts.push(summary);
-  }
+  if (errorLines.length > 0) parts.push(errorLines.join('\n'));
+  if (text) parts.push(text);
+  if (footer) parts.push(footer);
   const result = parts.join('\n\n');
   return result.length > 0 ? result : null;
 }

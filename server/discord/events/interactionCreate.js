@@ -10,6 +10,7 @@ import { handleList } from '../commands/list.js';
 import { handleResume } from '../commands/resume.js';
 import { handleSession } from '../commands/session.js';
 import { handleSetup } from '../commands/setup.js';
+import { handleStatus } from '../commands/status.js';
 
 export async function handleInteraction(interaction) {
   if (!interaction.isChatInputCommand()) return;
@@ -32,6 +33,9 @@ export async function handleInteraction(interaction) {
         break;
       case 'list':
         await handleList(interaction);
+        break;
+      case 'status':
+        await handleStatus(interaction);
         break;
       default:
         await interaction.reply({

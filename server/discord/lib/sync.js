@@ -195,20 +195,43 @@ export async function sendSessionHistoryToThread(
 }
 
 /**
- * Check if a session already has a Discord thread.
+ * Check if a session already has a live Discord thread.
+ *
+ * Verifies the thread still exists in Discord (not just in local storage),
+ * so that deleted threads don't block re-creation.
  *
  * @param {string} sessionId - Session ID to check
- * @returns {Promise<string|null>} Thread ID if exists, null otherwise
+ * @param {Object} guild - Discord guild object (to verify thread exists)
+ * @returns {Promise<string|null>} Thread ID if exists and live, null otherwise
  */
-export async function findThreadForSession(sessionId) {
+export async function findThreadForSession(sessionId, guild) {
   // Load all session mappings and search for matching sessionId
-  const { loadSessionMappings } = await import('../config.js');
+  const { loadSessionMappings, removeSessionMapping } = await import(
+    '../config.js'
+  );
   const mappings = loadSessionMappings();
 
   for (const [threadId, mapping] of Object.entries(mappings)) {
-    if (mapping.sessionId === sessionId) {
-      return threadId;
+    if (mapping.sessionId !== sessionId) continue;
+
+    // Verify thread still exists in Discord
+    if (guild) {
+      try {
+        await guild.channels.fetch(threadId);
+        // Thread exists - return it
+        return threadId;
+      } catch {
+        // Thread was deleted - clean up stale mapping and continue searching
+        logger.log(
+          `[Discord] Removing stale thread mapping ${threadId} (thread deleted)`,
+        );
+        removeSessionMapping(threadId);
+        continue;
+      }
     }
+
+    // No guild provided - trust local storage (fallback)
+    return threadId;
   }
 
   return null;

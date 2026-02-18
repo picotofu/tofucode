@@ -103,86 +103,171 @@ function escapeBackticks(text) {
 }
 
 /**
- * Format a tool_use event for Discord.
- * Returns a compact representation: tool name + truncated input.
+ * Accumulate tool_use events into a running tally.
+ * Returns updated state — call this for each tool_use event.
  *
+ * State shape:
+ * {
+ *   counts: { Read: 2, Edit: 1, ... },  // call counts per tool
+ *   lastBash: 'npm run check',           // last bash command (for hint)
+ *   lastTool: 'Bash',                    // most recent tool name (for status line)
+ *   lastToolHint: 'npm run check',       // most recent tool detail (for status line)
+ * }
+ *
+ * @param {Object} state - Current accumulator state (mutated in place)
  * @param {Object} event - { tool, input }
- * @returns {string} Formatted string
+ * @returns {Object} Same state object (for convenience)
  */
-export function formatToolUse(event) {
+export function accumulateToolUse(state, event) {
   const toolName = event.tool;
   const input = event.input || {};
 
-  // Tool-specific compact formats
-  if (toolName === 'Read' && input.file_path) {
-    return `> :mag: **Read** \`${escapeBackticks(input.file_path)}\``;
-  }
-  if (toolName === 'Write' && input.file_path) {
-    return `> :pencil2: **Write** \`${escapeBackticks(input.file_path)}\``;
-  }
-  if (toolName === 'Edit' && input.file_path) {
-    return `> :pencil2: **Edit** \`${escapeBackticks(input.file_path)}\``;
-  }
+  // Increment count
+  state.counts[toolName] = (state.counts[toolName] || 0) + 1;
+  state.lastTool = toolName;
+
+  // Capture a short hint for the status line
   if (toolName === 'Bash' && input.command) {
     const cmd =
-      input.command.length > 100
-        ? `${input.command.substring(0, 100)}...`
+      input.command.length > 60
+        ? `${input.command.substring(0, 60)}…`
         : input.command;
-    return `> :computer: **Bash** \`${escapeBackticks(cmd)}\``;
-  }
-  if (toolName === 'Glob' && input.pattern) {
-    return `> :mag_right: **Glob** \`${escapeBackticks(input.pattern)}\``;
-  }
-  if (toolName === 'Grep' && input.pattern) {
-    return `> :mag_right: **Grep** \`${escapeBackticks(input.pattern)}\``;
+    state.lastBash = cmd;
+    state.lastToolHint = cmd;
+  } else if (
+    (toolName === 'Read' || toolName === 'Write' || toolName === 'Edit') &&
+    input.file_path
+  ) {
+    // Show just the filename, not full path
+    const filename = input.file_path.split('/').pop();
+    state.lastToolHint = filename;
+  } else if ((toolName === 'Glob' || toolName === 'Grep') && input.pattern) {
+    state.lastToolHint = input.pattern;
+  } else {
+    state.lastToolHint = null;
   }
 
-  return `> :wrench: **${toolName}**`;
+  return state;
 }
 
 /**
- * Format tool_result for Discord.
- * Only shows errors (non-error results are too verbose for Discord).
+ * Build a compact one-line tool status for the streaming "thinking" message.
+ * Shows what Claude is currently doing.
+ *
+ * @param {Object} state - Accumulator state from accumulateToolUse
+ * @returns {string} e.g. "⚙️ Reading `config.js`..." or "⚙️ Running tools..."
+ */
+export function formatToolStatus(state) {
+  if (!state.lastTool) return '⚙️ Working…';
+
+  const toolLabels = {
+    Read: 'Reading',
+    Write: 'Writing',
+    Edit: 'Editing',
+    Bash: 'Running',
+    Glob: 'Searching',
+    Grep: 'Searching',
+    Task: 'Delegating',
+  };
+
+  const label = toolLabels[state.lastTool] || state.lastTool;
+  const hint = state.lastToolHint ? ` ${state.lastToolHint}` : '';
+  return `⚙️ ${label}${hint}…`;
+}
+
+/**
+ * Build the compact tool summary footer line.
+ * Groups tools by name with counts, appends last bash command as context.
+ *
+ * @param {Object} state - Accumulator state from accumulateToolUse
+ * @returns {string|null} e.g. "🔧 Read ×4 · Edit ×2 · Bash `npm run check`" or null if no tools
+ */
+export function formatToolSummary(state) {
+  const { counts, lastBash } = state;
+  if (Object.keys(counts).length === 0) return null;
+
+  // Tool display order (most common first)
+  const ORDER = ['Read', 'Glob', 'Grep', 'Edit', 'Write', 'Bash', 'Task'];
+  const sorted = [
+    ...ORDER.filter((t) => counts[t]),
+    ...Object.keys(counts).filter((t) => !ORDER.includes(t)),
+  ];
+
+  const parts = sorted.map((tool) => {
+    const count = counts[tool];
+    const suffix = count > 1 ? ` ×${count}` : '';
+    // For Bash, append last command as plain text hint (no backticks — avoids rendering issues)
+    if (tool === 'Bash' && lastBash) {
+      return `Bash (${lastBash})${count > 1 ? ` ×${count}` : ''}`;
+    }
+    return `${tool}${suffix}`;
+  });
+
+  return `🔧 ${parts.join(' · ')}`;
+}
+
+/**
+ * Format tool_result errors only — shown inline in the response.
+ * Non-error results are suppressed (too verbose for Discord).
  *
  * @param {Object} event - { content, isError }
- * @returns {string|null} Formatted string, or null if content should be skipped
+ * @returns {string|null}
  */
 export function formatToolResult(event) {
-  // Most tool results are verbose - only show errors
   if (event.isError) {
     const content = event.content || 'Unknown error';
-    // Escape backticks in error content to prevent breaking code blocks
-    const truncated = escapeBackticks(content.substring(0, 500));
-    return `> :x: Error:\n\`\`\`\n${truncated}\n\`\`\``;
+    // Truncate and strip backticks to avoid breaking Discord formatting
+    const truncated = content.substring(0, 300).replace(/`/g, "'");
+    return `> ❌ ${truncated}`;
   }
-  // Skip non-error tool results in Discord (too verbose)
   return null;
 }
 
 /**
- * Format the final result summary.
+ * Build the final footer line combining tool summary + result status.
  *
- * @param {Object} event - { subtype, cost, duration }
+ * @param {Object} toolState - Accumulator state from accumulateToolUse
+ * @param {Object} resultEvent - { subtype, cost, duration }
  * @returns {string}
  */
-export function formatResult(event) {
-  const status = event.subtype === 'success' ? ':white_check_mark:' : ':x:';
+export function formatFooter(toolState, resultEvent) {
+  const status = resultEvent.subtype === 'success' ? '✅' : '❌';
   const duration =
-    event.duration != null ? `${(event.duration / 1000).toFixed(1)}s` : '';
-  const cost = event.cost ? `$${event.cost.toFixed(4)}` : '';
-  const parts = [status, 'Completed'];
-  if (duration) parts.push(`in ${duration}`);
-  if (cost) parts.push(`| ${cost}`);
-  return parts.join(' ');
+    resultEvent.duration != null
+      ? `${(resultEvent.duration / 1000).toFixed(1)}s`
+      : '';
+  const cost = resultEvent.cost ? `$${resultEvent.cost.toFixed(4)}` : '';
+
+  const meta = [status, duration, cost ? `· ${cost}` : '']
+    .filter(Boolean)
+    .join(' ');
+
+  const toolSummary = formatToolSummary(toolState);
+
+  if (toolSummary) {
+    return `-# ${toolSummary}   ${meta}`;
+  }
+  return `-# ${meta}`;
 }
 
 /**
  * Format an error for Discord.
- * Escapes backticks to prevent formatting issues.
  *
  * @param {string} message
  * @returns {string}
  */
 export function formatError(message) {
   return `:warning: **Error**: ${escapeBackticks(message)}`;
+}
+
+// Keep formatResult exported for any callers that still use it directly
+export function formatResult(event) {
+  const status = event.subtype === 'success' ? '✅' : '❌';
+  const duration =
+    event.duration != null ? `${(event.duration / 1000).toFixed(1)}s` : '';
+  const cost = event.cost ? `$${event.cost.toFixed(4)}` : '';
+  const parts = [status, 'Completed'];
+  if (duration) parts.push(`in ${duration}`);
+  if (cost) parts.push(`· ${cost}`);
+  return parts.join(' ');
 }

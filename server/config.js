@@ -28,8 +28,9 @@ export const config = {
 
 // Convert project path to slug (how Claude stores it)
 export function pathToSlug(projectPath) {
-  // Claude uses: leading dash + path with slashes replaced by dashes
-  return `-${projectPath.replace(/\//g, '-').replace(/^-/, '')}`;
+  // Claude uses: leading dash + path with slashes AND dots replaced by dashes
+  // e.g. /home/ts/projects/picotofu.com → -home-ts-projects-picotofu-com
+  return `-${projectPath.replace(/[/.]/g, '-').replace(/^-/, '')}`;
 }
 
 // Extract display name from slug (last segment, best effort)

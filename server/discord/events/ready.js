@@ -12,9 +12,17 @@ import { data as listData } from '../commands/list.js';
 import { data as resumeData } from '../commands/resume.js';
 import { data as sessionData } from '../commands/session.js';
 import { data as setupData } from '../commands/setup.js';
+import { data as statusData } from '../commands/status.js';
 import { discordConfig } from '../config.js';
 
-const commands = [setupData, sessionData, cancelData, resumeData, listData];
+const commands = [
+  setupData,
+  sessionData,
+  cancelData,
+  resumeData,
+  listData,
+  statusData,
+];
 
 export async function handleReady(client) {
   logger.log(`[Discord] Bot logged in as ${client.user.tag}`);

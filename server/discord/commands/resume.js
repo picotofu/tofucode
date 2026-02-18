@@ -113,8 +113,12 @@ export async function handleResume(interaction) {
 
     const selectedSessionId = selection.values[0];
 
-    // Check if this session already has a thread
-    const existingThreadId = await findThreadForSession(selectedSessionId);
+    // Check if this session already has a live Discord thread
+    // Pass guild so stale mappings (deleted threads) are cleaned up automatically
+    const existingThreadId = await findThreadForSession(
+      selectedSessionId,
+      interaction.guild,
+    );
     if (existingThreadId) {
       await selection.update({
         content: `⚠️ This session already has a Discord thread: <#${existingThreadId}>`,

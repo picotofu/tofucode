@@ -127,6 +127,17 @@ export function getSessionMapping(threadId) {
 }
 
 /**
+ * Remove a thread-to-session mapping
+ * @param {string} threadId - Discord thread ID
+ */
+export function removeSessionMapping(threadId) {
+  ensureDir();
+  const mappings = loadSessionMappings();
+  delete mappings[threadId];
+  writeFileSync(SESSIONS_FILE, JSON.stringify(mappings, null, 2));
+}
+
+/**
  * Find all sessions for a specific channel
  * @param {string} channelId - Discord channel ID
  * @returns {Array} Array of session mappings
