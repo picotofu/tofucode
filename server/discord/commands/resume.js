@@ -21,6 +21,7 @@ import { getChannelMapping } from '../config.js';
 import {
   createThreadForSession,
   findThreadForSession,
+  sendSessionHistoryToThread,
   sendToThread,
 } from '../lib/sync.js';
 
@@ -150,16 +151,27 @@ export async function handleResume(interaction) {
       interaction.user.id,
     );
 
-    // Send initial message to thread with session info
-    const sessionInfo = selectedSession
-      ? '📋 **Resumed session**\n' +
-        `**Title**: ${sessionTitle}\n` +
-        `**Messages**: ${selectedSession.messageCount}\n` +
-        `**Last active**: ${new Date(selectedSession.modified).toLocaleString()}\n\n` +
-        '_You can now continue this conversation in this thread._'
-      : `📋 **Resumed session**: ${sessionTitle}\n\n_You can now continue this conversation in this thread._`;
+    // Send session header
+    const lastActive = selectedSession
+      ? new Date(selectedSession.modified).toLocaleString()
+      : 'Unknown';
+    const msgCount = selectedSession?.messageCount ?? '?';
 
-    await sendToThread(thread, sessionInfo);
+    await sendToThread(
+      thread,
+      `📋 **Resumed session** — ${sessionTitle}\n` +
+        `${msgCount} messages • Last active: ${lastActive}\n` +
+        '─'.repeat(30),
+    );
+
+    // Send last 3 turns of conversation history
+    await sendSessionHistoryToThread(thread, projectSlug, selectedSessionId, 3);
+
+    // Send continuation prompt
+    await sendToThread(
+      thread,
+      '_Session history loaded above. Continue the conversation below._',
+    );
 
     // Update the selection response
     await selection.editReply({

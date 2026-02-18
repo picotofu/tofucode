@@ -8,7 +8,9 @@
  */
 
 import { logger } from '../../lib/logger.js';
+import { loadSessionHistory } from '../../lib/sessions.js';
 import { registerSession } from '../lib/sessions.js';
+import { chunkMessage } from './formatter.js';
 
 /**
  * Create a Discord thread for a session.
@@ -72,13 +74,8 @@ export async function sendToThread(thread, content) {
     return await thread.send(content);
   }
 
-  // Otherwise, chunk (simple split for now - Phase 2 can use formatter.js chunking)
-  const chunks = [];
-  let remaining = content;
-  while (remaining.length > 0) {
-    chunks.push(remaining.substring(0, 1900));
-    remaining = remaining.substring(1900);
-  }
+  // Use code-block-aware chunking from formatter
+  const chunks = chunkMessage(content);
 
   // Send first chunk, return that message
   const firstMessage = await thread.send(chunks[0]);
@@ -89,6 +86,112 @@ export async function sendToThread(thread, content) {
   }
 
   return firstMessage;
+}
+
+/**
+ * Format the last N turns of a session as Discord messages.
+ * Since bots can't impersonate users, user messages are prefixed with 👤.
+ *
+ * A "turn" = one user message + the assistant response to it.
+ *
+ * @param {string} projectSlug
+ * @param {string} sessionId
+ * @param {number} [turns=3] - Number of turns to load
+ * @returns {Promise<string[]>} Array of Discord-ready message strings (chunked)
+ */
+export async function formatLastTurnsForDiscord(
+  projectSlug,
+  sessionId,
+  turns = 3,
+) {
+  const { messages } = await loadSessionHistory(projectSlug, sessionId, {
+    turnLimit: turns,
+  });
+
+  if (!messages || messages.length === 0) {
+    return [];
+  }
+
+  const parts = [];
+
+  for (const msg of messages) {
+    switch (msg.type) {
+      case 'user':
+        // Bot can't impersonate - prefix clearly
+        if (msg.content?.trim()) {
+          parts.push(
+            `> 👤 **User**\n> ${msg.content.trim().replace(/\n/g, '\n> ')}`,
+          );
+        }
+        break;
+
+      case 'text':
+        // Assistant text response
+        if (msg.content?.trim()) {
+          parts.push(`🤖 ${msg.content.trim()}`);
+        }
+        break;
+
+      case 'tool_use': {
+        // Compact tool use line (same as formatter.js formatToolUse)
+        const { formatToolUse } = await import('./formatter.js');
+        parts.push(formatToolUse(msg));
+        break;
+      }
+
+      case 'tool_result':
+        // Only show errors
+        if (msg.isError && msg.content) {
+          parts.push(`> ❌ Tool error: ${msg.content.substring(0, 200)}`);
+        }
+        break;
+
+      case 'summary':
+        // Session summary from Claude's context management
+        parts.push(`> 📝 _Context summary (${turns} turns ago)_`);
+        break;
+
+      default:
+        // Skip system messages, progress updates, etc.
+        break;
+    }
+  }
+
+  if (parts.length === 0) {
+    return [];
+  }
+
+  // Join all parts and chunk for Discord's 2000 char limit
+  const combined = parts.join('\n\n');
+  return chunkMessage(combined);
+}
+
+/**
+ * Send the last N turns of session history to a Discord thread.
+ * Called after thread creation in /resume.
+ *
+ * @param {Object} thread - Discord thread object
+ * @param {string} projectSlug
+ * @param {string} sessionId
+ * @param {number} [turns=3]
+ */
+export async function sendSessionHistoryToThread(
+  thread,
+  projectSlug,
+  sessionId,
+  turns = 3,
+) {
+  const chunks = await formatLastTurnsForDiscord(projectSlug, sessionId, turns);
+
+  if (chunks.length === 0) {
+    return;
+  }
+
+  for (const chunk of chunks) {
+    if (chunk?.trim()) {
+      await thread.send(chunk);
+    }
+  }
 }
 
 /**
