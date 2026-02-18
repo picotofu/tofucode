@@ -8,12 +8,13 @@ import { REST, Routes } from 'discord.js';
 import { logger } from '../../lib/logger.js';
 // Import command definitions
 import { data as cancelData } from '../commands/cancel.js';
+import { data as listData } from '../commands/list.js';
 import { data as resumeData } from '../commands/resume.js';
 import { data as sessionData } from '../commands/session.js';
 import { data as setupData } from '../commands/setup.js';
 import { discordConfig } from '../config.js';
 
-const commands = [setupData, sessionData, cancelData, resumeData];
+const commands = [setupData, sessionData, cancelData, resumeData, listData];
 
 export async function handleReady(client) {
   logger.log(`[Discord] Bot logged in as ${client.user.tag}`);

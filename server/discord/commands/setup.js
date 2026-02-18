@@ -73,7 +73,7 @@ export async function handleSetup(interaction) {
   });
 
   const overwriteNote = existingMapping
-    ? `\n\n_Previously mapped to \`${existingMapping.projectPath}\`_`
+    ? `\n\n⚠️ _Previously mapped to \`${existingMapping.projectPath}\`. Existing threads will now run Claude in the new project directory._`
     : '';
 
   await interaction.reply(

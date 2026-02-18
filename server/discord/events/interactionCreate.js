@@ -6,6 +6,7 @@
 
 import { logger } from '../../lib/logger.js';
 import { handleCancel } from '../commands/cancel.js';
+import { handleList } from '../commands/list.js';
 import { handleResume } from '../commands/resume.js';
 import { handleSession } from '../commands/session.js';
 import { handleSetup } from '../commands/setup.js';
@@ -28,6 +29,9 @@ export async function handleInteraction(interaction) {
         break;
       case 'resume':
         await handleResume(interaction);
+        break;
+      case 'list':
+        await handleList(interaction);
         break;
       default:
         await interaction.reply({
