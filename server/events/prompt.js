@@ -336,6 +336,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
             isNew: isNewSession,
             prompt,
           });
+
           // Note: No need to broadcast sessions_list here - clients will
           // refresh via getRecentSessions() when task_status changes
         }

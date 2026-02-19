@@ -49,10 +49,10 @@ export function startWebUiBridge(client) {
     'session:start',
     async ({ projectPath, sessionId, isNew, prompt }) => {
       try {
-        const slug = pathToSlug(projectPath);
         const channelMapping = getChannelMappingByPath(projectPath);
         if (!channelMapping) return; // Project not mapped to any Discord channel
 
+        const slug = pathToSlug(projectPath);
         const { channelId } = channelMapping;
 
         // Find or create Discord thread for this session
@@ -66,22 +66,40 @@ export function startWebUiBridge(client) {
         );
         if (!thread) return;
 
-        // Initialize per-session state
-        sessionState.set(sessionId, {
-          thread,
-          toolState: {
-            counts: {},
-            lastBash: null,
-            lastTool: null,
-            lastToolHint: null,
-          },
-          fullText: '',
-          lastEditTime: 0,
-          thinkingMsg: null,
+        // Initialize (or re-use) per-session state
+        if (!sessionState.has(sessionId)) {
+          sessionState.set(sessionId, {
+            thread,
+            toolState: {
+              counts: {},
+              lastBash: null,
+              lastTool: null,
+              lastToolHint: null,
+            },
+            fullText: '',
+            lastEditTime: 0,
+            thinkingMsg: null,
+          });
+        }
+
+        const state = sessionState.get(sessionId);
+        // Always update thread ref in case it was re-created
+        state.thread = thread;
+
+        // Send user prompt flagged as Web UI input
+        await thread.send(formatUserPrompt(prompt)).catch((err) => {
+          logger.error('[Discord Bridge] Send error:', err);
         });
 
-        // Send thinking indicator
-        const state = sessionState.get(sessionId);
+        // Reset turn state and send thinking indicator
+        state.fullText = '';
+        state.toolState = {
+          counts: {},
+          lastBash: null,
+          lastTool: null,
+          lastToolHint: null,
+        };
+        state.lastEditTime = 0;
         state.thinkingMsg = await thread.send('⏳ Working…').catch((err) => {
           logger.error('[Discord Bridge] Send error:', err);
           return null;
@@ -138,7 +156,17 @@ export function startWebUiBridge(client) {
         }
       }
 
-      sessionState.delete(sessionId);
+      // Keep session state alive — user may send follow-up messages from Web UI.
+      // Reset per-turn fields, keep thread reference.
+      state.fullText = '';
+      state.toolState = {
+        counts: {},
+        lastBash: null,
+        lastTool: null,
+        lastToolHint: null,
+      };
+      state.thinkingMsg = null;
+      state.lastEditTime = 0;
     },
   );
 
@@ -147,10 +175,21 @@ export function startWebUiBridge(client) {
     if (!state) return;
 
     if (state.thinkingMsg) {
-      await state.thinkingMsg.edit(`⚠️ ${message}`).catch(() => {});
+      await state.thinkingMsg
+        .edit(`⚠️ ${message}\n\n-# 💬 Reply to retry or rephrase`)
+        .catch(() => {});
     }
 
-    sessionState.delete(sessionId);
+    // Keep state alive for retry
+    state.fullText = '';
+    state.toolState = {
+      counts: {},
+      lastBash: null,
+      lastTool: null,
+      lastToolHint: null,
+    };
+    state.thinkingMsg = null;
+    state.lastEditTime = 0;
   });
 }
 
@@ -230,4 +269,24 @@ async function editMsg(state, content) {
   await state.thinkingMsg.edit(content).catch((err) => {
     logger.error('[Discord Bridge] Edit error:', err);
   });
+}
+
+/**
+ * Format a user prompt as a bot message that's clearly flagged as Web UI input.
+ * Truncates long prompts to keep Discord messages readable.
+ *
+ * @param {string} prompt
+ * @returns {string}
+ */
+function formatUserPrompt(prompt) {
+  const MAX = 1500;
+  const text = prompt.trim();
+  const truncated =
+    text.length > MAX ? `${text.substring(0, MAX)}\n_…(truncated)_` : text;
+  // Blockquote the content so it's visually distinct from bot responses
+  const quoted = truncated
+    .split('\n')
+    .map((line) => `> ${line}`)
+    .join('\n');
+  return `👤 **Web UI**\n${quoted}`;
 }
