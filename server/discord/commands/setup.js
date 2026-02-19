@@ -72,13 +72,18 @@ export async function handleSetup(interaction) {
 
   // If already configured, always require confirmation via button
   if (existingMapping) {
+    // Namespace customIds with the interaction ID to avoid collisions between
+    // concurrent /setup invocations (e.g. two admins running it simultaneously)
+    const confirmId = `setup_confirm_${interaction.id}`;
+    const cancelId = `setup_cancel_${interaction.id}`;
+
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId('setup_confirm')
+        .setCustomId(confirmId)
         .setLabel('Yes, remap channel')
         .setStyle(ButtonStyle.Danger),
       new ButtonBuilder()
-        .setCustomId('setup_cancel')
+        .setCustomId(cancelId)
         .setLabel('Cancel')
         .setStyle(ButtonStyle.Secondary),
     );
@@ -96,7 +101,7 @@ export async function handleSetup(interaction) {
 
     // Wait for button click (30 second timeout)
     const filter = (i) =>
-      ['setup_confirm', 'setup_cancel'].includes(i.customId) &&
+      [confirmId, cancelId].includes(i.customId) &&
       i.user.id === interaction.user.id;
 
     try {
@@ -105,7 +110,7 @@ export async function handleSetup(interaction) {
         time: 30000,
       });
 
-      if (button.customId === 'setup_cancel') {
+      if (button.customId === cancelId) {
         await button.update({
           content: '❌ Remap cancelled. Channel mapping unchanged.',
           components: [],

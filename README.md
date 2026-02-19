@@ -331,6 +331,7 @@ tofucode supports a bring-your-own-bot Discord integration, letting you run Clau
 - Each Discord **channel** maps to one project
 - Each Discord **thread** is an isolated Claude Code session
 - Sessions are shared with the Web UI — continue in either interface
+- Web UI prompts are mirrored to Discord automatically (toggle in Settings → Discord)
 - Slash commands: `/setup`, `/session`, `/resume`, `/cancel`, `/list`, `/status`
 
 See the **[Discord Setup Guide](./docs/DISCORD_SETUP_GUIDE.md)** for full setup instructions, configuration options, and command reference.

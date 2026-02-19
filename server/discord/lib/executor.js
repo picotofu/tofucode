@@ -92,10 +92,12 @@ export async function* executePrompt({
     ...(Object.keys(mcpServers).length > 0 && { mcpServers }),
   };
 
-  // Set model if specified (opus defaults to 4.6)
+  // Set model if specified — map shorthand names to full model strings via config
   if (options.model) {
+    const modelKey = options.model; // e.g. 'opus', 'sonnet', 'haiku'
     queryOptions.model =
-      options.model === 'opus' ? 'claude-opus-4-6' : options.model;
+      config.models[modelKey] ??
+      (options.model.startsWith('claude-') ? options.model : undefined);
   }
 
   // Resume session if sessionId provided

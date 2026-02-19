@@ -6,5 +6,7 @@ export async function handler(ws) {
   send(ws, {
     type: 'settings',
     settings,
+    // Server capability flags — not user-editable, inform the frontend what's available
+    discordEnabled: process.env.DISCORD_ENABLED === 'true',
   });
 }

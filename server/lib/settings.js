@@ -12,6 +12,8 @@ const DEFAULT_SETTINGS = {
   symbolToolbar: '` ~ ! @ # $ % ^ & * ( ) - _ = + /',
   quickAccessFile: 'TODO.md', // Memo file for Cmd+M quick access (keep old key name)
   enableMemo: true, // Enable memo feature (Cmd+M quick access)
+  // Discord settings (only meaningful when DISCORD_ENABLED=true on the server)
+  discordSyncEnabled: true, // Mirror Web UI sessions to Discord
 };
 
 export function loadSettings() {

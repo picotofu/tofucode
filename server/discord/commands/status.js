@@ -33,6 +33,11 @@ export async function handleStatus(interaction) {
 
   const lines = [];
 
+  // Load channel sessions once (used in both config block and active tasks block)
+  const channelSessions = channelMapping
+    ? findSessionsByChannel(channelId)
+    : [];
+
   // --- Channel config ---
   lines.push('## 📡 Channel Config');
   if (channelMapping) {
@@ -41,9 +46,6 @@ export async function handleStatus(interaction) {
     lines.push(
       `**Since**: ${new Date(channelMapping.configuredAt).toLocaleDateString()}`,
     );
-
-    // Sessions in this channel
-    const channelSessions = findSessionsByChannel(channelId);
     lines.push(`**Threads in this channel**: ${channelSessions.length}`);
   } else {
     lines.push(
@@ -53,7 +55,6 @@ export async function handleStatus(interaction) {
 
   // --- Active sessions in this channel ---
   if (channelMapping) {
-    const channelSessions = findSessionsByChannel(channelId);
     const activeSessions = channelSessions.filter(
       (s) => tasks.get(s.sessionId)?.status === 'running',
     );

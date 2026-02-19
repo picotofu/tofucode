@@ -33,8 +33,35 @@ import {
   formatToolStatus,
 } from './formatter.js';
 
-// Per-session Discord state: sessionId → { thread, toolState, fullText, lastEditTime, thinkingMsg }
+// Per-session Discord state: sessionId → { thread, toolState, fullText, lastEditTime, thinkingMsg, cleanupTimer }
 const sessionState = new Map();
+
+// How long to keep idle session state after the last result/error (ms)
+const SESSION_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Schedule cleanup of session state after TTL.
+ * Cancels any existing scheduled cleanup first.
+ */
+function scheduleCleanup(sessionId) {
+  const state = sessionState.get(sessionId);
+  if (!state) return;
+  if (state.cleanupTimer) clearTimeout(state.cleanupTimer);
+  state.cleanupTimer = setTimeout(() => {
+    sessionState.delete(sessionId);
+  }, SESSION_TTL_MS);
+}
+
+/**
+ * Cancel any pending cleanup (called when a new turn starts).
+ */
+function cancelCleanup(sessionId) {
+  const state = sessionState.get(sessionId);
+  if (state?.cleanupTimer) {
+    clearTimeout(state.cleanupTimer);
+    state.cleanupTimer = null;
+  }
+}
 
 /**
  * Start the bridge — subscribe to event bus and forward to Discord.
@@ -79,10 +106,13 @@ export function startWebUiBridge(client) {
             fullText: '',
             lastEditTime: 0,
             thinkingMsg: null,
+            cleanupTimer: null,
           });
         }
 
         const state = sessionState.get(sessionId);
+        // Cancel any pending TTL cleanup — session is active again
+        cancelCleanup(sessionId);
         // Always update thread ref in case it was re-created
         state.thread = thread;
 
@@ -149,8 +179,13 @@ export function startWebUiBridge(client) {
       const display = [state.fullText, footer].filter(Boolean).join('\n\n');
       const chunks = chunkMessage(display);
 
-      if (state.thinkingMsg && chunks[0]) {
-        await state.thinkingMsg.edit(chunks[0]).catch(() => {});
+      if (chunks[0]) {
+        if (state.thinkingMsg) {
+          await state.thinkingMsg.edit(chunks[0]).catch(() => {});
+        } else {
+          // thinkingMsg failed to send earlier — fall back to a new message
+          await state.thread.send(chunks[0]).catch(() => {});
+        }
         for (let i = 1; i < chunks.length; i++) {
           await state.thread.send(chunks[i]).catch(() => {});
         }
@@ -167,6 +202,8 @@ export function startWebUiBridge(client) {
       };
       state.thinkingMsg = null;
       state.lastEditTime = 0;
+      // Schedule TTL cleanup so idle sessions don't accumulate indefinitely
+      scheduleCleanup(sessionId);
     },
   );
 
@@ -180,7 +217,7 @@ export function startWebUiBridge(client) {
         .catch(() => {});
     }
 
-    // Keep state alive for retry
+    // Keep state alive for retry (user may reply to the error message)
     state.fullText = '';
     state.toolState = {
       counts: {},
@@ -190,6 +227,8 @@ export function startWebUiBridge(client) {
     };
     state.thinkingMsg = null;
     state.lastEditTime = 0;
+    // Schedule TTL cleanup — errors are usually retried quickly, but don't leak forever
+    scheduleCleanup(sessionId);
   });
 }
 
@@ -288,5 +327,5 @@ function formatUserPrompt(prompt) {
     .split('\n')
     .map((line) => `> ${line}`)
     .join('\n');
-  return `👤 **Web UI**\n${quoted}`;
+  return `**👤 Web UI User Message**\n${quoted}`;
 }

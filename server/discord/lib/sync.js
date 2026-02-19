@@ -133,9 +133,14 @@ export async function formatLastTurnsForDiscord(
         break;
 
       case 'tool_use': {
-        // Compact tool use line (same as formatter.js formatToolUse)
-        const { formatToolUse } = await import('./formatter.js');
-        parts.push(formatToolUse(msg));
+        // Compact inline format — formatToolUse was removed, inline it here
+        const hint =
+          msg.input?.command ||
+          msg.input?.file_path ||
+          msg.input?.pattern ||
+          '';
+        const short = hint.length > 60 ? `${hint.substring(0, 57)}…` : hint;
+        parts.push(`> ⚙️ ${msg.tool}${short ? ` — ${short}` : ''}`);
         break;
       }
 

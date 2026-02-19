@@ -125,6 +125,20 @@ Create a thread in the configured channel. Each thread is an isolated Claude Cod
 
 > Sessions are also accessible from the Web UI. Conversations started in Discord appear in tofucode's session list, and vice versa.
 
+### Web UI → Discord Syncing
+
+When a project is mapped to a Discord channel, prompts sent from the **Web UI** are automatically mirrored to Discord:
+
+- A new thread is created in Discord for each new Web UI session (named after the first prompt)
+- Both your messages and Claude's responses appear in the thread, just like a Discord-initiated session
+
+**To disable syncing** (Web UI prompts stay local):
+
+1. Open tofucode Web UI → click the ⚙️ settings icon
+2. Under **Discord**, uncheck **Enable Discord Syncing**
+
+This setting takes effect immediately — no restart required.
+
 ---
 
 ## Slash Command Reference

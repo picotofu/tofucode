@@ -19,6 +19,10 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  discordEnabled: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const activeTab = ref('settings');
@@ -284,6 +288,25 @@ async function handleClearCacheAndUpdate() {
           />
         </div>
 
+        <!-- Discord Settings (only shown when DISCORD_ENABLED=true on server) -->
+        <template v-if="discordEnabled">
+          <hr class="divider" />
+          <div class="section-heading">Discord</div>
+          <div class="setting-item">
+            <label class="setting-label">
+              <input
+                type="checkbox"
+                v-model="localSettings.discordSyncEnabled"
+                class="setting-checkbox"
+              />
+              <span class="setting-title">Enable Discord Syncing</span>
+            </label>
+            <p class="setting-description">
+              Mirror Web UI sessions to Discord. Both your messages and Claude's responses will appear in the mapped Discord channel thread.
+            </p>
+          </div>
+        </template>
+
         <hr class="divider" />
 
         <!-- Clear Cache & Update PWA -->
@@ -510,6 +533,15 @@ async function handleClearCacheAndUpdate() {
 
 .setting-header {
   margin-bottom: 8px;
+}
+
+.section-heading {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 16px;
 }
 
 .setting-textarea {

@@ -45,7 +45,11 @@ const settings = ref({
   symbolToolbar: '` ~ ! @ # $ % ^ & * ( ) - _ = + /',
   quickAccessFile: 'TODO.md',
   enableMemo: true,
+  discordSyncEnabled: true,
 });
+
+// Server capability flags (not user settings — set by server environment)
+const discordEnabled = ref(false);
 
 function openSettings() {
   showSettings.value = true;
@@ -81,6 +85,9 @@ function handleRestart() {
 onMessage((msg) => {
   if (msg.type === 'settings') {
     settings.value = msg.settings;
+    if (msg.discordEnabled !== undefined) {
+      discordEnabled.value = msg.discordEnabled;
+    }
   } else if (msg.type === 'settings_updated') {
     if (msg.success) {
       settings.value = msg.settings;
@@ -258,6 +265,7 @@ onUnmounted(() => {
       :settings="settings"
       :connected="connected"
       :usage-stats="usageStats"
+      :discord-enabled="discordEnabled"
       @close="closeSettings"
       @update="updateSettings"
       @restart="handleRestart"

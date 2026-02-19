@@ -86,9 +86,13 @@ export async function handleResume(interaction) {
     };
   });
 
+  // Namespace customId with interaction ID to avoid collisions between
+  // concurrent /resume invocations
+  const selectId = `resume_session_${interaction.id}`;
+
   // Create select menu
   const selectMenu = new StringSelectMenuBuilder()
-    .setCustomId('resume_session')
+    .setCustomId(selectId)
     .setPlaceholder('Choose a session to resume')
     .addOptions(options);
 
@@ -103,7 +107,7 @@ export async function handleResume(interaction) {
 
   // Wait for user selection (60 second timeout)
   const filter = (i) =>
-    i.customId === 'resume_session' && i.user.id === interaction.user.id;
+    i.customId === selectId && i.user.id === interaction.user.id;
 
   try {
     const selection = await interaction.channel.awaitMessageComponent({

@@ -27,6 +27,7 @@ import { config, slugToPath } from '../config.js';
 import { eventBus } from '../lib/event-bus.js';
 import { logger } from '../lib/logger.js';
 import { loadMcpServers } from '../lib/mcp.js';
+import { loadSettings } from '../lib/settings.js';
 import { addTaskResult, getOrCreateTask, tasks } from '../lib/tasks.js';
 import {
   broadcast,
@@ -34,6 +35,15 @@ import {
   send,
   watchSession,
 } from '../lib/ws.js';
+
+// Emit to the event bus only when Discord sync is enabled in user settings.
+// Reads settings fresh each call so toggling the setting takes effect immediately.
+function discordEmit(event, payload) {
+  const settings = loadSettings();
+  if (settings.discordSyncEnabled) {
+    eventBus.emit(event, payload);
+  }
+}
 
 // Helper to send to client and broadcast to other session watchers
 function sendAndBroadcast(ws, sessionId, message) {
@@ -279,6 +289,11 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
     };
     addTaskResult(task, errorResult);
     sendAndBroadcast(ws, taskSessionId, errorResult);
+    discordEmit('session:error', {
+      projectPath,
+      sessionId: taskSessionId,
+      message: userMessage,
+    });
     broadcastTaskStatus(taskSessionId, {
       type: 'task_status',
       taskId: task.id,
@@ -330,7 +345,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
             projectPath,
             isNew: isNewSession,
           });
-          eventBus.emit('session:start', {
+          discordEmit('session:start', {
             projectPath,
             sessionId: newSessionId,
             isNew: isNewSession,
@@ -371,7 +386,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
             };
             addTaskResult(task, result);
             sendAndBroadcast(ws, taskSessionId, result);
-            eventBus.emit('session:text', {
+            discordEmit('session:text', {
               projectPath,
               sessionId: taskSessionId,
               content: block.text,
@@ -389,7 +404,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
             };
             addTaskResult(task, result);
             sendAndBroadcast(ws, taskSessionId, result);
-            eventBus.emit('session:tool', {
+            discordEmit('session:tool', {
               projectPath,
               sessionId: taskSessionId,
               tool: block.name,
@@ -466,7 +481,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
         };
         addTaskResult(task, result);
         sendAndBroadcast(ws, taskSessionId, result);
-        eventBus.emit('session:result', {
+        discordEmit('session:result', {
           projectPath,
           sessionId: taskSessionId,
           subtype: message.subtype,
@@ -559,7 +574,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
     };
     addTaskResult(task, errorResult);
     sendAndBroadcast(ws, taskSessionId, errorResult);
-    eventBus.emit('session:error', {
+    discordEmit('session:error', {
       projectPath,
       sessionId: taskSessionId,
       message: userMessage,

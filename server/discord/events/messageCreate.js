@@ -129,9 +129,10 @@ async function handleThreadMessage(message) {
   const isFirstMessage = sessionId === null; // true when this opens a new session
 
   try {
-    // Send "thinking" indicator
-    thinkingMsg = await message.reply('⏳ Thinking…').catch((err) => {
-      logger.error('[Discord] Reply error:', err);
+    // Send "thinking" indicator — use thread.send instead of message.reply
+    // to avoid Discord quoting the user's message above every bot response
+    thinkingMsg = await thread.send('⏳ Thinking…').catch((err) => {
+      logger.error('[Discord] Send error:', err);
       return null;
     });
 
@@ -218,24 +219,30 @@ async function handleThreadMessage(message) {
           const isSuccess = event.subtype === 'success';
           const footer = formatFooter(toolState, event);
 
-          // Item 3: mention user on completion (only on success, not trivial fast replies)
-          const elapsed = event.duration ?? 0;
-          const mention =
-            isSuccess && elapsed > 10000 ? `<@${message.author.id}> ` : '';
-
-          const display = buildDisplayMessage(fullText, errorLines, footer);
+          // Build display — fall back to footer alone if no text (avoids stuck 'Thinking…')
+          const display =
+            buildDisplayMessage(fullText, errorLines, footer) || footer;
           const chunks = chunkMessage(display);
 
-          if (thinkingMsg && chunks[0]) {
-            await thinkingMsg.edit(`${mention}${chunks[0]}`).catch((err) => {
-              logger.error('[Discord] Edit error:', err);
-            });
+          if (thinkingMsg) {
+            if (chunks[0]) {
+              await thinkingMsg.edit(chunks[0]).catch((err) => {
+                logger.error('[Discord] Edit error:', err);
+              });
+            }
             for (let i = 1; i < chunks.length; i++) {
               await thread.send(chunks[i]).catch((err) => {
                 logger.error('[Discord] Send error:', err);
               });
             }
           }
+
+          // Send a final message so Discord notifies the user even if they
+          // closed the thread — edits to the thinking message don't trigger notifications
+          const doneLabel = isSuccess ? '✅ Done' : '⚠️ Done with errors';
+          await thread.send(doneLabel).catch((err) => {
+            logger.error('[Discord] Send error:', err);
+          });
 
           if (newSessionId && sessionMapping === null) {
             setSessionTitle(projectSlug, newSessionId, thread.name);
