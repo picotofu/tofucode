@@ -234,7 +234,7 @@ Docker provides OS-level isolation that cannot be bypassed. See the [Docker Guid
 - **PWA Support** - Install as standalone app on desktop/mobile
 - **Auto-Update** - One-click upgrades for npm installs
 - **Docker Ready** - Multi-arch images with flexible mounting
-- **MCP Integration** - Auto-detection of Model Context Protocol servers
+- **MCP Manager** - View, add, edit, and remove MCP servers (HTTP/SSE full CRUD, stdio config management, OAuth read-only display) via plug icon in sidebar
 
 ### Keyboard Shortcuts
 

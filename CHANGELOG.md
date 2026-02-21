@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Terminal watch mode** — Schedule a bookmarked command to re-run at a set interval; output renders as a table or raw stdout in the Active tab
 - **Copy message button** — Hover over any user or Claude message to reveal a copy icon; copies raw markdown content to clipboard (not rendered HTML), with a 2-second checkmark feedback
+- **MCP Server Manager** — Dedicated modal (plug icon in sidebar) to view, add, edit, and remove MCP servers across all config scopes (local, project, user)
+  - HTTP/SSE servers: full CRUD with inline test connection (MCP handshake, status-aware result display)
+  - Stdio servers: full config CRUD (command, args, env vars); binary installation is user's responsibility
+  - OAuth-managed servers: read-only display with expiry badge and CLI reconfiguration hint
+  - Scope selector locked in edit mode; saving/loading state on form; inline mutation error banner
+  - Cmd+2 terminal subtab cycle order fixed: History → Active → Bookmarks
 
 ## [1.1.0] - 2026-02-18
 

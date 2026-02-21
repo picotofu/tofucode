@@ -395,9 +395,9 @@ function handleKeydown(e) {
     }
     if (e.key === '2') {
       e.preventDefault();
-      // If already in terminal mode, cycle through bookmarks → active → history
+      // If already in terminal mode, cycle through history → active → bookmarks
       if (currentMode.value === 'terminal') {
-        const tabs = ['bookmarks', 'active', 'history'];
+        const tabs = ['history', 'active', 'bookmarks'];
         const idx = tabs.indexOf(terminalSubTab.value);
         terminalSubTab.value = tabs[(idx + 1) % tabs.length];
       } else {

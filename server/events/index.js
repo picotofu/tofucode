@@ -29,6 +29,13 @@ import { handler as getTaskStatuses } from './get-task-statuses.js';
 import { handler as getUsageStats } from './get-usage-stats.js';
 import { handler as gitClone } from './git-clone.js';
 import { handler as loadOlderMessages } from './load-older-messages.js';
+import {
+  addHandler as mcpAdd,
+  listHandler as mcpList,
+  removeHandler as mcpRemove,
+  testHandler as mcpTest,
+  updateHandler as mcpUpdate,
+} from './mcp.js';
 import { handler as newSession } from './new-session.js';
 import { handler as prompt } from './prompt.js';
 import { handleRestart } from './restart.js';
@@ -91,4 +98,9 @@ export const handlers = {
   get_settings: getSettings,
   update_settings: updateSettings,
   get_usage_stats: getUsageStats,
+  'mcp:list': mcpList,
+  'mcp:add': mcpAdd,
+  'mcp:update': mcpUpdate,
+  'mcp:remove': mcpRemove,
+  'mcp:test': mcpTest,
 };

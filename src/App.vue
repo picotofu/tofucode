@@ -1,10 +1,11 @@
 <script setup>
-import { computed, onMounted, onUnmounted, provide, ref } from 'vue';
+import { onMounted, onUnmounted, provide, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import CommandPalette from './components/CommandPalette.vue';
 import FilePicker from './components/FilePicker.vue';
 import GitCloneModal from './components/GitCloneModal.vue';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal.vue';
+import McpModal from './components/McpModal.vue';
 import PwaPrompt from './components/PwaPrompt.vue';
 import SettingsModal from './components/SettingsModal.vue';
 import Sidebar from './components/Sidebar.vue';
@@ -75,6 +76,47 @@ function closeHelp() {
   showHelp.value = false;
 }
 
+// MCP modal state
+const showMcp = ref(false);
+const mcpServers = ref([]);
+const mcpLoading = ref(false);
+const mcpModalRef = ref(null);
+
+function openMcp() {
+  showMcp.value = true;
+}
+
+function closeMcp() {
+  showMcp.value = false;
+}
+
+function fetchMcpServers() {
+  mcpLoading.value = true;
+  send({ type: 'mcp:list' });
+}
+
+function handleMcpAdd({ name, config, scope }) {
+  send({ type: 'mcp:add', name, config, scope });
+}
+
+function handleMcpUpdate({ name, config, scope }) {
+  send({ type: 'mcp:update', name, config, scope });
+}
+
+function handleMcpRemove({ name, scope }) {
+  send({ type: 'mcp:remove', name, scope });
+}
+
+function handleMcpTest({ serverName, url, headers, _formLevel }) {
+  send({
+    type: 'mcp:test',
+    url,
+    headers,
+    _formLevel: _formLevel ?? false,
+    serverName: serverName ?? null,
+  });
+}
+
 function updateSettings(newSettings) {
   send({
     type: 'update_settings',
@@ -86,7 +128,7 @@ function handleRestart() {
   send({ type: 'restart' });
 }
 
-// Handle settings and usage messages
+// Handle settings, usage, and MCP messages
 onMessage((msg) => {
   if (msg.type === 'settings') {
     settings.value = msg.settings;
@@ -99,6 +141,22 @@ onMessage((msg) => {
     }
   } else if (msg.type === 'usage_stats') {
     usageStats.value = msg.stats;
+  } else if (msg.type === 'mcp:servers') {
+    mcpServers.value = msg.servers;
+    mcpLoading.value = false;
+  } else if (
+    msg.type === 'mcp:added' ||
+    msg.type === 'mcp:updated' ||
+    msg.type === 'mcp:removed'
+  ) {
+    if (msg.success) {
+      mcpServers.value = msg.servers;
+      mcpModalRef.value?.handleMutationSuccess();
+    } else {
+      mcpModalRef.value?.handleMutationError(msg.error ?? 'Operation failed');
+    }
+  } else if (msg.type === 'mcp:test_result') {
+    mcpModalRef.value?.handleTestResult(msg);
   }
 });
 
@@ -257,7 +315,7 @@ onUnmounted(() => {
 
 <template>
   <div class="app" :class="{ 'sidebar-open': sidebarOpen }">
-    <Sidebar :open="sidebarOpen" @close="closeSidebar" @open-settings="openSettings" @open-help="openHelp" />
+    <Sidebar :open="sidebarOpen" @close="closeSidebar" @open-settings="openSettings" @open-help="openHelp" @open-mcp="openMcp" />
     <div class="app-main">
       <router-view />
     </div>
@@ -288,6 +346,18 @@ onUnmounted(() => {
       :initial-target-dir="cloneInitialDir"
       @close="closeCloneDialog"
       @cloned="handleCloned"
+    />
+    <McpModal
+      ref="mcpModalRef"
+      :show="showMcp"
+      :servers="mcpServers"
+      :loading="mcpLoading"
+      @close="closeMcp"
+      @fetch="fetchMcpServers"
+      @add="handleMcpAdd"
+      @update="handleMcpUpdate"
+      @remove="handleMcpRemove"
+      @test="handleMcpTest"
     />
     <KeyboardShortcutsModal
       v-if="showHelp"
