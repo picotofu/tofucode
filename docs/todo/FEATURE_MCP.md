@@ -2,9 +2,9 @@
 
 ## Overview
 
-Enable MCP server integration in claude-web, allowing Claude to use external tools and services configured via MCP servers.
+Enable MCP server integration in tofucode, allowing Claude to use external tools and services configured via MCP servers.
 
-**Status:** ✅ **Phase 1 Complete** | 📋 **Phase 2 Planned**
+**Status:** ✅ **Phase 1 Complete** | 🚧 **Phase 2 In Progress**
 
 ---
 
@@ -12,20 +12,35 @@ Enable MCP server integration in claude-web, allowing Claude to use external too
 
 MCP (Model Context Protocol) is a standard for connecting AI assistants to external tools and data sources. Claude Code CLI already supports MCP servers, and the Claude Agent SDK provides the `mcpServers` option to pass server configurations.
 
-### Current User Configuration
+### MCP Server Types
 
-The user has the following MCP servers configured in Claude CLI:
+**1. HTTP / SSE (Remote)**
+- Hosted somewhere (third party or self-hosted)
+- Config is just a URL + optional auth headers / OAuth
+- Examples: `dbhub.io`, Notion MCP, hosted services
+- Works identically whether tofucode runs on a VM or locally
+
+**2. Stdio (Local process)**
+- Runs as a subprocess spawned by Claude on the same machine as tofucode
+- Transport is stdin/stdout between Claude and the MCP process
+- Examples: `npx @playwright/mcp@latest`, `docker run ...`, `python my_mcp.py`
+- "Local" means wherever tofucode's server runs — on VM or on user's machine
+
+### tofucode Context
+
+tofucode works in two modes:
+- **VM/remote** — browser is just UI, MCP processes run on the server
+- **Local** — tofucode and MCP both run on the user's own machine (no conflict)
+
+In both cases, MCP config lives on the server side (`~/.claude.json`, `.mcp.json`) and is a server-side concern.
+
+### Current User Configuration (Example)
 
 | Server | Type | URL/Command |
 |--------|------|-------------|
 | notion | HTTP | `https://mcp.notion.com/mcp` |
 | dbhub | HTTP | `http://0.0.0.0:9999/message` |
 | playwright | stdio | `npx @playwright/mcp@latest` |
-
-These servers provide tools like:
-- `mcp__notion__notion-search`, `mcp__notion__notion-fetch`, `mcp__notion__notion-update-page`
-- `mcp__dbhub__execute_sql`
-- `mcp__playwright__*` (browser automation)
 
 ---
 
@@ -87,92 +102,32 @@ type McpSSEServerConfig = {
 
 ---
 
-## Implementation Options
+## Scope Decisions
 
-### Option A: Auto-detect from Claude CLI Config
+Agreed design decisions for Phase 2 UI management:
 
-Read MCP server configurations from existing Claude CLI config files.
+| MCP Type | UI Capability | Rationale |
+|----------|--------------|-----------|
+| **HTTP / SSE** | Full CRUD — add, edit, remove, view | Config is just URL + headers; safe and straightforward |
+| **Stdio** | Config CRUD — add, edit, remove (command/args/env), view | User installs the binary themselves; tofucode only manages the config |
+| **OAuth** | Out of scope — read-only display of what's configured | Too complex; redirect URIs, token storage, refresh logic — user manages via CLI |
+| **Installation** | Out of scope entirely | Not tofucode's job; security risk on shared VM instances |
 
-**Pros:**
-- Zero configuration for users who already have MCP set up
-- Stays in sync with CLI settings
+### Why no OAuth management
 
-**Cons:**
-- Need to parse multiple config file formats
-- OAuth tokens stored in `.credentials.json` need careful handling
-- Config locations may vary
+OAuth flows require browser redirect URIs + server-side token storage + refresh logic. This is a rabbit hole that doesn't belong in tofucode. The user already sets this up via `claude mcp add --oauth ...` before tofucode is involved. tofucode already reads and applies `~/.claude/.credentials.json` automatically (Phase 1).
 
-**Config Locations:**
-- `~/.claude/settings.json` - allowedCommands with MCP tools
-- `~/.claude/.credentials.json` - OAuth tokens for MCP servers
-- `~/.claude/plugins/*/.mcp.json` - Plugin MCP configs
+### Why no stdio installation management
 
-### Option B: Dedicated Config File
+- Spawning arbitrary install commands from a web UI is a meaningful attack surface, especially on shared VM instances
+- Whether it's `npx`, `uvx`, `docker`, or a compiled binary — the user manages their own toolchain
+- The stdio config (command/args/env) is what tofucode manages; the binary existing is the user's responsibility
 
-Create a `mcp-servers.json` config file for claude-web.
+### Config scope — default to local
 
-**Pros:**
-- Clear separation from CLI config
-- Full control over format
-- No parsing complexity
-
-**Cons:**
-- Duplicate configuration
-- Manual sync required
-
-**Example:**
-```json
-{
-  "servers": {
-    "notion": {
-      "type": "http",
-      "url": "https://mcp.notion.com/mcp"
-    },
-    "dbhub": {
-      "type": "http",
-      "url": "http://0.0.0.0:9999/message"
-    },
-    "playwright": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"]
-    }
-  }
-}
-```
-
-### Option C: UI Configuration
-
-Add MCP server management in the web UI.
-
-**Pros:**
-- User-friendly
-- No file editing required
-- Can validate connections
-
-**Cons:**
-- More complex implementation
-- Need to store config somewhere (localStorage, backend file)
-- OAuth flow handling is complex
-
----
-
-## Recommended Approach
-
-**Phase 1: Auto-detect from CLI Config (Option A)** ✅ IMPLEMENTED
-- Reads MCP servers from `~/.claude.json` (user and project scopes)
-- Reads local overrides from `.mcp.json` in project root
-- Merges with precedence: user < project < local
-- Applies OAuth credentials from `~/.claude/.credentials.json`
-
-**Phase 2: UI Status Display**
-- Display connected MCP servers in sidebar
-- Show connection status (connected/error)
-
-**Phase 3: UI Configuration (Option C)**
-- Optional enhancement
-- Add/remove servers from UI
-- Test connection functionality
+New servers added via UI should default to **local scope** (`.mcp.json` in project root):
+- Most surgical — doesn't affect other projects
+- User scope (`~/.claude.json`) is too broad to manage from a per-project UI
 
 ---
 
@@ -189,7 +144,7 @@ Config Sources (merged with precedence: user < project < local):
 
 Features:
 - Automatic OAuth token injection from `~/.claude/.credentials.json`
-- Token expiry checking (5 minute buffer)
+- Token expiry checking (5-minute buffer)
 - Logging of loaded servers (without sensitive data)
 - `getMcpServerInfo()` helper for UI display
 
@@ -223,140 +178,103 @@ Each server has custom icons and display formatting for better UX.
 
 ---
 
-### Phase 2: UI Management 📋 **PLANNED**
+### Phase 2: UI Management 🚧 **PLANNED**
 
-**Scope:** Full MCP server management from the web interface
+#### Scope Summary
 
-#### 2.1 View MCP Servers
-- New page/section to view configured MCP servers
-- Display per-project and global servers
-- Show server type, status, and available tools
-- Filter/search through servers
+- View all configured MCP servers (all scopes, all types)
+- HTTP/SSE: full CRUD
+- Stdio: config CRUD (no install)
+- OAuth: read-only, show expiry status
+- Default new servers to local scope (`.mcp.json`)
 
-#### 2.2 Add/Edit Servers
-- Forms to add new MCP servers (HTTP, SSE, stdio)
-- Edit existing server configurations
-- Validation for server URLs and commands
-- Test connection before saving
+#### 2.1 Backend API Endpoints
 
-#### 2.3 Server Status & Health
-- Real-time connection status indicators
-- Error messages for failed servers
-- Tool availability list per server
-- OAuth authentication flow for HTTP servers
-
-#### 2.4 Scope Management
-- Toggle servers per project vs global
-- Override global servers at project level
-- Manage `.mcp.json` files from UI
-
-#### 2.5 Backend APIs
-New API endpoints needed:
 ```
-GET  /api/mcp/servers          # List all servers (user + project + local)
-POST /api/mcp/servers          # Add new server
-PUT  /api/mcp/servers/:name    # Update server config
-DELETE /api/mcp/servers/:name  # Remove server
-GET  /api/mcp/servers/:name/status  # Connection status
-POST /api/mcp/servers/:name/test    # Test connection
+GET    /api/mcp/servers                  # List servers (merged, all scopes) with metadata
+POST   /api/mcp/servers                  # Add server (writes to .mcp.json by default)
+PUT    /api/mcp/servers/:name            # Update server config
+DELETE /api/mcp/servers/:name            # Remove server (from specific scope file)
+POST   /api/mcp/servers/:name/test       # Test HTTP/SSE connection (ping URL)
 ```
 
-#### Implementation Complexity: **HIGH**
-- Multiple forms for different server types
-- File system operations for config management
-- OAuth flow handling for HTTP servers
-- Real-time status monitoring
-- Scope-aware CRUD operations
+Scope targeting via query param or body field:
+- `scope=local` → `.mcp.json` in project root (default)
+- `scope=project` → `~/.claude.json` project entry
+- `scope=user` → `~/.claude.json` root
 
-**Estimated Effort:** 2-3 days of focused development
+#### 2.2 View MCP Servers
+
+- Panel/page listing all configured servers across scopes
+- Show per server: name, type, source scope, URL or command, OAuth expiry if applicable
+- Read-only for OAuth-configured servers — show a note to manage via CLI
+
+#### 2.3 Add / Edit Servers
+
+**HTTP / SSE form fields:**
+- Name (unique identifier)
+- Type: `http` | `sse`
+- URL
+- Headers (key-value pairs, optional)
+- Scope selector (local / project / user)
+- Test connection button (pings the URL before save)
+
+**Stdio form fields:**
+- Name (unique identifier)
+- Command (e.g. `npx`, `docker`, `python`)
+- Args (space-separated or array input)
+- Env vars (key-value pairs, optional)
+- Scope selector (local / project / user)
+- No test connection — not meaningful for stdio
+
+#### 2.4 Remove Servers
+
+- Delete from the scope it's defined in
+- Warn if removing a server defined at a higher scope (user/project) — change is permanent
+- Cannot delete servers configured with OAuth via UI — show CLI instruction
+
+#### 2.5 Config File Operations
+
+Backend reads and writes:
+- `.mcp.json` — local scope per project
+- `~/.claude.json` — user/project scopes (surgical merge, don't overwrite unrelated keys)
 
 ---
 
-### Phase 3: Advanced Features (Future)
-
-- **Tool Permissions**: Granular control over which MCP tools are allowed
-- **Usage Analytics**: Track which MCP tools are used most
-- **Server Marketplace**: Discover and install popular MCP servers
-- **Custom Tool Wrappers**: Create aliases or shortcuts for complex tool chains
-
-### Phase 3: UI Enhancement
-
-#### 3.1 MCP Status in Sidebar
-
-- Show connected MCP servers
-- Connection status indicator (connected/error)
-- Tool count per server
-
-#### 3.2 MCP Management Page
-
-- List all configured servers
-- Add new servers (stdio/http/sse)
-- Test connection
-- View available tools
-
----
-
-## File Structure
+## File Structure (Phase 2)
 
 ```
 server/
 ├── lib/
-│   └── mcp.js                    # MCP config loading
+│   ├── mcp.js                        # Existing: load/merge MCP config (Phase 1)
+│   └── mcp-config.js                 # New: read/write config file operations
 └── events/
-    └── mcp.js                    # MCP status WebSocket events (optional)
+    └── mcp.js                        # New: WebSocket event handlers for MCP management
 
 src/
 ├── components/
-│   └── McpStatus.vue             # MCP status indicator (Phase 3)
+│   ├── McpServerList.vue             # Server list with status indicators
+│   ├── McpServerForm.vue             # Add/edit form (HTTP/SSE and stdio variants)
+│   └── McpServerItem.vue             # Single server row/card
 └── views/
-    └── McpSettingsView.vue       # MCP management UI (Phase 3)
-
-# Config file (user creates)
-mcp-servers.json                  # Project-level MCP config
-~/.tofucode/mcp-servers.json    # Global MCP config
+    └── McpView.vue                   # MCP management page (or settings panel)
 ```
 
 ---
 
 ## Security Considerations
 
-1. **OAuth Tokens**: Never expose tokens to frontend; keep in backend only
-2. **Stdio Servers**: Validate commands to prevent arbitrary code execution
-3. **HTTP Servers**: Consider allowing only localhost or whitelisted domains
-4. **Permissions**: MCP tools should respect existing permission modes
-
----
-
-## Testing Plan
-
-1. **Stdio Server**: Test with playwright MCP
-   - Verify process spawning
-   - Test tool invocation
-   - Clean process termination
-
-2. **HTTP Server**: Test with local dbhub
-   - Verify HTTP requests
-   - Test authentication headers
-   - Handle connection errors
-
-3. **OAuth Server**: Test with Notion
-   - Token refresh flow
-   - Permission scopes
-   - Error handling
-
----
-
-## Related Documentation
-
-- [Claude Agent SDK MCP Types](https://platform.claude.com/docs/en/agent-sdk/overview)
-- [Model Context Protocol Spec](https://modelcontextprotocol.io/)
-- [FEATURE_CLAUDE_INTERACTIVE.md](./FEATURE_CLAUDE_INTERACTIVE.md) - Permission handling
+1. **OAuth Tokens**: Never expose tokens to frontend; keep in backend only — already enforced in Phase 1
+2. **Stdio commands**: Validate that command is not an arbitrary shell string; reject shell operators (`&&`, `|`, `;`, `$()`)
+3. **HTTP URLs**: No domain whitelist (user's own config), but validate URL format
+4. **Scope writes**: Only write to expected config file locations; never path-traverse
+5. **Shared instances**: On VM deployments, all browser users share MCP config — document this clearly
 
 ---
 
 ## Success Criteria
 
-### Phase 1 (Complete)
+### Phase 1 ✅ Complete
 - [x] MCP servers load from CLI config files (user, project, local scopes)
 - [x] OAuth credentials applied to HTTP servers automatically
 - [x] Tools from MCP servers available in Claude responses
@@ -365,11 +283,19 @@ mcp-servers.json                  # Project-level MCP config
 - [x] Modular frontend structure for adding new MCP servers
 - [ ] Stdio servers spawn and communicate correctly (needs testing with playwright)
 
-### Phase 2 (Planned)
-- [ ] View all configured MCP servers from UI
-- [ ] Add new MCP servers (HTTP, SSE, stdio) from UI
-- [ ] Edit/delete existing servers
-- [ ] Test server connections from UI
-- [ ] Real-time server status indicators
-- [ ] Per-project vs global scope management
-- [ ] OAuth flow handling for HTTP servers
+### Phase 2 🚧 Planned
+- [ ] View all configured MCP servers from UI (all scopes, all types)
+- [ ] Add HTTP/SSE servers from UI (with test connection)
+- [ ] Edit HTTP/SSE server config from UI
+- [ ] Add stdio servers from UI (config only, no install)
+- [ ] Edit stdio server config from UI
+- [ ] Delete servers from UI (from correct scope file)
+- [ ] OAuth servers shown read-only with expiry status and CLI hint
+- [ ] Default new servers to local scope
+
+---
+
+## Related Documentation
+
+- [Claude Agent SDK MCP Types](https://platform.claude.com/docs/en/agent-sdk/overview)
+- [Model Context Protocol Spec](https://modelcontextprotocol.io/)
