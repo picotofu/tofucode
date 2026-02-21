@@ -893,6 +893,12 @@ export function useChatWebSocket() {
     // The server will send back session_info with the new sessionId
     currentSession.value = null;
     messages.value = [];
+    sessionTitle.value = null;
+    hasOlderMessages.value = false;
+    totalTurns.value = 0;
+    loadedTurns.value = 0;
+    messagesOffset.value = 0;
+    summaryCount.value = 0;
     taskStatus.value = 'idle'; // Reset task status for new session
     // Reset contextReady until server acknowledges (sends session_selected)
     contextReady.value = false;
