@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Message Queue** — Submit prompts while Claude is running; they queue server-side (FIFO) and execute automatically once the current task finishes
+  - Red badge on chat prompt icon shows queue depth; click to open Queue Manager modal
+  - Queue Manager: view queued prompts with position, preview, timestamp, and per-item delete; Clear All with confirmation
+  - Queue pauses on task cancel — next item processes only after a task completes or errors
+  - Queue state synced on session select/reconnect; cleared when session is deleted
+  - Max 50 queued messages per session; empty/invalid prompts rejected before enqueue
+  - Queue processing is single-file: each item runs to completion before the next dequeues
 - **Terminal watch mode** — Schedule a bookmarked command to re-run at a set interval; output renders as a table or raw stdout in the Active tab
 - **Copy message button** — Hover over any user or Claude message to reveal a copy icon; copies raw markdown content to clipboard (not rendered HTML), with a 2-second checkmark feedback
 - **MCP Server Manager** — Dedicated modal (plug icon in sidebar) to view, add, edit, and remove MCP servers across all config scopes (local, project, user)

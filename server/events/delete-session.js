@@ -27,6 +27,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { getSessionsDir } from '../config.js';
+import { clearQueue } from '../lib/message-queue.js';
 import { deleteTitle } from '../lib/session-titles.js';
 import { isValidSessionId } from '../lib/sessions.js';
 import { broadcast, send } from '../lib/ws.js';
@@ -80,6 +81,9 @@ export function handler(ws, message, context) {
 
     // Delete session title if exists
     deleteTitle(context.currentProjectPath, sessionId);
+
+    // Clear any queued messages for this session
+    clearQueue(sessionId);
 
     // Broadcast to all clients so UI updates everywhere
     broadcast({

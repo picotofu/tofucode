@@ -18,6 +18,7 @@
  * { type: 'session_history', messages: [...] }
  */
 
+import { getQueue } from '../lib/message-queue.js';
 import { isValidSessionId, loadSessionHistory } from '../lib/sessions.js';
 import { clearCompletedTask, getOrCreateTask } from '../lib/tasks.js';
 import {
@@ -144,6 +145,15 @@ export async function handler(ws, message, context) {
     totalTurns,
     loadedTurns,
     offset: effectiveOffset,
+  });
+
+  // Send current queue state to the requesting client
+  const sessionQueue = getQueue(sessionId);
+  send(ws, {
+    type: 'queue_state',
+    sessionId,
+    queue: sessionQueue,
+    size: sessionQueue.length,
   });
 
   // Clear completed/error task from memory when user opens the session

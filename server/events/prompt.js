@@ -27,6 +27,7 @@ import { config, slugToPath } from '../config.js';
 import { eventBus } from '../lib/event-bus.js';
 import { logger } from '../lib/logger.js';
 import { loadMcpServers } from '../lib/mcp.js';
+import { dequeue, enqueue, getQueue } from '../lib/message-queue.js';
 import { loadSettings } from '../lib/settings.js';
 import { addTaskResult, getOrCreateTask, tasks } from '../lib/tasks.js';
 import {
@@ -45,9 +46,13 @@ function discordEmit(event, payload) {
   }
 }
 
-// Helper to send to client and broadcast to other session watchers
+// Helper to send to client and broadcast to other session watchers.
+// ws may be null when processing a queued message after the originating tab closed —
+// in that case we broadcast to session watchers only (no direct send).
 function sendAndBroadcast(ws, sessionId, message) {
-  send(ws, message);
+  if (ws) {
+    send(ws, message);
+  }
   if (sessionId) {
     broadcastToSession(sessionId, message, ws);
   }
@@ -66,16 +71,28 @@ export async function handler(ws, message, context) {
     return;
   }
 
-  // Check if the CURRENT session already has a running task
-  // This allows concurrent queries on different sessions (different tabs/connections)
-  // but prevents double-sending on the same session
+  // Check if the CURRENT session already has a running task.
+  // If so, enqueue the prompt instead of rejecting it — it will be auto-processed
+  // once the current task finishes.
   if (context.currentSessionId) {
     const existingTask = getOrCreateTask(context.currentSessionId);
     if (existingTask.status === 'running') {
-      send(ws, {
-        type: 'error',
-        message:
-          'A task is already running on this session. Please wait for it to complete or cancel it first.',
+      const result = enqueue(context.currentSessionId, message.prompt, {
+        model: message.model,
+        permissionMode: message.permissionMode,
+        dangerouslySkipPermissions: message.dangerouslySkipPermissions,
+      });
+      if (!result.ok) {
+        send(ws, { type: 'error', message: result.error });
+        return;
+      }
+      const queue = getQueue(context.currentSessionId);
+      // Broadcast to all session watchers — no excludeWs so the sender is included too.
+      broadcastToSession(context.currentSessionId, {
+        type: 'queue_updated',
+        sessionId: context.currentSessionId,
+        queue,
+        size: queue.length,
       });
       return;
     }
@@ -109,10 +126,12 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
     const relativePath = path.relative(resolvedRoot, resolvedProject);
 
     if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-      send(ws, {
-        type: 'error',
-        message: `Access denied: project outside root (${config.rootPath})`,
-      });
+      if (ws) {
+        send(ws, {
+          type: 'error',
+          message: `Access denied: project outside root (${config.rootPath})`,
+        });
+      }
       return sessionId; // Return current session unchanged
     }
   }
@@ -164,10 +183,12 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
       queryOptions.model = options.model;
     } else {
       // Reject unknown/invalid model strings
-      send(ws, {
-        type: 'error',
-        message: `Invalid model: "${options.model}". Use "opus", "sonnet", "haiku", or a valid claude-* model string.`,
-      });
+      if (ws) {
+        send(ws, {
+          type: 'error',
+          message: `Invalid model: "${options.model}". Use "opus", "sonnet", "haiku", or a valid claude-* model string.`,
+        });
+      }
       return sessionId;
     }
   }
@@ -228,6 +249,12 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
     status: 'running',
     resultsCount: 1,
   });
+
+  // Flag set when the task completes (result received) inside the stream loop.
+  // processNextInQueue is deferred to after the loop exits to avoid a double-fire
+  // race where the next queued task sets task.status='running' before the
+  // post-loop fallback checks it, causing both messages to execute simultaneously.
+  let shouldProcessQueue = false;
 
   let stream;
   try {
@@ -300,6 +327,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
       status: 'error',
       resultsCount: task.results.length,
     });
+    processNextInQueue(taskSessionId, projectSlug);
     return taskSessionId;
   }
 
@@ -339,12 +367,14 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
             // Register this client as watching the new session
             watchSession(taskSessionId, ws);
           }
-          send(ws, {
-            type: 'session_info',
-            sessionId: newSessionId,
-            projectPath,
-            isNew: isNewSession,
-          });
+          if (ws) {
+            send(ws, {
+              type: 'session_info',
+              sessionId: newSessionId,
+              projectPath,
+              isNew: isNewSession,
+            });
+          }
           discordEmit('session:start', {
             projectPath,
             sessionId: newSessionId,
@@ -492,8 +522,15 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
         // Mark completed immediately on result — don't wait for the for-await loop to exit.
         // The SDK may keep the stream open briefly after emitting result (e.g. cleanup),
         // which causes the session to appear stuck in "running" state.
+        // Mark completed but defer processNextInQueue to after the loop exits.
+        // The SDK may keep the stream open briefly after emitting result (cleanup),
+        // so we can't call processNextInQueue here — the next task would set
+        // task.status='running' while this loop is still iterating, causing the
+        // post-loop fallback to fire processNextInQueue a second time and run
+        // two queued messages simultaneously.
         task.status = 'completed';
         task.stream = null;
+        shouldProcessQueue = true;
         broadcastTaskStatus(taskSessionId, {
           type: 'task_status',
           taskId: task.id,
@@ -504,18 +541,40 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
       }
     }
 
-    // Loop exited naturally — ensure status is completed if not already set.
-    // Handles edge case where stream ends without a result message.
-    if (task.status === 'running') {
-      task.status = 'completed';
-      task.stream = null;
-      broadcastTaskStatus(taskSessionId, {
-        type: 'task_status',
-        taskId: task.id,
-        status: 'completed',
-        resultsCount: task.results.length,
-      });
-      console.log(`Task ${task.id} completed (stream ended without result)`);
+    // Loop exited naturally.
+    // Case 1: result message was received inside the loop (shouldProcessQueue=true, status='completed')
+    //   → process queue now that the loop has fully exited (safe: no more iterations possible)
+    // Case 2: stream ended without a result message (status still 'running')
+    //   → mark completed and process queue
+    // Case 3: abort signal fired (status='cancelled' or aborted after loop drain)
+    //   → queue pauses on cancel
+    if (shouldProcessQueue) {
+      // Result was received — loop is now fully done, safe to process next queue item
+      processNextInQueue(taskSessionId, projectSlug);
+    } else if (task.status === 'running') {
+      if (abortController.signal.aborted) {
+        task.status = 'cancelled';
+        task.stream = null;
+        broadcastTaskStatus(taskSessionId, {
+          type: 'task_status',
+          taskId: task.id,
+          status: 'cancelled',
+          resultsCount: task.results.length,
+        });
+        console.log(`Task ${task.id} cancelled (stream ended after abort)`);
+        // Queue pauses on cancel — do NOT call processNextInQueue
+      } else {
+        task.status = 'completed';
+        task.stream = null;
+        broadcastTaskStatus(taskSessionId, {
+          type: 'task_status',
+          taskId: task.id,
+          status: 'completed',
+          resultsCount: task.results.length,
+        });
+        console.log(`Task ${task.id} completed (stream ended without result)`);
+        processNextInQueue(taskSessionId, projectSlug);
+      }
     }
   } catch (error) {
     task.status = 'error';
@@ -585,7 +644,41 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
       status: 'error',
       resultsCount: task.results.length,
     });
+    processNextInQueue(taskSessionId, projectSlug);
   }
 
   return taskSessionId;
+}
+
+/**
+ * Dequeue and execute the next queued prompt for a session (if any).
+ * Called after each task completes or errors — NOT after cancel (queue pauses on cancel).
+ * ws is null so messages broadcast to session watchers only.
+ */
+function processNextInQueue(sessionId, projectSlug) {
+  if (!sessionId) return;
+  const next = dequeue(sessionId);
+  if (!next) return;
+
+  // Broadcast updated queue state (item was dequeued)
+  const queue = getQueue(sessionId);
+  broadcastToSession(sessionId, {
+    type: 'queue_updated',
+    sessionId,
+    queue,
+    size: queue.length,
+  });
+
+  console.log(
+    `[queue] Processing next queued message for session ${sessionId}: "${next.prompt.substring(0, 50)}..."`,
+  );
+
+  executePrompt(null, projectSlug, sessionId, next.prompt, next.options).catch(
+    (err) => {
+      console.error(
+        `[queue] Error processing queued message for session ${sessionId}:`,
+        err,
+      );
+    },
+  );
 }
