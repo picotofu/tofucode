@@ -16,6 +16,7 @@ import DebugPopover from '../components/DebugPopover.vue';
 import FileEditor from '../components/FileEditor.vue';
 import FileExplorer from '../components/FileExplorer.vue';
 import GitDiffModal from '../components/GitDiffModal.vue';
+import QueueModal from '../components/QueueModal.vue';
 import TerminalOutput from '../components/TerminalOutput.vue';
 import { useDebugMode } from '../composables/useDebugMode';
 import { useChatWebSocket, useWebSocket } from '../composables/useWebSocket';
@@ -68,6 +69,10 @@ const {
   clearTaskStatus,
   pendingQuestion,
   answerQuestion,
+  queuedMessages,
+  queueSize,
+  deleteQueuedMessage,
+  clearQueuedMessages,
   send,
   sendAndWait,
   onMessage,
@@ -237,6 +242,21 @@ function handleQuestionSubmit(toolUseId, answers) {
 function closeQuestionModal() {
   showQuestionModal.value = false;
   questionModalData.value = null;
+}
+
+// Queue modal
+const showQueueModal = ref(false);
+
+function openQueueModal() {
+  showQueueModal.value = true;
+}
+
+function closeQueueModal() {
+  showQueueModal.value = false;
+}
+
+function handleQueueBadgeClick() {
+  if (queueSize.value > 0) openQueueModal();
 }
 
 // Auto-open question modal when server sends ask_user_question
@@ -1026,7 +1046,13 @@ function cancelEditingSessionTitle() {
 
 function handleSubmit() {
   const prompt = inputValue.value.trim();
-  if (!prompt || isRunning.value) return;
+  if (!prompt) return;
+
+  // Guard: cannot send while session is being created (new session route with no ID yet)
+  if (currentSession.value === null && !isNewSession.value) {
+    // Edge case: project selected but no session — shouldn't happen normally
+    return;
+  }
 
   // Check if server context is ready (prevents lost messages after reconnect)
   if (!contextReady.value) {
@@ -2521,10 +2547,16 @@ watch(
 
       <!-- Chat input -->
       <form v-if="currentMode === 'chat'" class="input-form" :class="['permission-' + permissionMode, { 'reconnecting': !contextReady }]" @submit.prevent="handleSubmit" @click="focusChatInput">
-        <span class="chat-prompt">
+        <span
+          class="chat-prompt"
+          :class="{ 'has-queue': queueSize > 0 }"
+          :title="queueSize > 0 ? `${queueSize} message${queueSize === 1 ? '' : 's'} queued — click to manage` : undefined"
+          @click.stop="handleQueueBadgeClick"
+        >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
+          <span v-if="queueSize > 0" class="queue-badge">{{ queueSize }}</span>
         </span>
         <div
           ref="editorEl"
@@ -2566,7 +2598,7 @@ watch(
         <button
           type="submit"
           class="send-btn"
-          :disabled="!inputValue.trim() || isRunning || !contextReady"
+          :disabled="!inputValue.trim() || !contextReady"
           title="Send (Ctrl+Enter)"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2868,6 +2900,15 @@ watch(
       :tool-use-id="questionModalData?.toolUseId"
       @submit="handleQuestionSubmit"
       @close="closeQuestionModal"
+    />
+
+    <!-- Queue Modal -->
+    <QueueModal
+      :show="showQueueModal"
+      :messages="queuedMessages"
+      @close="closeQueueModal"
+      @delete="deleteQueuedMessage"
+      @clear="clearQueuedMessages"
     />
 
     <!-- Debug Popover -->
@@ -4108,6 +4149,32 @@ watch(
   align-self: flex-start;
   padding-left: 4px;
   padding-top: 4px;
+  position: relative;
+}
+
+/* Specificity must beat .input-form.permission-* .chat-prompt (0,2,0) */
+.input-form .chat-prompt.has-queue {
+  cursor: pointer;
+  color: #f87171;
+}
+
+.queue-badge {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: #ef4444;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-sizing: border-box;
 }
 
 .input-form.permission-plan .chat-prompt {

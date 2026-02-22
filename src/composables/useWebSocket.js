@@ -1,4 +1,4 @@
-import { onUnmounted, readonly, ref } from 'vue';
+import { computed, onUnmounted, readonly, ref } from 'vue';
 
 // ============================================
 // GLOBAL STATE (shared across all components)
@@ -496,6 +496,10 @@ export function useChatWebSocket() {
   // This prevents sending prompts before server has our context after reconnect
   const contextReady = ref(false);
 
+  // Message queue state — prompts queued while a task is running
+  const queuedMessages = ref([]); // Array of { id, prompt, options, queuedAt }
+  const queueSize = computed(() => queuedMessages.value.length);
+
   // Pending AskUserQuestion waiting for user response
   const pendingQuestion = ref(null); // { toolUseId, questions }
 
@@ -802,6 +806,14 @@ export function useChatWebSocket() {
           pendingQuestion.value = null;
         }
         break;
+
+      case 'queue_state':
+      case 'queue_updated':
+        // Only update queue if it's for the current session
+        if (msg.sessionId === currentSession.value) {
+          queuedMessages.value = msg.queue || [];
+        }
+        break;
     }
   }
 
@@ -841,6 +853,7 @@ export function useChatWebSocket() {
     summaryCount.value = 0;
     sessionTitle.value = null;
     taskStatus.value = 'idle'; // Reset task status when switching sessions
+    queuedMessages.value = []; // Clear queue until server sends queue_state
     // Reset contextReady until server acknowledges session selection
     contextReady.value = false;
     send({ type: 'select_session', sessionId, ...options });
@@ -900,6 +913,7 @@ export function useChatWebSocket() {
     messagesOffset.value = 0;
     summaryCount.value = 0;
     taskStatus.value = 'idle'; // Reset task status for new session
+    queuedMessages.value = []; // New session has no queued messages
     // Reset contextReady until server acknowledges (sends session_selected)
     contextReady.value = false;
     send({ type: 'new_session', ...options });
@@ -918,6 +932,14 @@ export function useChatWebSocket() {
 
   function cancelTask() {
     send({ type: 'cancel_task' });
+  }
+
+  function deleteQueuedMessage(messageId) {
+    send({ type: 'queue:delete', messageId });
+  }
+
+  function clearQueuedMessages() {
+    send({ type: 'queue:clear' });
   }
 
   function onMessage(handler) {
@@ -1021,6 +1043,8 @@ export function useChatWebSocket() {
     totalTurns: readonly(totalTurns),
     loadedTurns: readonly(loadedTurns),
     pendingQuestion: readonly(pendingQuestion),
+    queuedMessages: readonly(queuedMessages),
+    queueSize,
 
     // Connection
     connect,
@@ -1052,6 +1076,10 @@ export function useChatWebSocket() {
 
     // Question answering
     answerQuestion,
+
+    // Queue actions
+    deleteQueuedMessage,
+    clearQueuedMessages,
 
     // Direct send
     send,

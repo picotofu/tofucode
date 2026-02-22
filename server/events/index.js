@@ -38,6 +38,11 @@ import {
 } from './mcp.js';
 import { handler as newSession } from './new-session.js';
 import { handler as prompt } from './prompt.js';
+import {
+  clearHandler as queueClear,
+  deleteHandler as queueDelete,
+  getHandler as queueGet,
+} from './queue.js';
 import { handleRestart } from './restart.js';
 import { handleFilesSearch } from './search-files.js';
 import { handler as selectProject } from './select-project.js';
@@ -103,4 +108,7 @@ export const handlers = {
   'mcp:update': mcpUpdate,
   'mcp:remove': mcpRemove,
   'mcp:test': mcpTest,
+  'queue:delete': queueDelete,
+  'queue:clear': queueClear,
+  'queue:get': queueGet,
 };
