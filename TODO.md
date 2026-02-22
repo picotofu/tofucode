@@ -1,5 +1,1 @@
 - RESTART_TOKEN
-- BUG: load previous turn issue after compact
-- symbols bar should not float
-- idle connection mode
-- mobile md editor issue
