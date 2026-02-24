@@ -62,10 +62,11 @@ export function handleWebSocket(ws) {
     } catch (err) {
       logger.error('Message handling error:', err);
       // Include sessionId from the original message so frontend doesn't filter it out
+      // Avoid leaking internal error details to the client
       send(ws, {
         type: 'error',
         sessionId: message?.sessionId,
-        message: err.message,
+        message: 'An internal error occurred',
       });
     }
   });

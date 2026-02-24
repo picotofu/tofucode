@@ -8,10 +8,17 @@
 
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 
-const PROCESS_FILE = '/tmp/tofucode-processes.json';
+const PROCESS_FILE = join(homedir(), '.tofucode', 'processes.json');
 const MAX_OUTPUT_FOR_FILE = 100; // Limit output saved to file per process
 const MAX_HISTORY_PER_PROJECT = 50; // Max completed processes to keep per project
 const PROCESS_MAX_AGE_MS = 24 * 60 * 60 * 1000; // Auto-cleanup processes older than 24 hours
@@ -122,9 +129,17 @@ class ProcessManager {
         }
       }
 
-      // Ensure directory exists
-      mkdirSync(dirname(PROCESS_FILE), { recursive: true });
-      writeFileSync(PROCESS_FILE, JSON.stringify(data, null, 2));
+      // Ensure directory exists with restricted permissions
+      const dir = dirname(PROCESS_FILE);
+      mkdirSync(dir, { recursive: true });
+      try {
+        chmodSync(dir, 0o700);
+      } catch {
+        // Ignore chmod errors (may not own the directory)
+      }
+      writeFileSync(PROCESS_FILE, JSON.stringify(data, null, 2), {
+        mode: 0o600,
+      });
     } catch (err) {
       console.error('Failed to save process state:', err.message);
     }

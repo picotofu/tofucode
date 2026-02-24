@@ -140,6 +140,7 @@ const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({
   noServer: true,
+  maxPayload: 1024 * 1024, // 1MB max message size
   perMessageDeflate: {
     zlibDeflateOptions: { level: 3 },
     clientNoContextTakeover: true,
@@ -153,6 +154,16 @@ httpServer = server;
 
 // Parse JSON and cookies
 app.use(express.json());
+
+// Security headers
+app.use((_req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+  });
+  next();
+});
 
 // Compress all responses (API and static files)
 // Threshold: 512 bytes - compress files larger than 0.5KB
@@ -203,10 +214,10 @@ app.post('/api/auth/setup', async (req, res) => {
   }
 
   const { password } = req.body;
-  if (!password || password.length < 4) {
+  if (!password || password.length < 8) {
     return res
       .status(400)
-      .json({ error: 'Password must be at least 4 characters' });
+      .json({ error: 'Password must be at least 8 characters' });
   }
 
   try {
@@ -260,11 +271,23 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 // ============================================
-// Serve docs folder (no auth required)
+// Serve docs folder (auth required)
 // ============================================
 const docsPath = join(rootDir, 'docs');
 if (existsSync(docsPath)) {
-  app.use('/docs', express.static(docsPath));
+  app.use(
+    '/docs',
+    (req, res, next) => {
+      if (!isAuthDisabled()) {
+        const token = parseSessionCookie(req.headers.cookie);
+        if (!validateSession(token)) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+      }
+      next();
+    },
+    express.static(docsPath),
+  );
 }
 
 // ============================================
@@ -333,6 +356,27 @@ server.on('upgrade', (request, socket, head) => {
   if (request.url !== '/ws') {
     socket.destroy();
     return;
+  }
+
+  // Validate Origin header to prevent Cross-Site WebSocket Hijacking (CSWSH)
+  const origin = request.headers.origin;
+  if (origin) {
+    try {
+      const originHost = new URL(origin).host;
+      const requestHost = request.headers.host;
+      if (originHost !== requestHost) {
+        logger.log(
+          `WebSocket upgrade rejected: origin ${origin} != host ${requestHost}`,
+        );
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+    } catch {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
   }
 
   // Check auth (skip if disabled)

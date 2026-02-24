@@ -1,4 +1,5 @@
 <script setup>
+import DOMPurify from 'dompurify';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { ansiToHtml } from '../utils/ansi';
 
@@ -477,7 +478,7 @@ function getOutputText(proc) {
 
 // Convert output to HTML with ANSI colors
 function getOutputHtml(proc) {
-  return proc.output
+  const raw = proc.output
     .map((chunk) => {
       const html = ansiToHtml(chunk.text);
       // Wrap in stream class for stderr coloring (only if no ANSI colors present)
@@ -487,6 +488,8 @@ function getOutputHtml(proc) {
       return html;
     })
     .join('');
+  // Defense-in-depth: sanitize even though ansiToHtml escapes HTML
+  return DOMPurify.sanitize(raw);
 }
 
 async function copyOutput(proc, e) {

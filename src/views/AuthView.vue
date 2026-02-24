@@ -26,8 +26,8 @@ async function handleSubmit() {
       localError.value = 'Passwords do not match';
       return;
     }
-    if (password.value.length < 4) {
-      localError.value = 'Password must be at least 4 characters';
+    if (password.value.length < 8) {
+      localError.value = 'Password must be at least 8 characters';
       return;
     }
 
