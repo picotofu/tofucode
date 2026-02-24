@@ -69,6 +69,7 @@ const formatTime = formatRelativeTime;
 
 function startEditingTitle(session, event) {
   event.stopPropagation();
+  event.preventDefault(); // Prevent <a> tag from navigating
   editingSessionId.value = session.sessionId;
   editingTitle.value = session.title || '';
   nextTick(() => {
