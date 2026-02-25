@@ -220,7 +220,14 @@ export async function handleFilesRead(ws, payload, context) {
         await fd.close();
 
         if (buffer.includes(0)) {
-          throw new Error('Cannot edit binary file');
+          send(ws, {
+            type: 'files:read:result',
+            path: resolvedPath,
+            content: null,
+            size: stats.size,
+            isBinary: true,
+          });
+          return;
         }
       }
 

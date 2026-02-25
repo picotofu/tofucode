@@ -16,6 +16,14 @@ const props = defineProps({
   filePath: String,
   content: String,
   loading: Boolean,
+  isBinary: {
+    type: Boolean,
+    default: false,
+  },
+  fileSize: {
+    type: Number,
+    default: null,
+  },
   autoSave: {
     type: Boolean,
     default: false,
@@ -115,6 +123,14 @@ const fileType = computed(() => {
 const fileName = computed(() => {
   if (!props.filePath) return '';
   return props.filePath.split('/').pop();
+});
+
+const formattedFileSize = computed(() => {
+  const size = props.fileSize;
+  if (size == null) return '';
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 });
 
 // Parse markdown headings for TOC
@@ -494,6 +510,21 @@ onUnmounted(() => {
     <!-- Editor content -->
     <div class="editor-content">
       <div v-if="loading" class="editor-loading">Loading...</div>
+      <div v-else-if="isBinary" class="binary-info">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        <div class="binary-info-name">{{ fileName }}</div>
+        <div class="binary-info-meta">
+          <span>Binary file</span>
+          <span v-if="formattedFileSize" class="binary-info-sep">·</span>
+          <span v-if="formattedFileSize">{{ formattedFileSize }}</span>
+          <span v-if="filePath?.split('.').pop()?.toUpperCase()" class="binary-info-sep">·</span>
+          <span>{{ filePath?.split('.').pop()?.toUpperCase() }}</span>
+        </div>
+        <div class="binary-info-note">This file cannot be previewed</div>
+      </div>
       <template v-else>
         <!-- Markdown editor (TinyMDE) -->
         <div
@@ -608,6 +639,44 @@ onUnmounted(() => {
   height: 100%;
   color: var(--text-muted);
   font-size: 13px;
+}
+
+.binary-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  color: var(--text-muted);
+}
+
+.binary-info svg {
+  opacity: 0.4;
+}
+
+.binary-info-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.binary-info-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.binary-info-sep {
+  opacity: 0.5;
+}
+
+.binary-info-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 
 /* Markdown editor */

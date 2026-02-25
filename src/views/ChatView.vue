@@ -1825,6 +1825,8 @@ function handleFileMessage(msg) {
         openedFile.value = {
           path: msg.path,
           content: msg.content,
+          size: msg.size,
+          isBinary: msg.isBinary || false,
           loading: false,
         };
       }
@@ -2209,6 +2211,8 @@ watch(
         :file-path="openedFile.path"
         :content="openedFile.content"
         :loading="openedFile.loading"
+        :is-binary="openedFile.isBinary"
+        :file-size="openedFile.size"
         :auto-save="autoSaveFilesEnabled"
         @save="handleFileSave"
         @close="handleFileClose"
