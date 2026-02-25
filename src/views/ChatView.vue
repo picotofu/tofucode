@@ -2045,8 +2045,13 @@ watch(terminalSubTab, (tab) => {
 });
 
 // Update URL when file is opened/closed in files mode
-watch(openedFile, (file) => {
+// Use oldFile to only push when the path actually changes (open/close),
+// not on every state update (loading → loaded, isBinary set, etc.)
+watch(openedFile, (file, oldFile) => {
   if (syncingFromUrl) return;
+  const newPath = file?.path ?? null;
+  const oldPath = oldFile?.path ?? null;
+  if (newPath === oldPath) return; // path unchanged — skip URL push
   if (currentMode.value === 'files') {
     const query = { ...route.query };
     if (file?.path) {
