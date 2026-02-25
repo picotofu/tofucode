@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-02-25
+
 ### Added
 - **Message Queue** — Submit prompts while Claude is running; they queue server-side (FIFO) and execute automatically once the current task finishes
   - Red badge on chat prompt icon shows queue depth; click to open Queue Manager modal
@@ -15,23 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Queue state synced on session select/reconnect; cleared when session is deleted
   - Max 50 queued messages per session; empty/invalid prompts rejected before enqueue
   - Queue processing is single-file: each item runs to completion before the next dequeues
-- **Terminal watch mode** — Schedule a bookmarked command to re-run at a set interval; output renders as a table or raw stdout in the Active tab
-- **Copy message button** — Hover over any user or Claude message to reveal a copy icon; copies raw markdown content to clipboard (not rendered HTML), with a 2-second checkmark feedback
-- **MCP Server Manager** — Dedicated modal (plug icon in sidebar) to view, add, edit, and remove MCP servers across all config scopes (local, project, user)
-- **Enhanced file picker search** — Cmd+P now matches across full relative paths and normalises word separators
-  - Path substring: `docs/api` matches `docs/api/episodes.md` and `docs/api/profile.md`
-  - Multi-token AND: `feature mcp` matches `FEATURE_MCP.md` (spaces match `_`, `-`, `/`)
-  - Separator-agnostic: `feature_mcp`, `feature-mcp`, and `feature mcp` all find the same files
-  - Match highlighted in the path row when matched via full path
-  - HTTP/SSE servers: full CRUD with inline test connection (MCP handshake, status-aware result display)
-  - Stdio servers: full config CRUD (command, args, env vars); binary installation is user's responsibility
-  - OAuth-managed servers: read-only display with expiry badge and CLI reconfiguration hint
-  - Scope selector locked in edit mode; saving/loading state on form; inline mutation error banner
-  - Cmd+2 terminal subtab cycle order fixed: History → Active → Bookmarks
-
-## [1.1.0] - 2026-02-18
-
-### Added
 - **Discord Bot Integration** — Bring-your-own-bot support. Run Claude Code sessions from Discord threads, mirrored to the Web UI via an internal event bus. See [Discord Setup Guide](docs/DISCORD_SETUP_GUIDE.md).
   - Channel-to-project mapping via `/setup`
   - Thread-per-session model with persistent session storage
@@ -40,6 +25,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Auto-rename threads from first message content
   - User mention on long-running task completion
   - Web UI → Discord sync via internal event bus (sessions started in Web UI create mirrored Discord threads)
+- **Terminal watch mode** — Schedule a bookmarked command to re-run at a set interval; output renders as a table or raw stdout in the Active tab
+- **Copy message button** — Hover over any user or Claude message to reveal a copy icon; copies raw markdown content to clipboard (not rendered HTML), with a 2-second checkmark feedback
+- **MCP Server Manager** — Dedicated modal (plug icon in sidebar) to view, add, edit, and remove MCP servers across all config scopes (local, project, user)
+  - HTTP/SSE servers: full CRUD with inline test connection (MCP handshake, status-aware result display)
+  - Stdio servers: full config CRUD (command, args, env vars); binary installation is user's responsibility
+  - OAuth-managed servers: read-only display with expiry badge and CLI reconfiguration hint
+  - Scope selector locked in edit mode; saving/loading state on form; inline mutation error banner
+- **Enhanced file picker search** — Cmd+P now matches across full relative paths and normalises word separators
+  - Path substring: `docs/api` matches `docs/api/episodes.md` and `docs/api/profile.md`
+  - Multi-token AND: `feature mcp` matches `FEATURE_MCP.md` (spaces match `_`, `-`, `/`)
+  - Separator-agnostic: `feature_mcp`, `feature-mcp`, and `feature mcp` all find the same files
+  - Match highlighted in the path row when matched via full path
+
+### Fixed
+- Session title overflow on mobile — long titles now truncate with ellipsis instead of causing horizontal scroll
+- Session edit button no longer triggers row navigation (click was propagating to the parent `<a>` tag)
+- Cmd+2 terminal subtab cycle order fixed: History → Active → Bookmarks
+
+### Security
+- `/docs` folder now requires authentication (previously publicly accessible)
+- WebSocket Origin header validated on upgrade to prevent CSWSH attacks
+- Security headers added: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
+- WebSocket max message size capped at 1MB
+- Minimum password length increased from 4 to 8 characters
+- Process history file moved from world-readable `/tmp/` to `~/.tofucode/` with `0o600` permissions
+- Terminal output sanitized with DOMPurify as defense-in-depth layer
+- Internal error details no longer sent to WebSocket clients
 
 ## [1.0.5] - 2026-02-18
 

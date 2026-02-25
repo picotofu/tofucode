@@ -141,59 +141,77 @@ npm run check
 
 ## Release Process
 
-### Security Testing Requirements
+### Branch Strategy
 
-**Before every release, perform thorough security and penetration testing:**
+- Features branch from `main` → `feature/*`
+- Release prep uses a dedicated `release/v{major}.{minor}.{patch}` branch
+- Feature branches merge into the release branch, then release branch merges into `main`
+- Version bump type: `patch` for bug fixes, `minor` for new features, `major` for breaking changes
 
-1. **Run Security Assessment**
-   - Test authentication bypass attempts
-   - Test file access controls and path traversal
-   - Test WebSocket security and session validation
-   - Test CORS and origin validation
-   - Review credentials access and exposure risks
-   - Document all findings
+### Version Number
 
-2. **Fix Security Issues**
-   - Work with team to address any vulnerabilities found
-   - Prioritize by severity (Critical → High → Medium → Low)
-   - Re-test after fixes to verify resolution
+The version in `package.json` is typically bumped at the **start** of the release branch, not at publish time. So at release time, check first:
 
-3. **Document Results**
-   - Create security report: `docs/security_report_v{version}.md`
-   - Include test methodology, findings, and mitigations
-   - Document both passed and failed tests
-   - Add recommendations for future improvements
-
-4. **Update README**
-   - Link new security report in README.md Security section
-   - Maintain transparency for public users
-
-5. **Only Release When Secure**
-   - All critical and high-severity issues must be resolved
-   - Security report must show passing results
-   - Document any accepted risks (low severity with mitigations)
-
-**Example workflow:**
 ```bash
-# 1. Run security tests
-node pentest_ws.js
-node pentest_cors.js
-
-# 2. If issues found, fix and re-test
-# (iterate until all critical issues resolved)
-
-# 3. Document results
-# Create docs/security_report_v1.0.4.md
-
-# 4. Update README
-# Add link to new security report
-
-# 5. Proceed with release
-npm run build
-npm version patch
-git push --tags
-npm publish
+node -p "require('./package.json').version"
 ```
+
+- **If version is already correct** (was bumped when branching): skip `npm version`, just tag manually
+- **If version still needs bumping**: run `npm version minor` (or `patch`/`major`) — this updates `package.json`, `package-lock.json`, and creates a git tag automatically
+
+### Pre-Release Checklist
+
+1. **Security Audit** (static code review — no pentest scripts required)
+   - Review all new code: auth, file access, WebSocket, input validation, credentials
+   - Run `npm audit` to check for new dependency vulnerabilities
+   - Fix all Critical and High severity issues before proceeding
+   - Create `docs/security_report_v{version}.md` with findings, fixes, and accepted risks
+   - All Critical/High must be resolved; document accepted Low/Medium risks
+
+2. **Update CHANGELOG**
+   - Move `## [Unreleased]` section content to `## [{version}] - {date}`
+   - Add a new empty `## [Unreleased]` section at the top
+
+3. **Update README**
+   - Add new security report link in the Security section
+   - Format: `- **[v{version} Security Report](./docs/security_report_v{version}.md)** - brief summary`
+
+4. **Final build verification**
+   - `npm run check` — lint + format (Biome)
+   - `npm run build` — production frontend build
+   - Confirm no errors
+
+### Release Steps
+
+```bash
+# 1. Push the release branch to origin
+git push origin release/v{version}
+
+# 2. Tag the release (if not already tagged by npm version)
+git tag v{version}
+git push origin v{version}
+
+# 3. Publish to npm
+npm publish
+
+# 4. Build and push Docker multi-arch image
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --tag picotofu/tofucode:{version} \
+  --tag picotofu/tofucode:latest \
+  --push .
+
+# 5. Merge release branch into main
+git checkout main
+git merge release/v{version}
+git push origin main
+```
+
+### Post-Release
+
+- Verify npm package is live: `npm info tofucode version`
+- Verify Docker image: `docker pull picotofu/tofucode:latest`
+- Archive the release branch (leave it; don't delete — useful for hotfix reference)
 
 ## Reference
 
