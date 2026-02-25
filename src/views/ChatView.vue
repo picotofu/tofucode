@@ -3135,7 +3135,7 @@ watch(
 }
 
 .session-title-display {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
   padding: 2px 6px;
@@ -3143,6 +3143,7 @@ watch(
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.15s;
+  min-width: 0;
 }
 
 .session-title-display:hover {
