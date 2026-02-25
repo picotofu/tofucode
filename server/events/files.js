@@ -168,7 +168,15 @@ export async function handleFilesRead(ws, payload, context) {
     // Check file size (limit to 10MB)
     const stats = await fs.stat(resolvedPath);
     if (stats.size > 10 * 1024 * 1024) {
-      throw new Error('File too large (max 10MB)');
+      send(ws, {
+        type: 'files:read:result',
+        path: resolvedPath,
+        content: null,
+        size: stats.size,
+        isBinary: true,
+        reason: 'too_large',
+      });
+      return;
     }
 
     // Detect if file is an image based on extension

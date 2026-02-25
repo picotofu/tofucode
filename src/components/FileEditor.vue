@@ -20,6 +20,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  binaryReason: {
+    type: String,
+    default: null, // null | 'too_large'
+  },
   fileSize: {
     type: Number,
     default: null,
@@ -523,7 +527,7 @@ onUnmounted(() => {
           <span v-if="filePath?.split('.').pop()?.toUpperCase()" class="binary-info-sep">·</span>
           <span>{{ filePath?.split('.').pop()?.toUpperCase() }}</span>
         </div>
-        <div class="binary-info-note">This file cannot be previewed</div>
+        <div class="binary-info-note">{{ binaryReason === 'too_large' ? 'File too large to preview (max 10MB)' : 'This file cannot be previewed' }}</div>
       </div>
       <template v-else>
         <!-- Markdown editor (TinyMDE) -->
