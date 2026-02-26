@@ -1,6 +1,8 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
+const explorerContentRef = ref(null);
+
 const props = defineProps({
   currentPath: String,
   items: Array,
@@ -71,6 +73,13 @@ function handleContextAction(action) {
   }
 }
 
+defineExpose({
+  getScrollTop: () => explorerContentRef.value?.scrollTop ?? 0,
+  setScrollTop: (value) => {
+    if (explorerContentRef.value) explorerContentRef.value.scrollTop = value;
+  },
+});
+
 // Lifecycle - properly cleanup event listeners
 onMounted(() => {
   document.addEventListener('click', closeContextMenu);
@@ -84,7 +93,7 @@ onUnmounted(() => {
 <template>
   <div class="file-explorer">
     <!-- File list -->
-    <div class="explorer-content">
+    <div ref="explorerContentRef" class="explorer-content">
       <div v-if="loading" class="explorer-loading">Loading...</div>
       <div v-else-if="!items || items.length === 0" class="explorer-empty">
         <p>Empty folder</p>
