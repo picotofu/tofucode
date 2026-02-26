@@ -14,9 +14,6 @@ const DEFAULT_SETTINGS = {
   enableMemo: true, // Enable memo feature (Cmd+M quick access)
   // Discord settings (only meaningful when DISCORD_ENABLED=true on the server)
   discordSyncEnabled: true, // Mirror Web UI sessions to Discord
-  // File size limits (MB) — user-configurable, capped by server's MAX_FILE_SIZE_MB env
-  maxFileSizeMb: 10, // Max file size for read/preview operations
-  uploadMaxFileSizeMb: 10, // Max file size for uploads
 };
 
 export function loadSettings() {

@@ -3,7 +3,6 @@ import fs from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { config, slugToPath } from '../config.js';
-import { loadSettings } from '../lib/settings.js';
 import { send } from '../lib/ws.js';
 
 /**
@@ -166,14 +165,9 @@ export async function handleFilesRead(ws, payload, context) {
     // Validate path
     const resolvedPath = validatePath(filePath, context);
 
-    // Check file size — use user's setting, capped by server hard limit
-    const settings = loadSettings();
-    const effectiveLimitMb = Math.min(
-      settings.maxFileSizeMb ?? 10,
-      config.maxFileSizeMb,
-    );
+    // Check file size against server hard limit (MAX_FILE_SIZE_MB env, default 10MB)
     const stats = await fs.stat(resolvedPath);
-    if (stats.size > effectiveLimitMb * 1024 * 1024) {
+    if (stats.size > config.maxFileSizeMb * 1024 * 1024) {
       send(ws, {
         type: 'files:read:result',
         path: resolvedPath,

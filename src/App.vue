@@ -56,6 +56,7 @@ const settings = ref({
 
 // Server capability flags (not user settings — set by server environment)
 const discordEnabled = ref(false);
+const maxFileSizeMb = ref(10);
 
 function openSettings() {
   showSettings.value = true;
@@ -134,6 +135,9 @@ onMessage((msg) => {
     settings.value = msg.settings;
     if (msg.discordEnabled !== undefined) {
       discordEnabled.value = msg.discordEnabled;
+    }
+    if (msg.maxFileSizeMb !== undefined) {
+      maxFileSizeMb.value = msg.maxFileSizeMb;
     }
   } else if (msg.type === 'settings_updated') {
     if (msg.success) {
@@ -297,6 +301,7 @@ provide('settings', {
   symbolToolbar: () => settings.value.symbolToolbar,
   quickAccessFile: () => settings.value.quickAccessFile,
   enableMemo: () => settings.value.enableMemo,
+  maxFileSizeMb, // server cap (ref)
 });
 
 onMounted(() => {

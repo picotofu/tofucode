@@ -9,7 +9,6 @@ import {
   parseSessionCookie,
   validateSession,
 } from '../lib/auth.js';
-import { loadSettings } from '../lib/settings.js';
 
 /**
  * Validate that a destination path is within allowed directories.
@@ -81,19 +80,12 @@ export function uploadAuthMiddleware(req, res, next) {
 }
 
 /**
- * Build a multer instance with the current upload size limit.
- * Re-read settings each request so changes take effect without restart.
+ * Build a multer instance using the server's hard cap (MAX_FILE_SIZE_MB env).
  */
 function buildUpload() {
-  const settings = loadSettings();
-  const limitMb = Math.min(
-    settings.uploadMaxFileSizeMb ?? 10,
-    config.maxFileSizeMb,
-  );
-
   return multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: limitMb * 1024 * 1024 },
+    limits: { fileSize: config.maxFileSizeMb * 1024 * 1024 },
   });
 }
 
@@ -111,14 +103,11 @@ export function uploadHandler(req, res) {
   upload.single('file')(req, res, async (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        const settings = loadSettings();
-        const limitMb = Math.min(
-          settings.uploadMaxFileSizeMb ?? 10,
-          config.maxFileSizeMb,
-        );
         return res
           .status(413)
-          .json({ error: `File exceeds upload limit (${limitMb} MB)` });
+          .json({
+            error: `File exceeds upload limit (${config.maxFileSizeMb} MB)`,
+          });
       }
       return res.status(400).json({ error: err.message });
     }

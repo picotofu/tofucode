@@ -89,7 +89,7 @@ const isDragOver = ref(false);
 let uploadClearTimer = null;
 
 function getUploadLimitMb() {
-  return settingsContext?.settings?.value?.uploadMaxFileSizeMb ?? 10;
+  return settingsContext?.maxFileSizeMb?.value ?? 10;
 }
 
 function triggerFileInput() {

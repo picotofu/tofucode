@@ -288,65 +288,6 @@ async function handleClearCacheAndUpdate() {
           />
         </div>
 
-        <hr class="divider" />
-        <div class="section-heading">File Limits</div>
-
-        <!-- Max file read size -->
-        <div class="setting-item">
-          <div class="setting-header">
-            <span class="setting-title">Max Read Size (MB)</span>
-          </div>
-          <p class="setting-description">
-            Maximum file size that can be opened in the file editor. Files larger than this will show an info view instead.
-          </p>
-          <div class="input-with-button">
-            <input
-              type="number"
-              v-model.number="localSettings.maxFileSizeMb"
-              class="setting-input"
-              min="1"
-              max="100"
-              step="1"
-              placeholder="10"
-            />
-            <button
-              class="reset-btn-inline"
-              @click="localSettings.maxFileSizeMb = 10"
-              title="Reset to Default"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-
-        <!-- Max upload size -->
-        <div class="setting-item">
-          <div class="setting-header">
-            <span class="setting-title">Max Upload Size (MB)</span>
-          </div>
-          <p class="setting-description">
-            Maximum file size allowed for uploads via the file browser.
-          </p>
-          <div class="input-with-button">
-            <input
-              type="number"
-              v-model.number="localSettings.uploadMaxFileSizeMb"
-              class="setting-input"
-              min="1"
-              max="100"
-              step="1"
-              placeholder="10"
-            />
-            <button
-              class="reset-btn-inline"
-              @click="localSettings.uploadMaxFileSizeMb = 10"
-              title="Reset to Default"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-
         <!-- Discord Settings (only shown when DISCORD_ENABLED=true on server) -->
         <template v-if="discordEnabled">
           <hr class="divider" />
