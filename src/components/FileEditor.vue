@@ -32,6 +32,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  renderHtml: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(['save', 'close', 'dirty']);
@@ -122,6 +126,11 @@ const fileType = computed(() => {
     return 'code';
   }
   return 'text';
+});
+
+const isHtmlExt = computed(() => {
+  const ext = props.filePath?.split('.').pop()?.toLowerCase();
+  return ext === 'html' || ext === 'htm';
 });
 
 const fileName = computed(() => {
@@ -550,6 +559,14 @@ onUnmounted(() => {
           <img :src="editorContent" :alt="props.filePath" />
         </div>
 
+        <!-- HTML render preview -->
+        <iframe
+          v-else-if="isHtmlExt && props.renderHtml"
+          class="html-preview"
+          sandbox="allow-scripts allow-same-origin"
+          :srcdoc="editorContent"
+        ></iframe>
+
         <!-- Plain text / code editor -->
         <textarea
           v-else
@@ -734,6 +751,14 @@ onUnmounted(() => {
   object-fit: contain;
   border-radius: var(--radius-md);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* HTML render preview */
+.html-preview {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: #fff;
 }
 
 /* TinyMDE dark theme overrides */

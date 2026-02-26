@@ -157,6 +157,14 @@ const filesFilter = ref(''); // Filter text for file list
 const showDotfiles = ref(false); // Toggle to show/hide dotfiles
 const openedFile = ref(null); // { path, content, loading }
 const fileEditorRef = ref(null);
+const fileExplorerRef = ref(null);
+const savedFileListScrollTop = ref(0);
+const htmlRenderMode = ref(false); // HTML render toggle (only active for .html/.htm files)
+
+const isHtmlFile = computed(() => {
+  const ext = openedFile.value?.path?.split('.').pop()?.toLowerCase();
+  return ext === 'html' || ext === 'htm';
+});
 
 const openedFileName = computed(() => {
   if (!openedFile.value?.path) return '';
@@ -1501,6 +1509,11 @@ const filesBreadcrumbs = computed(() => {
 
 // Files mode functions
 function goUpDirectory() {
+  // If a file is open, close it first instead of navigating up
+  if (openedFile.value) {
+    fileEditorRef.value?.close();
+    return;
+  }
   if (!filesCurrentPath.value || filesCurrentPath.value === '/') return;
   const parentPath =
     filesCurrentPath.value.split('/').slice(0, -1).join('/') || '/';
@@ -1518,7 +1531,10 @@ function handleFilesNavigate(path) {
 }
 
 function handleFileSelect(file) {
+  // Save scroll position before switching to file editor
+  savedFileListScrollTop.value = fileExplorerRef.value?.getScrollTop() ?? 0;
   // file.path is already absolute from backend
+  htmlRenderMode.value = false;
   openedFile.value = { path: file.path, content: '', loading: true };
 
   send({
@@ -1655,6 +1671,11 @@ function handleFileSave(data) {
 
 function handleFileClose() {
   openedFile.value = null;
+  htmlRenderMode.value = false;
+  // Restore scroll position after FileExplorer remounts
+  nextTick(() => {
+    fileExplorerRef.value?.setScrollTop(savedFileListScrollTop.value);
+  });
 }
 
 function handleCreateFile() {
@@ -2221,11 +2242,13 @@ watch(
         :binary-reason="openedFile.binaryReason"
         :file-size="openedFile.size"
         :auto-save="autoSaveFilesEnabled"
+        :render-html="htmlRenderMode"
         @save="handleFileSave"
         @close="handleFileClose"
       />
       <FileExplorer
         v-else
+        ref="fileExplorerRef"
         :current-path="filesCurrentPath"
         :items="filteredFilesItems"
         :loading="filesLoading"
@@ -2247,6 +2270,24 @@ watch(
         <span class="stat-item" :title="`Total lines: ${totalLines}`">≡ {{ totalLines }}</span>
         <span class="stat-item" :title="`Total characters: ${totalChars}`">∑ {{ totalChars }}</span>
       </span>
+      <button
+        v-if="isHtmlFile && !openedFile.loading && !openedFile.isBinary"
+        class="action-btn"
+        :class="{ active: htmlRenderMode }"
+        :title="htmlRenderMode ? 'View source' : 'Render HTML'"
+        @click="htmlRenderMode = !htmlRenderMode"
+      >
+        <!-- Eye icon: switch to render mode -->
+        <svg v-if="!htmlRenderMode" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        <!-- Code icon: switch back to source -->
+        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="16 18 22 12 16 6"/>
+          <polyline points="8 6 2 12 8 18"/>
+        </svg>
+      </button>
       <button
         class="action-btn"
         :disabled="!fileEditorRef?.isDirty || fileEditorRef?.isSaving"
@@ -3462,6 +3503,10 @@ watch(
 .editor-header .action-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+.editor-header .action-btn.active {
+  color: var(--text-primary);
 }
 
 .footer {
