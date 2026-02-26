@@ -19,15 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Download button added alongside the reference button (files only)
 
 ### Fixed
-- Docker: install `git` and `openssh-client` in Alpine image so Claude CLI can run git commands inside containers
-- Docker: set `SHELL=/bin/sh` environment variable so Claude CLI finds a valid POSIX shell in the Alpine container
-
-## [1.1.1] - 2026-02-25
-
-### Fixed
 - Binary and unsupported files no longer cause a flash loop — server returns file info instead of an error, frontend shows a "Binary file" info view
 - Files larger than 10MB now show a "File too large to preview" info view instead of looping
 - File URL watcher no longer re-fetches on loading state changes — only triggers on path open/close
+- Docker: install `git` and `openssh-client` in Alpine image so Claude CLI can run git commands inside containers
+- Docker: set `SHELL=/bin/sh` environment variable so Claude CLI finds a valid POSIX shell in the Alpine container
 
 ## [1.1.0] - 2026-02-25
 
