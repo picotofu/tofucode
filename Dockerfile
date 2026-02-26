@@ -13,7 +13,8 @@ FROM node:24-alpine
 ARG USER_ID=1000
 ARG GROUP_ID=1000
 
-RUN deluser node 2>/dev/null || true && \
+RUN apk add --no-cache git openssh-client && \
+    deluser node 2>/dev/null || true && \
     delgroup node 2>/dev/null || true && \
     addgroup -g ${GROUP_ID} appuser && \
     adduser -D -u ${USER_ID} -G appuser appuser
@@ -29,6 +30,8 @@ COPY --from=builder /build/dist ./dist
 RUN chown -R appuser:appuser /app && \
     mkdir -p /home/appuser/.claude && \
     chown -R appuser:appuser /home/appuser/.claude
+
+ENV SHELL=/bin/sh
 
 USER appuser
 

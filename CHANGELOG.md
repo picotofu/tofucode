@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Docker: install `git` and `openssh-client` in Alpine image so Claude CLI can run git commands inside containers
+- Docker: set `SHELL=/bin/sh` environment variable so Claude CLI finds a valid POSIX shell in the Alpine container
+
 ## [1.1.1] - 2026-02-25
 
 ### Fixed
