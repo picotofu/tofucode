@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **File Upload** — Upload files directly from the file browser via click-to-select or drag & drop. Progress is shown per-file with success/error feedback; the directory refreshes automatically on completion.
+- **Configurable file size limits** — Max read size and max upload size (in MB) are now configurable in Settings → File Limits. Both default to 10 MB and are capped by a server-side `MAX_FILE_SIZE_MB` env var.
+
 ### Fixed
 - Docker: install `git` and `openssh-client` in Alpine image so Claude CLI can run git commands inside containers
 - Docker: set `SHELL=/bin/sh` environment variable so Claude CLI finds a valid POSIX shell in the Alpine container

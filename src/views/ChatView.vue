@@ -2252,11 +2252,13 @@ watch(
         :current-path="filesCurrentPath"
         :items="filteredFilesItems"
         :loading="filesLoading"
+        :project-path="projectStatus.cwd"
         @navigate="handleFilesNavigate"
         @select-file="handleFileSelect"
         @reference="handleReference"
         @rename="handleRename"
         @delete="handleDelete"
+        @upload-done="handleFilesNavigate"
       />
     </main>
 

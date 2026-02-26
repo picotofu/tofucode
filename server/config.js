@@ -18,6 +18,9 @@ export const config = {
   // Root path restriction (if set, limits file/terminal access)
   rootPath: process.env.ROOT_PATH || null,
 
+  // Max file size for reading in MB (default 10MB, overridable via env)
+  maxFileSizeMb: Number.parseInt(process.env.MAX_FILE_SIZE_MB || '10', 10),
+
   // Model configuration (override default model versions)
   models: {
     haiku: process.env.MODEL_HAIKU_SLUG || 'claude-haiku-4-5',

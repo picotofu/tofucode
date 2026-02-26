@@ -112,6 +112,7 @@ import {
   getCurrentVersion,
   initVersionChecker,
 } from './lib/version-checker.js';
+import { uploadAuthMiddleware, uploadHandler } from './routes/upload.js';
 import { handleWebSocket } from './websocket.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -269,6 +270,11 @@ app.post('/api/auth/logout', (req, res) => {
   res.clearCookie('session');
   res.json({ success: true });
 });
+
+// ============================================
+// File Upload Route (auth required)
+// ============================================
+app.post('/api/upload', uploadAuthMiddleware, uploadHandler);
 
 // ============================================
 // Serve docs folder (auth required)

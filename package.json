@@ -48,6 +48,7 @@
     "dompurify": "^3.3.1",
     "express": "^5.2.1",
     "express-static-gzip": "^3.0.0",
+    "multer": "^2.0.2",
     "papaparse": "^5.5.3",
     "tabulator-tables": "^6.3.1",
     "tiny-markdown-editor": "^0.2.18",
