@@ -138,6 +138,7 @@ tofucode --help
 | Log file | `--log-file <path>` | `"logFile": "<path>"` | `LOG_FILE=<path>` |
 | Bypass token | `--bypass-token <token>` | `"bypassToken": "<token>"` | `DEBUG_TOKEN=<token>` |
 | Root path | `--root <path>` | `"root": "<path>"` | `ROOT_PATH=<path>` |
+| Max file size (MB) | - | `"maxFileSizeMb": 10` | `MAX_FILE_SIZE_MB=10` |
 | Disable update check | - | - | `DISABLE_UPDATE_CHECK=true` |
 | Update check interval | - | - | `UPDATE_CHECK_INTERVAL=3600000` |
 | Model: Haiku | - | - | `MODEL_HAIKU_SLUG=claude-haiku-4-5` |

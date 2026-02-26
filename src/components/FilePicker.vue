@@ -9,7 +9,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['close', 'select', 'reference']);
+const emit = defineEmits(['close', 'select', 'reference', 'download']);
 
 const route = useRoute();
 
@@ -169,7 +169,12 @@ function handleKeydown(e) {
     e.preventDefault();
     const file = results.value[selectedIndex.value];
     if (file) {
-      selectFile(file);
+      if (e.metaKey || e.ctrlKey) {
+        // Cmd+Enter / Ctrl+Enter → reference in chat
+        handleReference(null, file);
+      } else {
+        selectFile(file);
+      }
     }
     return;
   }
@@ -182,10 +187,17 @@ function selectFile(file) {
 }
 
 function handleReference(event, file) {
-  event.stopPropagation(); // Prevent triggering file selection
-  if (!file || file.isDirectory) return;
+  if (event) event.stopPropagation(); // Prevent triggering file selection
+  if (!file) return;
   emit('reference', file);
   emit('close'); // Close picker after referencing
+}
+
+function handleDownload(event, file) {
+  if (event) event.stopPropagation();
+  if (!file || file.isDirectory) return;
+  emit('download', file);
+  emit('close');
 }
 
 // Normalize word separators for flexible matching (mirrors backend logic)
@@ -317,6 +329,7 @@ function highlightPathMatch(text, query) {
 				<div v-if="currentCwd" class="picker-cwd">
 					<span class="picker-cwd-label">cwd:</span>
 					<span class="picker-cwd-path">{{ currentCwd }}</span>
+					<span class="picker-cwd-legend"><kbd>↵</kbd> open · <kbd>⌘↵</kbd> reference</span>
 				</div>
 
 				<div class="picker-results" v-if="results.length > 0">
@@ -342,18 +355,31 @@ function highlightPathMatch(text, query) {
 							</div>
 						</div>
 
-						<!-- Reference button (only for files, not folders) -->
-						<button
-							v-if="!file.isDirectory"
-							class="picker-ref-btn"
-							title="Reference this file"
-							@click="handleReference($event, file)"
-						>
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-								<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-							</svg>
-						</button>
+						<!-- Action buttons -->
+						<div class="picker-item-actions">
+							<button
+								v-if="!file.isDirectory"
+								class="picker-download-btn"
+								title="Download this file"
+								@click="handleDownload($event, file)"
+							>
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+									<polyline points="7 10 12 15 17 10"/>
+									<line x1="12" y1="15" x2="12" y2="3"/>
+								</svg>
+							</button>
+							<button
+								class="picker-ref-btn"
+								:title="file.isDirectory ? 'Reference this folder' : 'Reference this file'"
+								@click="handleReference($event, file)"
+							>
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+									<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+								</svg>
+							</button>
+						</div>
 
 						<!-- Folder icon -->
 						<svg
@@ -488,6 +514,26 @@ function highlightPathMatch(text, query) {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	flex: 1;
+}
+
+.picker-cwd-legend {
+	margin-left: auto;
+	color: var(--text-muted);
+	font-size: 10px;
+	white-space: nowrap;
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	flex-shrink: 0;
+}
+
+.picker-cwd-legend kbd {
+	font-size: 10px;
+	padding: 1px 4px;
+	background: var(--bg-secondary);
+	border-radius: var(--radius-sm);
+	font-family: var(--font-mono);
 }
 
 .picker-results {
@@ -556,7 +602,6 @@ function highlightPathMatch(text, query) {
 	width: 28px;
 	height: 28px;
 	padding: 0;
-	margin-right: 4px;
 	background: transparent;
 	color: var(--text-muted);
 	border: 1px solid transparent;
@@ -567,14 +612,46 @@ function highlightPathMatch(text, query) {
 }
 
 .picker-item:hover .picker-ref-btn,
-.picker-item.selected .picker-ref-btn {
+.picker-item.selected .picker-ref-btn,
+.picker-item:hover .picker-download-btn,
+.picker-item.selected .picker-download-btn {
 	opacity: 1;
+}
+
+.picker-item-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	flex-shrink: 0;
 }
 
 .picker-ref-btn:hover {
 	background: var(--bg-secondary);
-	color: var(--accent-color);
-	border-color: var(--accent-color);
+	color: var(--text-secondary);
+	border-color: var(--border-color);
+}
+
+.picker-download-btn {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	background: transparent;
+	color: var(--text-muted);
+	border: 1px solid transparent;
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	transition: all 0.15s;
+	opacity: 0;
+}
+
+.picker-download-btn:hover {
+	background: var(--bg-secondary);
+	color: var(--text-secondary);
+	border-color: var(--border-color);
 }
 
 .picker-item-icon {

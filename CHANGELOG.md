@@ -9,7 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **File Upload** — Upload files directly from the file browser via click-to-select or drag & drop. Progress is shown per-file with success/error feedback; the directory refreshes automatically on completion.
-- **Configurable file size limits** — Max read size and max upload size (in MB) are now configurable in Settings → File Limits. Both default to 10 MB and are capped by a server-side `MAX_FILE_SIZE_MB` env var.
+- **File size limit config** — Max file size for reads and uploads is controlled via `MAX_FILE_SIZE_MB` env var or `maxFileSizeMb` in `config.json`; defaults to 10 MB.
+- **HTML render toggle** — File editor shows a toggle button for `.html`/`.htm` files to switch between source view and a sandboxed iframe preview.
+- **File download** — Download button in the file editor header and in the Cmd+P file picker (files only). Cmd+P download fetches content on demand via WebSocket.
+- **Cmd+P enhancements**:
+  - Folders are now referenceable (link button shows on all items, not just files)
+  - Cmd+Enter references the selected item in chat (instead of opening it)
+  - Legend below the CWD bar: `↵ open · ⌘↵ reference`
+  - Download button added alongside the reference button (files only)
 
 ### Fixed
 - Docker: install `git` and `openssh-client` in Alpine image so Claude CLI can run git commands inside containers

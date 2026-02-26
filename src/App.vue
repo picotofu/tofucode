@@ -161,6 +161,24 @@ onMessage((msg) => {
     }
   } else if (msg.type === 'mcp:test_result') {
     mcpModalRef.value?.handleTestResult(msg);
+  } else if (msg.type === 'files:read:result' && pendingDownloadPath.value) {
+    // Handle download triggered from FilePicker
+    if (msg.path === pendingDownloadPath.value && msg.content !== undefined) {
+      const fileName = msg.path.split('/').pop();
+      let href;
+      if (msg.content.startsWith('data:')) {
+        href = msg.content;
+      } else {
+        const blob = new Blob([msg.content], { type: 'text/plain' });
+        href = URL.createObjectURL(blob);
+      }
+      const a = document.createElement('a');
+      a.href = href;
+      a.download = fileName;
+      a.click();
+      if (!msg.content.startsWith('data:')) URL.revokeObjectURL(href);
+      pendingDownloadPath.value = null;
+    }
   }
 });
 
@@ -264,6 +282,21 @@ function handleFileReference(file) {
   closeFilePicker();
 }
 
+// Pending download path (set when download is triggered from FilePicker)
+const pendingDownloadPath = ref(null);
+
+function handleFilePickerDownload(file) {
+  if (!file || file.isDirectory) return;
+  pendingDownloadPath.value = file.path;
+  // Request file content via WebSocket
+  send({
+    type: 'files:read',
+    path: file.path,
+    projectPath: route.params.project,
+  });
+  closeFilePicker();
+}
+
 // Sidebar state - shared across all pages
 const isDesktop = window.innerWidth > 768;
 const storedSidebarState = localStorage.getItem('sidebarOpen');
@@ -334,6 +367,7 @@ onUnmounted(() => {
       @close="closeFilePicker"
       @select="handleFileSelect"
       @reference="handleFileReference"
+      @download="handleFilePickerDownload"
     />
     <SettingsModal
       :show="showSettings"

@@ -9,6 +9,7 @@
   "pidFile": null,
   "bypassToken": null,
   "root": null,
+  "maxFileSizeMb": 10,
   "discord": false,
   "discordToken": null,
   "discordGuildId": null,

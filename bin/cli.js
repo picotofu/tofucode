@@ -251,6 +251,10 @@ if (options.root) {
   env.ROOT_PATH = options.root;
 }
 
+if (options.maxFileSizeMb !== undefined) {
+  env.MAX_FILE_SIZE_MB = options.maxFileSizeMb.toString();
+}
+
 // Model configuration from config file
 if (options.models) {
   if (options.models.haiku) {
@@ -439,6 +443,10 @@ async function loadConfig(options) {
     // Model configuration (store for later env setup)
     if (config.models) {
       options.models = config.models;
+    }
+
+    if (config.maxFileSizeMb !== undefined) {
+      options.maxFileSizeMb = config.maxFileSizeMb;
     }
 
     if (!options.quiet) {

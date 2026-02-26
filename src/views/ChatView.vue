@@ -1669,6 +1669,32 @@ function handleFileSave(data) {
   });
 }
 
+function handleFileDownload() {
+  const file = openedFile.value;
+  if (!file || file.loading || !file.content) return;
+
+  const fileName = file.path.split('/').pop();
+  let href;
+
+  if (file.content.startsWith('data:')) {
+    // Image: already a data URL
+    href = file.content;
+  } else {
+    // Text/code: create a blob
+    const blob = new Blob([file.content], { type: 'text/plain' });
+    href = URL.createObjectURL(blob);
+  }
+
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = fileName;
+  a.click();
+
+  if (!file.content.startsWith('data:')) {
+    URL.revokeObjectURL(href);
+  }
+}
+
 function handleFileClose() {
   openedFile.value = null;
   htmlRenderMode.value = false;
@@ -2288,6 +2314,18 @@ watch(
         <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="16 18 22 12 16 6"/>
           <polyline points="8 6 2 12 8 18"/>
+        </svg>
+      </button>
+      <button
+        v-if="!openedFile.loading && openedFile.content"
+        class="action-btn"
+        title="Download"
+        @click="handleFileDownload"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
         </svg>
       </button>
       <button

@@ -103,11 +103,9 @@ export function uploadHandler(req, res) {
   upload.single('file')(req, res, async (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res
-          .status(413)
-          .json({
-            error: `File exceeds upload limit (${config.maxFileSizeMb} MB)`,
-          });
+        return res.status(413).json({
+          error: `File exceeds upload limit (${config.maxFileSizeMb} MB)`,
+        });
       }
       return res.status(400).json({ error: err.message });
     }
