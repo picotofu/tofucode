@@ -20,7 +20,6 @@ import QueueModal from '../components/QueueModal.vue';
 import TerminalOutput from '../components/TerminalOutput.vue';
 import { useDebugMode } from '../composables/useDebugMode';
 import { useChatWebSocket, useWebSocket } from '../composables/useWebSocket';
-import { matchesSearch } from '../utils/fileSearch.js';
 import { getShortPath } from '../utils/format.js';
 
 // Get sidebar and settings from App.vue
@@ -123,7 +122,7 @@ const manualExpandState = ref(new Map()); // Map<processId, boolean> for user-to
 const terminalMode = computed(() => currentMode.value === 'terminal');
 const filesMode = computed(() => currentMode.value === 'files');
 
-// Filtered files list based on search, dotfiles toggle, and MD mode
+// Filtered files list based on dotfiles toggle and MD mode (used when no search query)
 const filteredFilesItems = computed(() => {
   let items = filesItems.value;
 
@@ -141,11 +140,6 @@ const filteredFilesItems = computed(() => {
     );
   }
 
-  // Apply fuzzy/glob search filter
-  if (filesFilter.value.trim()) {
-    items = items.filter((item) => matchesSearch(item.name, filesFilter.value));
-  }
-
   return items;
 });
 
@@ -153,10 +147,32 @@ const filteredFilesItems = computed(() => {
 const filesCurrentPath = ref('');
 const filesItems = ref([]);
 const filesLoading = ref(false);
-const filesFilter = ref(''); // Filter text for file list
+const filesFilter = ref(''); // Search query for server-side file search
+const filesSearchResults = ref(null); // null = not searching; array = search results
+const filesSearching = ref(false); // true while waiting for search results
 const showDotfiles = ref(false); // Toggle to show/hide dotfiles
 const openedFile = ref(null); // { path, content, loading }
 const fileEditorRef = ref(null);
+
+// Debounced server-side search for files tab (scoped to current viewed folder)
+let filesSearchTimeout = null;
+watch(filesFilter, (query) => {
+  clearTimeout(filesSearchTimeout);
+  if (!query.trim()) {
+    filesSearchResults.value = null;
+    filesSearching.value = false;
+    return;
+  }
+  filesSearching.value = true;
+  filesSearchResults.value = null;
+  filesSearchTimeout = setTimeout(() => {
+    send({
+      type: 'files:search',
+      query: query.trim(),
+      projectPath: filesCurrentPath.value,
+    });
+  }, 150);
+});
 const fileExplorerRef = ref(null);
 const savedFileListScrollTop = ref(0);
 const htmlRenderMode = ref(false); // HTML render toggle (only active for .html/.htm files)
@@ -1861,10 +1877,25 @@ function handleFileMessage(msg) {
       filesCurrentPath.value = msg.path;
       filesItems.value = msg.items;
       filesLoading.value = false;
+      // Clear search when navigating to a new directory
+      filesFilter.value = '';
+      filesSearchResults.value = null;
+      filesSearching.value = false;
       break;
     case 'files:browse:error':
       console.error('Browse error:', msg.error);
       filesLoading.value = false;
+      break;
+    case 'files:search:result':
+      if (filesFilter.value.trim()) {
+        filesSearchResults.value = msg.results || [];
+      }
+      filesSearching.value = false;
+      break;
+    case 'files:search:error':
+      console.error('File search error:', msg.error);
+      filesSearchResults.value = [];
+      filesSearching.value = false;
       break;
     case 'files:read:result':
       // Handle regular file editor
@@ -2011,6 +2042,8 @@ watch(currentSession, () => {
   filesLoading.value = false;
   openedFile.value = null;
   filesFilter.value = '';
+  filesSearchResults.value = null;
+  filesSearching.value = false;
 
   // Close git diff modal on session change to avoid stale data
   showGitDiffModal.value = false;
@@ -2276,8 +2309,8 @@ watch(
         v-else
         ref="fileExplorerRef"
         :current-path="filesCurrentPath"
-        :items="filteredFilesItems"
-        :loading="filesLoading"
+        :items="filesSearchResults ?? filteredFilesItems"
+        :loading="filesLoading || filesSearching"
         :project-path="projectStatus.cwd"
         @navigate="handleFilesNavigate"
         @select-file="handleFileSelect"
@@ -2352,7 +2385,7 @@ watch(
       </button>
     </div>
 
-    <footer class="footer">
+    <footer v-if="!(currentMode === 'files' && openedFile)" class="footer">
       <!-- Files explorer header (only in files mode) - moved above toolbar -->
       <div v-if="currentMode === 'files'" class="files-explorer-header">
         <div class="files-breadcrumb">
@@ -2731,7 +2764,7 @@ watch(
         </div>
       </form>
 
-      <!-- Files filter input -->
+      <!-- Files search input -->
       <div v-else-if="currentMode === 'files'" class="files-filter-form">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
           <circle cx="11" cy="11" r="8"/>
@@ -2741,14 +2774,15 @@ watch(
           v-model="filesFilter"
           type="text"
           class="files-filter-input"
-          placeholder="Filter files... (supports fuzzy & glob: *.md)"
+          placeholder="Search files... (fuzzy & glob: *.md)"
         />
+        <span v-if="filesSearching" class="files-filter-searching">Searching...</span>
         <button
           v-if="filesFilter"
           type="button"
           class="clear-btn"
           @click="filesFilter = ''"
-          title="Clear filter"
+          title="Clear search"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -4536,6 +4570,13 @@ watch(
 
 .files-filter-input::placeholder {
   color: var(--text-muted);
+}
+
+.files-filter-searching {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  flex-shrink: 0;
 }
 
 .files-filter-form .clear-btn {

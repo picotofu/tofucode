@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Cmd+Enter references the selected item in chat (instead of opening it)
   - Legend below the CWD bar: `↵ open · ⌘↵ reference`
   - Download button added alongside the reference button (files only)
+- **Files tab server-side search** — Search box in the files tab now uses the same server-side fuzzy/glob search as Cmd+P, scoped to the currently viewed folder (not the project root); searching across subfolders works naturally as you navigate
+- **Hide footer when viewing a file** — Footer (breadcrumb, toolbar, search, mode tabs) is hidden when a file is open in the files tab, giving the editor full vertical space
 
 ### Fixed
 - Binary and unsupported files no longer cause a flash loop — server returns file info instead of an error, frontend shows a "Binary file" info view
