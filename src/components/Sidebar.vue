@@ -758,7 +758,7 @@ function handleOverlayClick() {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 1;
+  white-space: nowrap;
   padding: 5px 8px;
   font-size: 12px;
   font-weight: 500;

@@ -195,8 +195,12 @@ function handleKeydown(e) {
   if (e.key === 'Enter') {
     e.preventDefault();
     if (newProjectMode.value) {
-      const item = folderItems.value[selectedIndex.value];
-      if (item) navigateFolder(item.path);
+      if (e.metaKey || e.ctrlKey) {
+        useCurrentFolder();
+      } else {
+        const item = folderItems.value[selectedIndex.value];
+        if (item) navigateFolder(item.path);
+      }
       return;
     }
     const item = flattenedItems.value[selectedIndex.value];
@@ -301,7 +305,7 @@ const formatTime = formatRelativeTime;
             </svg>
             <span class="palette-folder-select-label">Use this folder</span>
             <span class="palette-folder-select-path">{{ currentFolder }}</span>
-            <kbd class="palette-folder-select-hint">↵ enter</kbd>
+            <kbd class="palette-folder-select-hint">⌘↵</kbd>
           </div>
           <!-- Subdirectories -->
           <div

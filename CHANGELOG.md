@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Sidebar project toolbar** — Pinned toolbar in the Projects tab with three actions: New Project (opens Cmd+K folder selector), Sort A-Z toggle (persists within session), and Clone Repository icon button; the old full-width clone button is removed
-- **Cmd+K folder selector** — New Project toggle in Cmd+K switches the palette into a folder browser mode; navigate subdirectories with arrow keys or click, select current folder with Enter/click to start a new session; Escape returns to session search
+- **Cmd+K folder selector** — New Project toggle in Cmd+K switches the palette into a folder browser mode; navigate subdirectories with arrow keys or click, Cmd+Enter selects the current folder to start a new session, Escape returns to session search
 - **File Upload** — Upload files directly from the file browser via click-to-select or drag & drop. Progress is shown per-file with success/error feedback; the directory refreshes automatically on completion.
 - **File size limit config** — Max file size for reads and uploads is controlled via `MAX_FILE_SIZE_MB` env var or `maxFileSizeMb` in `config.json`; defaults to 10 MB.
 - **HTML render toggle** — File editor shows a toggle button for `.html`/`.htm` files to switch between source view and a sandboxed iframe preview.
