@@ -27,7 +27,7 @@ docker run -d \
   -p 3000:3000 \
   -e ANTHROPIC_API_KEY=your_key_here \
   -v $(pwd):/workspace \
-  picotofu/tofucode:latest
+  picotofu/tofucode:latest --root /workspace
 
 # Open http://localhost:3000
 ```
@@ -36,10 +36,12 @@ docker run -d \
 - `/home/node/.claude/.credentials.json` - required - API credentials (isolated, recommended)
 - `/home/node/.claude` - required - full Claude config (alternative, for host interop)
 - `ANTHROPIC_API_KEY` env var - required - API key (alternative)
-- `/workspace` - optional - project directory
+- `/workspace` - recommended - project directory (always pair with `--root /workspace`)
 - `/home/node/.tofucode` - optional - auth, settings, state storage
 
 **Note:** Only one API authentication method is required (credentials file, full `.claude` folder, or env var)
+
+**Project root:** Always pass `--root` to tell tofucode where your projects live. Without it, the app falls back to `$HOME` (`/home/node`), which is an empty directory unless you mount something there.
 
 **Git credentials:** `git` and `openssh-client` are included in the image. Mount your SSH key and git config to enable git operations:
 ```bash

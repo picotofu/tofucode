@@ -9,7 +9,7 @@ docker run -d \
   -p 3000:3000 \
   -v ~/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro \
   -v $(pwd):/workspace \
-  picotofu/tofucode:latest
+  picotofu/tofucode:latest --root /workspace
 ```
 
 Open http://localhost:3000
@@ -34,10 +34,12 @@ Open http://localhost:3000
 ### Optional: Workspace
 
 ```bash
-# Mount your project directory
+# Mount your project directory — always pair with --root
 -v /path/to/project:/workspace
 -v $(pwd):/workspace
 ```
+
+> **Note:** Always pass `--root /workspace` (or wherever you mount your projects) so tofucode knows where to look. Without `--root`, it falls back to `$HOME` (`/home/node`), which is an empty directory unless you mount something there.
 
 ### Optional: Persistent Settings
 
@@ -166,7 +168,7 @@ docker run -d \
   -e ANTHROPIC_API_KEY=your_key \
   -v ~/projects:/workspace \
   -v tofucode-sessions:/home/node/.claude/projects \
-  picotofu/tofucode:latest --port 8080
+  picotofu/tofucode:latest --port 8080 --root /workspace
 ```
 
 ### Full Host Interop
