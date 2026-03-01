@@ -11,7 +11,13 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['close', 'open-settings', 'open-help', 'open-mcp']);
+const emit = defineEmits([
+  'close',
+  'open-settings',
+  'open-help',
+  'open-mcp',
+  'new-project',
+]);
 
 const router = useRouter();
 const route = useRoute();
@@ -30,6 +36,14 @@ const {
   onMessage,
   openCloneDialog,
 } = useWebSocket();
+
+// Project sort state (default: recent first; true = A-Z)
+const sortAZ = ref(false);
+
+const sortedProjects = computed(() => {
+  if (!sortAZ.value) return projects.value;
+  return [...projects.value].sort((a, b) => a.name.localeCompare(b.name));
+});
 
 // Upgrade state
 const isUpgrading = ref(false);
@@ -232,19 +246,8 @@ function handleOverlayClick() {
 
       <!-- Projects Tab -->
       <ul v-else-if="activeTab === 'projects'" class="sidebar-list">
-        <li class="sidebar-item clone-item">
-          <button class="clone-project-btn" @click="openCloneDialog()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="18" cy="18" r="3"/>
-              <circle cx="6" cy="6" r="3"/>
-              <circle cx="6" cy="18" r="3"/>
-              <path d="M6 9v3m0 0v3m0-3h3M15 6a9 9 0 0 0-9 9"/>
-            </svg>
-            Clone Repository
-          </button>
-        </li>
         <li
-          v-for="project in projects"
+          v-for="project in sortedProjects"
           :key="project.slug"
           class="sidebar-item project-item"
           :class="{ active: currentProject === project.slug }"
@@ -280,6 +283,40 @@ function handleOverlayClick() {
           No projects yet
         </li>
       </ul>
+    </div>
+
+    <!-- Projects toolbar (pinned, only in projects tab) -->
+    <div v-if="activeTab === 'projects'" class="sidebar-project-toolbar">
+      <!-- New Project -->
+      <button class="project-toolbar-btn" title="New Project" @click="$emit('new-project')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          <line x1="12" y1="11" x2="12" y2="17"/>
+          <line x1="9" y1="14" x2="15" y2="14"/>
+        </svg>
+        New Project
+      </button>
+      <div class="project-toolbar-divider"></div>
+      <!-- Sort A-Z toggle -->
+      <button
+        class="project-toolbar-icon-btn"
+        :class="{ active: sortAZ }"
+        :title="sortAZ ? 'Sorted A-Z (click for recent first)' : 'Sort A-Z'"
+        @click="sortAZ = !sortAZ"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18M7 12h10M11 18h2"/>
+        </svg>
+      </button>
+      <!-- Clone -->
+      <button class="project-toolbar-icon-btn" title="Clone Repository" @click="openCloneDialog()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="18" cy="18" r="3"/>
+          <circle cx="6" cy="6" r="3"/>
+          <circle cx="6" cy="18" r="3"/>
+          <path d="M6 9v3m0 0v3m0-3h3M15 6a9 9 0 0 0-9 9"/>
+        </svg>
+      </button>
     </div>
 
     <nav class="sidebar-tabs">
@@ -709,30 +746,65 @@ function handleOverlayClick() {
   font-size: 13px;
 }
 
-.clone-item {
-  padding: 6px 4px;
-}
-
-.clone-project-btn {
+.sidebar-project-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 10px;
+  gap: 4px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border-color);
+}
+
+.project-toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  padding: 5px 8px;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
   background: transparent;
-  border: 1px dashed var(--border-color);
-  border-radius: var(--radius-md);
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.clone-project-btn:hover {
+.project-toolbar-btn:hover {
   background: var(--bg-tertiary);
-  border-color: var(--text-muted);
   color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.project-toolbar-divider {
+  flex: 1;
+}
+
+.project-toolbar-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.project-toolbar-icon-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.project-toolbar-icon-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
 }
 
 /* Animated spinner for running status */

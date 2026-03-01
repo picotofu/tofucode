@@ -184,6 +184,12 @@ onMessage((msg) => {
 
 // Command palette state
 const showPalette = ref(false);
+const paletteNewProjectMode = ref(false);
+
+function openPaletteNewProject() {
+  paletteNewProjectMode.value = true;
+  showPalette.value = true;
+}
 
 // File picker state
 const showFilePicker = ref(false);
@@ -223,6 +229,7 @@ function handleGlobalKeydown(e) {
 
 function closePalette() {
   showPalette.value = false;
+  paletteNewProjectMode.value = false;
 }
 
 function handleCloned({ projectSlug }) {
@@ -353,13 +360,14 @@ onUnmounted(() => {
 
 <template>
   <div class="app" :class="{ 'sidebar-open': sidebarOpen }">
-    <Sidebar :open="sidebarOpen" @close="closeSidebar" @open-settings="openSettings" @open-help="openHelp" @open-mcp="openMcp" />
+    <Sidebar :open="sidebarOpen" @close="closeSidebar" @open-settings="openSettings" @open-help="openHelp" @open-mcp="openMcp" @new-project="openPaletteNewProject" />
     <div class="app-main">
       <router-view />
     </div>
     <CommandPalette
       :show="showPalette"
       :sessions="recentSessions"
+      :initial-new-project-mode="paletteNewProjectMode"
       @close="closePalette"
     />
     <FilePicker
