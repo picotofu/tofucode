@@ -33,13 +33,19 @@ docker run -d \
 ```
 
 **Mount Points:**
-- `/home/appuser/.claude/.credentials.json` - required - API credentials (isolated, recommended)
-- `/home/appuser/.claude` - required - full Claude config (alternative, for host interop)
+- `/home/node/.claude/.credentials.json` - required - API credentials (isolated, recommended)
+- `/home/node/.claude` - required - full Claude config (alternative, for host interop)
 - `ANTHROPIC_API_KEY` env var - required - API key (alternative)
 - `/workspace` - optional - project directory
-- `/home/appuser/.tofucode` - optional - auth, settings, state storage
+- `/home/node/.tofucode` - optional - auth, settings, state storage
 
 **Note:** Only one API authentication method is required (credentials file, full `.claude` folder, or env var)
+
+**Git credentials:** `git` and `openssh-client` are included in the image. Mount your SSH key and git config to enable git operations:
+```bash
+-v ~/.ssh:/home/node/.ssh:ro \
+-v ~/.gitconfig:/home/node/.gitconfig:ro \
+```
 
 See [Docker Guide](./docs/DOCKER.md) for all configuration options.
 

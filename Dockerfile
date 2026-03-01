@@ -1,4 +1,4 @@
-FROM node:24-alpine AS builder
+FROM node:24-slim AS builder
 
 WORKDIR /build
 
@@ -8,16 +8,17 @@ RUN npm ci
 COPY . .
 RUN npm run build && npm ci --omit=dev
 
-FROM node:24-alpine
+FROM node:24-slim
 
 ARG USER_ID=1000
 ARG GROUP_ID=1000
 
-RUN apk add --no-cache git openssh-client && \
-    deluser node 2>/dev/null || true && \
-    delgroup node 2>/dev/null || true && \
-    addgroup -g ${GROUP_ID} appuser && \
-    adduser -D -u ${USER_ID} -G appuser appuser
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    openssh-client \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupmod -g ${GROUP_ID} node \
+    && usermod -u ${USER_ID} -g ${GROUP_ID} node
 
 WORKDIR /app
 
@@ -27,13 +28,11 @@ COPY --from=builder /build/bin ./bin
 COPY --from=builder /build/server ./server
 COPY --from=builder /build/dist ./dist
 
-RUN chown -R appuser:appuser /app && \
-    mkdir -p /home/appuser/.claude && \
-    chown -R appuser:appuser /home/appuser/.claude
+RUN chown -R node:node /app && \
+    mkdir -p /home/node/.claude && \
+    chown -R node:node /home/node/.claude
 
-ENV SHELL=/bin/sh
-
-USER appuser
+USER node
 
 EXPOSE 3000
 

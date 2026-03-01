@@ -7,7 +7,7 @@ docker pull picotofu/tofucode:latest
 
 docker run -d \
   -p 3000:3000 \
-  -v ~/.claude/.credentials.json:/home/appuser/.claude/.credentials.json:ro \
+  -v ~/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro \
   -v $(pwd):/workspace \
   picotofu/tofucode:latest
 ```
@@ -22,10 +22,10 @@ Open http://localhost:3000
 
 ```bash
 # Option 1: Mount credentials only (isolated, recommended)
--v ~/.claude/.credentials.json:/home/appuser/.claude/.credentials.json:ro
+-v ~/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro
 
 # Option 2: Mount full Claude folder (host interop)
--v ~/.claude:/home/appuser/.claude
+-v ~/.claude:/home/node/.claude
 
 # Option 3: Environment variable
 -e ANTHROPIC_API_KEY=your_key_here
@@ -43,13 +43,22 @@ Open http://localhost:3000
 
 ```bash
 # Web UI auth and settings
--v ~/.tofucode:/home/appuser/.tofucode
+-v ~/.tofucode:/home/node/.tofucode
 
 # Claude sessions (isolated)
--v tofucode-sessions:/home/appuser/.claude/projects
+-v tofucode-sessions:/home/node/.claude/projects
 
 # Full Claude interop (shares everything with host)
--v ~/.claude:/home/appuser/.claude
+-v ~/.claude:/home/node/.claude
+```
+
+### Optional: Git Credentials
+
+`git` and `openssh-client` are included in the image. Mount your SSH key and git config to enable git operations inside Claude sessions:
+
+```bash
+-v ~/.ssh:/home/node/.ssh:ro \
+-v ~/.gitconfig:/home/node/.gitconfig:ro \
 ```
 
 ---
@@ -128,8 +137,21 @@ Default: `USER_ID=1000`, `GROUP_ID=1000`
 docker run -d \
   --name tofucode \
   -p 3000:3000 \
-  -v ~/.claude/.credentials.json:/home/appuser/.claude/.credentials.json:ro \
+  -v ~/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro \
   -v $(pwd):/workspace \
+  picotofu/tofucode:latest --root /workspace
+```
+
+### Development with Git
+
+```bash
+docker run -d \
+  --name tofucode \
+  -p 3000:3000 \
+  -v ~/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro \
+  -v $(pwd):/workspace \
+  -v ~/.ssh:/home/node/.ssh:ro \
+  -v ~/.gitconfig:/home/node/.gitconfig:ro \
   picotofu/tofucode:latest --root /workspace
 ```
 
@@ -143,7 +165,7 @@ docker run -d \
   -p 8080:8080 \
   -e ANTHROPIC_API_KEY=your_key \
   -v ~/projects:/workspace \
-  -v tofucode-sessions:/home/appuser/.claude/projects \
+  -v tofucode-sessions:/home/node/.claude/projects \
   picotofu/tofucode:latest --port 8080
 ```
 
@@ -153,7 +175,7 @@ docker run -d \
 docker run -d \
   --name tofucode \
   -p 3000:3000 \
-  -v ~/.claude:/home/appuser/.claude \
+  -v ~/.claude:/home/node/.claude \
   -v ~/projects:/workspace \
   picotofu/tofucode:latest --root /workspace
 ```
@@ -208,11 +230,13 @@ docker run -p 3000:3000 -e ANTHROPIC_API_KEY=key tofucode:local
 
 | Path | Type | Purpose |
 |------|------|---------|
-| `/home/appuser/.claude/.credentials.json` | Required* | API credentials only (isolated, recommended) |
-| `/home/appuser/.claude` | Required* | Full Claude config, API key, sessions (host interop) |
+| `/home/node/.claude/.credentials.json` | Required* | API credentials only (isolated, recommended) |
+| `/home/node/.claude` | Required* | Full Claude config, API key, sessions (host interop) |
 | `ANTHROPIC_API_KEY` | Required* | API key via environment variable |
-| `/home/appuser/.claude/projects` | Optional | Sessions only (isolated persistent) |
-| `/home/appuser/.tofucode` | Optional | Web UI auth and settings |
+| `/home/node/.claude/projects` | Optional | Sessions only (isolated persistent) |
+| `/home/node/.tofucode` | Optional | Web UI auth and settings |
+| `/home/node/.ssh` | Optional | SSH key for git operations |
+| `/home/node/.gitconfig` | Optional | Git user config for commits |
 | `/workspace` | Optional | Your project files |
 | `/config/config.json` | Optional | Configuration file |
 
