@@ -240,7 +240,7 @@ const formatTime = formatRelativeTime;
 
 <template>
   <Teleport to="body">
-    <div v-if="show" class="palette-overlay" @click="$emit('close')">
+    <div v-if="show" class="palette-overlay" @click="$emit('close')" @keydown="handleKeydown">
       <div class="palette" @click.stop>
         <div class="palette-input-wrapper">
           <!-- Folder mode: up button + path display -->
