@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useWebSocket } from '../composables/useWebSocket';
 import { formatRelativeTime } from '../utils/format.js';
@@ -134,7 +134,7 @@ const flattenedItems = computed(() => {
   return items;
 });
 
-// Reset state when palette opens
+// Global keydown listener — works regardless of which element has focus
 watch(
   () => props.show,
   (isVisible) => {
@@ -150,9 +150,16 @@ watch(
       nextTick(() => {
         inputRef.value?.focus();
       });
+      document.addEventListener('keydown', handleKeydown);
+    } else {
+      document.removeEventListener('keydown', handleKeydown);
     }
   },
 );
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown);
+});
 
 // Reset selected index when results change
 watch(flattenedItems, () => {
@@ -240,7 +247,7 @@ const formatTime = formatRelativeTime;
 
 <template>
   <Teleport to="body">
-    <div v-if="show" class="palette-overlay" @click="$emit('close')" @keydown="handleKeydown">
+    <div v-if="show" class="palette-overlay" @click="$emit('close')">
       <div class="palette" @click.stop>
         <div class="palette-input-wrapper">
           <!-- Folder mode: up button + path display -->
@@ -253,7 +260,7 @@ const formatTime = formatRelativeTime;
             <span class="palette-folder-path">{{ currentFolder || '~' }}</span>
           </template>
           <!-- Folder mode: hidden focusable input to capture keydown -->
-          <input v-if="newProjectMode" ref="inputRef" class="palette-input-hidden" @keydown="handleKeydown" readonly />
+          <input v-if="newProjectMode" ref="inputRef" class="palette-input-hidden" readonly />
           <!-- Session mode: search icon + input -->
           <template v-else>
             <svg class="palette-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -266,7 +273,6 @@ const formatTime = formatRelativeTime;
               type="text"
               class="palette-input"
               placeholder="Search sessions..."
-              @keydown="handleKeydown"
             />
           </template>
           <!-- New Project toggle -->
