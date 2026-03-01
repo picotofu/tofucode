@@ -32,6 +32,8 @@ RUN chown -R node:node /app && \
     mkdir -p /home/node/.claude && \
     chown -R node:node /home/node/.claude
 
+ENV SHELL=/bin/bash
+
 USER node
 
 EXPOSE 3000
