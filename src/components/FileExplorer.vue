@@ -150,9 +150,6 @@ async function uploadFiles(files) {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('destPath', props.currentPath);
-      if (props.projectPath) {
-        formData.append('projectPath', props.projectPath);
-      }
 
       try {
         const res = await fetch('/api/upload', {

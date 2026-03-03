@@ -3,7 +3,18 @@ import fs from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { config, slugToPath } from '../config.js';
+import { logger } from '../lib/logger.js';
 import { send } from '../lib/ws.js';
+
+/**
+ * Return a safe error message for client consumption.
+ * Access-denied messages pass through; filesystem errors are genericised.
+ */
+function safeError(err, fallback = 'Operation failed') {
+  if (err.message?.startsWith('Access denied')) return err.message;
+  logger.error(err.message); // log the full detail server-side
+  return fallback;
+}
 
 /**
  * Validate that a path is within allowed directories
@@ -55,12 +66,23 @@ function validatePath(requestedPath, context) {
     allowedRoots.push(path.resolve(context.currentProjectPath));
   }
 
+  // SECURITY: Resolve symlinks to prevent escape via symlink
+  const realResolved = existsSync(resolved)
+    ? realpathSync(resolved)
+    : (() => {
+        const parent = path.dirname(resolved);
+        const basename = path.basename(resolved);
+        return existsSync(parent)
+          ? path.join(realpathSync(parent), basename)
+          : resolved;
+      })();
+
   // Check if resolved path is within any allowed root
   const isAllowed = allowedRoots.some((root) => {
     const normalizedRoot = path.resolve(root);
     return (
-      resolved === normalizedRoot ||
-      resolved.startsWith(normalizedRoot + path.sep)
+      realResolved === normalizedRoot ||
+      realResolved.startsWith(normalizedRoot + path.sep)
     );
   });
 
@@ -68,7 +90,7 @@ function validatePath(requestedPath, context) {
     throw new Error('Access denied: path outside allowed directories');
   }
 
-  return resolved;
+  return realResolved;
 }
 
 /**
@@ -150,7 +172,7 @@ export async function handleFilesBrowse(ws, payload, context) {
     send(ws, {
       type: 'files:browse:error',
       path: folderPath,
-      error: err.message,
+      error: safeError(err),
     });
   }
 }
@@ -253,7 +275,7 @@ export async function handleFilesRead(ws, payload, context) {
     send(ws, {
       type: 'files:read:error',
       path: filePath,
-      error: err.message,
+      error: safeError(err),
     });
   }
 }
@@ -284,7 +306,7 @@ export async function handleFilesWrite(ws, payload, context) {
     send(ws, {
       type: 'files:write:error',
       path: filePath,
-      error: err.message,
+      error: safeError(err),
     });
   }
 }
@@ -322,7 +344,7 @@ export async function handleFilesCreate(ws, payload, context) {
     send(ws, {
       type: 'files:create:error',
       path: filePath,
-      error: err.message,
+      error: safeError(err),
     });
   }
 }
@@ -358,7 +380,7 @@ export async function handleFilesRename(ws, payload, context) {
       type: 'files:rename:error',
       oldPath,
       newPath,
-      error: err.message,
+      error: safeError(err),
     });
   }
 }
@@ -396,7 +418,7 @@ export async function handleFilesDelete(ws, payload, context) {
     send(ws, {
       type: 'files:delete:error',
       path: targetPath,
-      error: err.message,
+      error: safeError(err),
     });
   }
 }
@@ -440,7 +462,7 @@ export async function handleFilesMove(ws, payload, context) {
       type: 'files:move:error',
       sourcePath,
       destPath,
-      error: err.message,
+      error: safeError(err),
     });
   }
 }

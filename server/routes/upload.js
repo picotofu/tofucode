@@ -12,9 +12,11 @@ import {
 
 /**
  * Validate that a destination path is within allowed directories.
- * Mirrors the logic in server/events/files.js.
+ * Unlike WebSocket file handlers, the upload route has no server-side project context,
+ * so we only allow paths under homedir() (or config.rootPath when set).
+ * Symlinks are resolved in both modes for defense-in-depth.
  */
-function validateUploadPath(requestedPath, projectPath) {
+function validateUploadPath(requestedPath) {
   const resolved = path.resolve(requestedPath);
 
   if (config.rootPath) {
@@ -33,35 +35,38 @@ function validateUploadPath(requestedPath, projectPath) {
       const relativePath = path.relative(resolvedRoot, resolvedPath);
 
       if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-        throw new Error(
-          `Access denied: path outside root (${config.rootPath})`,
-        );
+        throw new Error('Access denied: path outside root');
       }
 
       return resolvedPath;
     } catch (err) {
-      throw new Error(`Access denied: unable to resolve path (${err.message})`);
+      if (err.message.startsWith('Access denied')) throw err;
+      throw new Error('Access denied: unable to resolve path');
     }
   }
 
-  const allowedRoots = [homedir()];
-  if (projectPath) {
-    allowedRoots.push(path.resolve(projectPath));
-  }
+  // SECURITY: Resolve symlinks to prevent escape via symlink
+  const realResolved = existsSync(resolved)
+    ? realpathSync(resolved)
+    : (() => {
+        const parent = path.dirname(resolved);
+        const basename = path.basename(resolved);
+        return existsSync(parent)
+          ? path.join(realpathSync(parent), basename)
+          : resolved;
+      })();
 
-  const isAllowed = allowedRoots.some((root) => {
-    const normalizedRoot = path.resolve(root);
-    return (
-      resolved === normalizedRoot ||
-      resolved.startsWith(normalizedRoot + path.sep)
-    );
-  });
+  const home = homedir();
+  const normalizedHome = path.resolve(home);
+  const isAllowed =
+    realResolved === normalizedHome ||
+    realResolved.startsWith(normalizedHome + path.sep);
 
   if (!isAllowed) {
     throw new Error('Access denied: path outside allowed directories');
   }
 
-  return resolved;
+  return realResolved;
 }
 
 /**
@@ -95,7 +100,6 @@ function buildUpload() {
  * multipart/form-data fields:
  *   file      — the file binary (required)
  *   destPath  — absolute destination directory path (required)
- *   projectPath — current project path for access validation (optional)
  */
 export function uploadHandler(req, res) {
   const upload = buildUpload();
@@ -114,23 +118,36 @@ export function uploadHandler(req, res) {
       return res.status(400).json({ error: 'No file provided' });
     }
 
-    const { destPath, projectPath } = req.body;
+    const { destPath } = req.body;
     if (!destPath) {
       return res.status(400).json({ error: 'destPath is required' });
     }
 
     try {
-      const resolvedDir = validateUploadPath(destPath, projectPath || null);
+      const resolvedDir = validateUploadPath(destPath);
 
       // Ensure destination directory exists
       await fs.mkdir(resolvedDir, { recursive: true });
 
-      const finalPath = path.join(resolvedDir, req.file.originalname);
+      // SECURITY: Sanitize filename — strip path separators and traversal sequences
+      const sanitizedName = path.basename(req.file.originalname);
+      if (!sanitizedName || sanitizedName === '.' || sanitizedName === '..') {
+        return res.status(400).json({ error: 'Invalid filename' });
+      }
+
+      const finalPath = path.join(resolvedDir, sanitizedName);
+
+      // SECURITY: Re-validate that the final path is still within allowed directories
+      validateUploadPath(finalPath);
+
       await fs.writeFile(finalPath, req.file.buffer);
 
-      res.json({ success: true, path: finalPath, name: req.file.originalname });
+      res.json({ success: true, path: finalPath, name: sanitizedName });
     } catch (writeErr) {
-      res.status(400).json({ error: writeErr.message });
+      const safeMessage = writeErr.message?.includes('Access denied')
+        ? writeErr.message
+        : 'Upload failed';
+      res.status(400).json({ error: safeMessage });
     }
   });
 }

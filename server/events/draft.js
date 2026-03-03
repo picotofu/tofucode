@@ -21,6 +21,7 @@ import { send } from '../lib/ws.js';
 
 const DRAFTS_FILE = '.drafts.json';
 const MAX_DRAFT_LENGTH = 100_000; // 100KB safety cap
+const MAX_DRAFT_ENTRIES = 100; // max drafts per project
 
 async function loadDrafts(projectPath) {
   const filePath = path.join(projectPath, DRAFTS_FILE);
@@ -80,12 +81,27 @@ export async function setHandler(ws, message, context) {
       delete drafts[sessionId];
     } else {
       drafts[sessionId] = { draft, updatedAt: Date.now() };
+
+      // Evict oldest entries if over limit
+      const keys = Object.keys(drafts);
+      if (keys.length > MAX_DRAFT_ENTRIES) {
+        const sorted = keys.sort(
+          (a, b) => (drafts[a].updatedAt || 0) - (drafts[b].updatedAt || 0),
+        );
+        for (const key of sorted.slice(0, keys.length - MAX_DRAFT_ENTRIES)) {
+          delete drafts[key];
+        }
+      }
     }
 
     await saveDrafts(projectPath, drafts);
     send(ws, { type: 'draft:ack', success: true, sessionId });
-  } catch (err) {
-    send(ws, { type: 'draft:ack', success: false, error: err.message });
+  } catch (_err) {
+    send(ws, {
+      type: 'draft:ack',
+      success: false,
+      error: 'Failed to save draft',
+    });
   }
 }
 
