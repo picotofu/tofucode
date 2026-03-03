@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, ref, watch } from 'vue';
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useWebSocket } from '../composables/useWebSocket';
 
 const props = defineProps({
@@ -94,10 +94,16 @@ function handleClose() {
 }
 
 function handleKeydown(e) {
-  if (e.key === 'Escape' && status.value !== 'cloning') {
-    handleClose();
+  if (e.key === 'Escape' && props.show) {
+    e.preventDefault();
+    if (status.value !== 'cloning') {
+      handleClose();
+    }
   }
 }
+
+onMounted(() => document.addEventListener('keydown', handleKeydown));
+onUnmounted(() => document.removeEventListener('keydown', handleKeydown));
 
 async function startClone() {
   if (!repoUrl.value.trim() || !targetDir.value.trim()) return;
@@ -166,16 +172,17 @@ function retryClone() {
 
 <template>
   <Teleport to="body">
-    <div v-if="show" class="modal-backdrop" @click.self="handleClose" @keydown="handleKeydown">
+    <div v-if="show" class="modal-backdrop" @click.self="handleClose">
       <div class="modal" role="dialog" aria-modal="true" aria-label="Clone Repository">
         <!-- Header -->
         <div class="modal-header">
           <div class="modal-title">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="18" cy="18" r="3"/>
+              <circle cx="12" cy="18" r="3"/>
               <circle cx="6" cy="6" r="3"/>
-              <circle cx="6" cy="18" r="3"/>
-              <path d="M6 9v3m0 0v3m0-3h3M15 6a9 9 0 0 0-9 9"/>
+              <circle cx="18" cy="6" r="3"/>
+              <path d="M6 9v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/>
+              <line x1="12" y1="15" x2="12" y2="12"/>
             </svg>
             Clone Repository
           </div>

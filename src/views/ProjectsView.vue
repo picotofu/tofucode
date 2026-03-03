@@ -201,10 +201,11 @@ function cancelEditingPath() {
           </form>
           <button class="clone-btn" @click="openCloneDialog(currentFolder)" :disabled="!currentFolder" title="Clone a git repository into this folder">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="18" cy="18" r="3"/>
+              <circle cx="12" cy="18" r="3"/>
               <circle cx="6" cy="6" r="3"/>
-              <circle cx="6" cy="18" r="3"/>
-              <path d="M6 9v3m0 0v3m0-3h3M15 6a9 9 0 0 0-9 9"/>
+              <circle cx="18" cy="6" r="3"/>
+              <path d="M6 9v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/>
+              <line x1="12" y1="15" x2="12" y2="12"/>
             </svg>
             Clone
           </button>
