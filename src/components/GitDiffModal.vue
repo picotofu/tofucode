@@ -186,26 +186,14 @@ function handleKeydown(e) {
     <div class="modal-container">
       <!-- Header -->
       <div class="modal-header">
-        <!-- Mobile back button (only in diff view) -->
-        <button v-if="mobileView === 'diff'" class="back-btn mobile-only" @click="goBackToList">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
-        </button>
         <h2 class="modal-title">
           <span v-if="mobileView === 'diff' && selectedFile" class="mobile-only title-file">{{
             selectedFile
           }}</span>
           <span v-else>Git Changes</span>
         </h2>
-        <button class="close-btn" @click="close">
+        <!-- Close button: desktop always, mobile only on list view -->
+        <button class="close-btn" :class="{ 'mobile-hidden': mobileView === 'diff' }" @click="close">
           <svg
             width="20"
             height="20"
@@ -216,6 +204,36 @@ function handleKeydown(e) {
           >
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
+        </button>
+      </div>
+
+      <!-- Mobile bottom action bar -->
+      <div class="mobile-action-bar mobile-only">
+        <button v-if="mobileView === 'diff'" class="mobile-action-btn" @click="goBackToList">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M19 12H5M12 5l-7 7 7 7" />
+          </svg>
+          <span>Back</span>
+        </button>
+        <button class="mobile-action-btn mobile-action-close" @click="close">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+          <span>Close</span>
         </button>
       </div>
 
@@ -632,6 +650,37 @@ function handleKeydown(e) {
   white-space: pre;
 }
 
+/* Mobile bottom action bar */
+.mobile-action-bar {
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  padding: 8px 16px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.mobile-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: background 0.15s;
+}
+
+.mobile-action-btn:hover {
+  background: var(--bg-hover);
+}
+
+.mobile-action-close {
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
 /* Mobile-only / desktop-only visibility helpers */
 .mobile-only {
   display: none;
@@ -723,6 +772,10 @@ function handleKeydown(e) {
 
   .diff-layout {
     flex-direction: column;
+  }
+
+  .mobile-hidden {
+    display: none;
   }
 }
 </style>
