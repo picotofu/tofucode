@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 
 const props = defineProps({
   projectPath: {
@@ -19,7 +19,11 @@ const files = ref([]);
 const diffs = ref({});
 const selectedFile = ref(null);
 const error = ref(null);
-const showFileList = ref(true);
+
+// Mobile navigation: 'list' | 'diff'
+const mobileView = ref('list');
+
+const diffViewerRef = ref(null);
 
 onMounted(() => {
   loadGitDiff();
@@ -52,7 +56,7 @@ async function loadGitDiff() {
     if (response.error) {
       error.value = response.error;
     }
-    // Auto-select first file
+    // Auto-select first file on desktop
     if (files.value.length > 0) {
       selectedFile.value = files.value[0].path;
     }
@@ -63,6 +67,15 @@ async function loadGitDiff() {
   }
 }
 
+// All files' parsed diffs for the combined diff view
+const allParsedDiffs = computed(() => {
+  return files.value.map((file) => ({
+    file,
+    lines: diffs.value[file.path] ? parseDiff(diffs.value[file.path]) : null,
+  }));
+});
+
+// Selected file's parsed diff (desktop single-file view)
 const selectedDiff = computed(() => {
   if (!selectedFile.value || !diffs.value[selectedFile.value]) {
     return null;
@@ -98,8 +111,25 @@ function parseDiff(diffText) {
   return parsedLines;
 }
 
-function selectFile(path) {
+function fileAnchorId(filePath) {
+  // Create a safe DOM id from the file path
+  return `diff-file-${filePath.replace(/[^a-zA-Z0-9]/g, '-')}`;
+}
+
+async function selectFile(path) {
   selectedFile.value = path;
+  // On mobile: switch to diff view and scroll to the file section
+  mobileView.value = 'diff';
+  await nextTick();
+  const anchorId = fileAnchorId(path);
+  const el = diffViewerRef.value?.querySelector(`#${anchorId}`);
+  if (el) {
+    el.scrollIntoView({ block: 'start' });
+  }
+}
+
+function goBackToList() {
+  mobileView.value = 'list';
 }
 
 function getStatusColor(status) {
@@ -141,7 +171,12 @@ function close() {
 function handleKeydown(e) {
   if (e.key === 'Escape') {
     e.preventDefault();
-    close();
+    // On mobile diff view, Escape goes back to list first
+    if (mobileView.value === 'diff') {
+      goBackToList();
+    } else {
+      close();
+    }
   }
 }
 </script>
@@ -149,8 +184,27 @@ function handleKeydown(e) {
 <template>
   <div class="modal-overlay" @click.self="close">
     <div class="modal-container">
+      <!-- Header -->
       <div class="modal-header">
-        <h2 class="modal-title">Git Changes</h2>
+        <!-- Mobile back button (only in diff view) -->
+        <button v-if="mobileView === 'diff'" class="back-btn mobile-only" @click="goBackToList">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M19 12H5M12 5l-7 7 7 7" />
+          </svg>
+        </button>
+        <h2 class="modal-title">
+          <span v-if="mobileView === 'diff' && selectedFile" class="mobile-only title-file">{{
+            selectedFile
+          }}</span>
+          <span v-else>Git Changes</span>
+        </h2>
         <button class="close-btn" @click="close">
           <svg
             width="20"
@@ -182,23 +236,8 @@ function handleKeydown(e) {
         </div>
 
         <div v-else class="diff-layout">
-          <!-- Mobile file list toggle -->
-          <button class="mobile-toggle" @click="showFileList = !showFileList">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M3 12h18M3 6h18M3 18h18" />
-            </svg>
-            <span>{{ showFileList ? 'Hide' : 'Show' }} Files ({{ files.length }})</span>
-          </button>
-
-          <!-- File list sidebar -->
-          <div class="file-list" :class="{ hidden: !showFileList }">
+          <!-- File list sidebar (desktop always visible; mobile only in 'list' view) -->
+          <div class="file-list" :class="{ 'mobile-hidden': mobileView === 'diff' }">
             <div class="file-list-header">
               <span class="file-count">{{ files.length }} changed files</span>
             </div>
@@ -217,27 +256,80 @@ function handleKeydown(e) {
               </span>
               <span class="file-path">{{ file.path }}</span>
               <span class="file-stats">
-                <span class="additions" v-if="file.additions > 0">+{{ file.additions }}</span>
-                <span class="deletions" v-if="file.deletions > 0">-{{ file.deletions }}</span>
+                <span v-if="file.additions > 0" class="additions">+{{ file.additions }}</span>
+                <span v-if="file.deletions > 0" class="deletions">-{{ file.deletions }}</span>
               </span>
+              <!-- Mobile chevron -->
+              <svg
+                class="mobile-only file-chevron"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
             </div>
           </div>
 
-          <!-- Diff viewer -->
-          <div class="diff-viewer">
-            <div v-if="!selectedFile" class="diff-placeholder">
-              Select a file to view changes
-            </div>
-            <div v-else-if="!selectedDiff" class="diff-placeholder">
-              No diff available for this file
-            </div>
-            <div v-else class="diff-content">
-              <div
-                v-for="(line, index) in selectedDiff"
-                :key="index"
-                :class="['diff-line', line.type]"
-              >
-                <span class="line-content">{{ line.content }}</span>
+          <!-- Diff viewer (desktop: single selected file; mobile: all files, 'diff' view only) -->
+          <div
+            ref="diffViewerRef"
+            class="diff-viewer"
+            :class="{ 'mobile-hidden': mobileView === 'list' }"
+          >
+            <!-- Desktop: single selected file diff -->
+            <template class="desktop-only">
+              <div v-if="!selectedFile" class="diff-placeholder desktop-only">
+                Select a file to view changes
+              </div>
+              <div v-else-if="!selectedDiff" class="diff-placeholder desktop-only">
+                No diff available for this file
+              </div>
+              <div v-else class="diff-scroll desktop-only">
+                <div class="diff-content">
+                  <div
+                    v-for="(line, index) in selectedDiff"
+                    :key="index"
+                    :class="['diff-line', line.type]"
+                  >
+                    <span class="line-content">{{ line.content }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Mobile: all files concatenated -->
+            <div class="mobile-only mobile-all-diffs">
+              <div v-for="entry in allParsedDiffs" :key="entry.file.path" class="mobile-file-section">
+                <div :id="fileAnchorId(entry.file.path)" class="mobile-file-heading">
+                  <span
+                    class="file-status"
+                    :style="{ color: getStatusColor(entry.file.status) }"
+                    :title="getStatusLabel(entry.file.status)"
+                  >
+                    {{ entry.file.status }}
+                  </span>
+                  <span class="mobile-file-heading-path">{{ entry.file.path }}</span>
+                  <span class="file-stats">
+                    <span v-if="entry.file.additions > 0" class="additions">+{{ entry.file.additions }}</span>
+                    <span v-if="entry.file.deletions > 0" class="deletions">-{{ entry.file.deletions }}</span>
+                  </span>
+                </div>
+                <div v-if="entry.lines" class="diff-scroll">
+                  <div class="diff-content">
+                    <div
+                      v-for="(line, index) in entry.lines"
+                      :key="index"
+                      :class="['diff-line', line.type]"
+                    >
+                      <span class="line-content">{{ line.content }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="diff-placeholder-inline">No diff available</div>
               </div>
             </div>
           </div>
@@ -278,28 +370,44 @@ function handleKeydown(e) {
 .modal-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border-color);
+  min-width: 0;
 }
 
 .modal-title {
+  flex: 1;
   font-size: 16px;
   font-weight: 600;
   margin: 0;
+  min-width: 0;
 }
 
+.title-file {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+.back-btn,
 .close-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
+  flex-shrink: 0;
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   transition: background 0.15s, color 0.15s;
 }
 
+.back-btn:hover,
 .close-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
@@ -351,7 +459,6 @@ function handleKeydown(e) {
   display: flex;
   flex: 1;
   min-height: 0;
-  /* Removed overflow: hidden - children need to scroll independently */
 }
 
 /* File list */
@@ -362,6 +469,7 @@ function handleKeydown(e) {
   flex-direction: column;
   background: var(--bg-secondary);
   overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .file-list-header {
@@ -430,12 +538,18 @@ function handleKeydown(e) {
   color: #ef4444;
 }
 
+.file-chevron {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
 /* Diff viewer */
 .diff-viewer {
   flex: 1;
   overflow-x: hidden;
   overflow-y: auto;
   background: var(--bg-primary);
+  min-width: 0;
 }
 
 .diff-placeholder {
@@ -447,11 +561,16 @@ function handleKeydown(e) {
   font-size: 14px;
 }
 
+/* Scroll container wrapping diff-content — horizontal scroll scoped per section */
+.diff-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
 .diff-content {
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.5;
-  /* Changed from inline-block to block for proper scrolling */
   display: block;
   min-width: fit-content;
 }
@@ -460,8 +579,7 @@ function handleKeydown(e) {
   display: flex;
   padding: 0 16px;
   min-height: 21px;
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre;
 }
 
 .diff-line.header {
@@ -514,29 +632,46 @@ function handleKeydown(e) {
   white-space: pre;
 }
 
-/* Mobile toggle button */
-.mobile-toggle {
+/* Mobile-only / desktop-only visibility helpers */
+.mobile-only {
   display: none;
+}
+
+/* Mobile all-files diff */
+.mobile-all-diffs {
+  display: none;
+}
+
+.mobile-file-section {
+  border-bottom: 2px solid var(--border-color);
+}
+
+.mobile-file-heading {
+  display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: var(--bg-secondary);
-  border: none;
+  background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border-color);
-  color: var(--text-primary);
-  font-size: 14px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.mobile-file-heading-path {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
   font-weight: 500;
-  cursor: pointer;
-  width: 100%;
-  transition: background 0.15s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.mobile-toggle:hover {
-  background: var(--bg-hover);
-}
-
-.mobile-toggle svg {
-  flex-shrink: 0;
+.diff-placeholder-inline {
+  padding: 12px 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 
 /* Mobile responsive styles */
@@ -547,32 +682,47 @@ function handleKeydown(e) {
 
   .modal-container {
     max-width: 100%;
-    max-height: 100vh;
+    max-height: 100dvh;
+    height: 100dvh;
     border-radius: 0;
   }
 
-  .mobile-toggle {
+  .mobile-only {
     display: flex;
   }
 
-  .diff-layout {
-    flex-direction: column;
+  .desktop-only {
+    display: none !important;
   }
 
+  /* Switch between screens */
   .file-list {
     width: 100%;
     border-right: none;
-    border-bottom: 1px solid var(--border-color);
-    max-height: 40vh;
-    overflow-y: auto;
+    flex: 1;
+    max-height: none;
   }
 
-  .file-list.hidden {
+  .file-list.mobile-hidden {
     display: none;
   }
 
   .diff-viewer {
+    flex: 1;
     width: 100%;
+    overflow-x: auto;
+  }
+
+  .diff-viewer.mobile-hidden {
+    display: none;
+  }
+
+  .mobile-all-diffs {
+    display: block;
+  }
+
+  .diff-layout {
+    flex-direction: column;
   }
 }
 </style>

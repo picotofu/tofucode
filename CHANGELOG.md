@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Mobile git diff** — Git diff modal is now mobile-friendly: file list and diff view are separate full-screen panels; tapping a file navigates to the diff view (all files concatenated, scrolled to the selected file); back button returns to the file list; each file's diff section scrolls independently; desktop layout unchanged
 - **Server-side draft sync** — Chat input drafts are now persisted server-side (per session) in addition to localStorage. On session load, the server draft is fetched: if no local draft exists it is silently restored; if both exist and differ, a yellow `⚠` indicator appears on the input form and a conflict modal lets you choose between the local (this device) and server (another device) version. Drafts are cleared server-side on submit.
 - **Sidebar project toolbar** — Pinned toolbar in the Projects tab with three actions: New Project (opens Cmd+K folder selector), Sort A-Z toggle (persists within session), and Clone Repository icon button; the old full-width clone button is removed
 - **Cmd+K folder selector** — New Project toggle in Cmd+K switches the palette into a folder browser mode; navigate subdirectories with arrow keys or click, Cmd+Enter selects the current folder to start a new session, Escape returns to session search
