@@ -9,6 +9,19 @@ const props = defineProps({
   },
 });
 
+// Dotfiles toggle — synced with files tab via localStorage
+const SHOW_DOTFILES_KEY = 'tofucode:show-dotfiles';
+const showDotfiles = ref(localStorage.getItem(SHOW_DOTFILES_KEY) === 'true');
+watch(showDotfiles, (val) => {
+  localStorage.setItem(SHOW_DOTFILES_KEY, val);
+  // Re-trigger search or browse to reflect the new state
+  if (searchQuery.value.trim()) {
+    triggerSearch(searchQuery.value);
+  } else {
+    triggerBrowse();
+  }
+});
+
 const emit = defineEmits(['close', 'select', 'reference', 'download']);
 
 const route = useRoute();
@@ -61,6 +74,7 @@ onMessage((msg) => {
       // Transform browse results to match search result format
       // For browse results, all items are in the same dir (shown in CWD), so no need to show path
       const items = (msg.items || [])
+        .filter((item) => showDotfiles.value || !item.name.startsWith('.'))
         .map((item) => ({
           ...item,
           directory: '', // Empty since CWD indicator already shows the location
@@ -79,6 +93,22 @@ onMessage((msg) => {
   }
 });
 
+function triggerSearch(query) {
+  send({
+    type: 'files:search',
+    query: query.trim(),
+    projectPath: route.params.project,
+    showDotfiles: showDotfiles.value,
+  });
+}
+
+function triggerBrowse() {
+  send({
+    type: 'files:browse',
+    path: route.params.project,
+  });
+}
+
 // Debounced search
 let searchTimeout = null;
 watch(searchQuery, (query) => {
@@ -92,12 +122,7 @@ watch(searchQuery, (query) => {
 
   searching.value = true;
   searchTimeout = setTimeout(() => {
-    send({
-      type: 'files:search',
-      query: query.trim(),
-      // Send project slug from route - backend will convert it to path
-      projectPath: route.params.project,
-    });
+    triggerSearch(query);
   }, 150); // 150ms debounce
 });
 
@@ -112,10 +137,7 @@ watch(
       searching.value = true;
 
       // Load current directory listing
-      send({
-        type: 'files:browse',
-        path: route.params.project, // Send project slug, backend will convert
-      });
+      triggerBrowse();
 
       nextTick(() => {
         inputRef.value?.focus();
@@ -322,6 +344,18 @@ function highlightPathMatch(text, query) {
 						@keydown="handleKeydown"
 					/>
 					<span v-if="searching" class="picker-loading">Searching...</span>
+					<button
+						type="button"
+						class="picker-dotfiles-btn"
+						:class="{ active: showDotfiles }"
+						title="Show dotfiles"
+						@click.stop="showDotfiles = !showDotfiles"
+					>
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<circle cx="12" cy="12" r="10"/>
+							<circle cx="12" cy="12" r="1"/>
+						</svg>
+					</button>
 					<kbd class="picker-hint">esc</kbd>
 				</div>
 
@@ -491,6 +525,32 @@ function highlightPathMatch(text, query) {
 	border-radius: var(--radius-sm);
 	color: var(--text-muted);
 	font-family: var(--font-mono);
+}
+
+.picker-dotfiles-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border: none;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	padding: 0;
+	flex-shrink: 0;
+	transition: color 0.15s, background 0.15s;
+}
+
+.picker-dotfiles-btn:hover {
+	color: var(--text-primary);
+	background: var(--bg-tertiary);
+}
+
+.picker-dotfiles-btn.active {
+	color: var(--text-primary);
+	background: var(--bg-tertiary);
 }
 
 .picker-cwd {

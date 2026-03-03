@@ -43,6 +43,7 @@ async function searchFiles(
   maxDepth = 5,
   maxResults = 100,
   basePath = dirPath,
+  showDotfiles = false,
 ) {
   const results = [];
   const lowerQuery = query.toLowerCase();
@@ -87,8 +88,11 @@ async function searchFiles(
       for (const entry of entries) {
         if (results.length >= maxResults) break;
 
-        // Skip hidden files/folders and common build directories
-        if (entry.name.startsWith('.') || skipDirs.has(entry.name)) {
+        // Skip hidden files/folders (unless showDotfiles) and common build directories
+        if (
+          (!showDotfiles && entry.name.startsWith('.')) ||
+          skipDirs.has(entry.name)
+        ) {
           continue;
         }
 
@@ -290,7 +294,7 @@ function validateSearchPath(requestedPath, context) {
  * Handle files:search WebSocket event
  */
 export async function handleFilesSearch(ws, payload, context) {
-  const { query, projectPath } = payload;
+  const { query, projectPath, showDotfiles = false } = payload;
 
   try {
     // Get project slug from context or use provided path
@@ -317,7 +321,14 @@ export async function handleFilesSearch(ws, payload, context) {
     }
 
     // Perform search
-    const results = await searchFiles(resolvedPath, query);
+    const results = await searchFiles(
+      resolvedPath,
+      query,
+      5,
+      100,
+      resolvedPath,
+      showDotfiles,
+    );
 
     send(ws, {
       type: 'files:search:result',

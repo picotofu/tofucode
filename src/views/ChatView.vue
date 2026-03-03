@@ -150,7 +150,9 @@ const filesLoading = ref(false);
 const filesFilter = ref(''); // Search query for server-side file search
 const filesSearchResults = ref(null); // null = not searching; array = search results
 const filesSearching = ref(false); // true while waiting for search results
-const showDotfiles = ref(false); // Toggle to show/hide dotfiles
+const SHOW_DOTFILES_KEY = 'tofucode:show-dotfiles';
+const showDotfiles = ref(localStorage.getItem(SHOW_DOTFILES_KEY) === 'true');
+watch(showDotfiles, (val) => localStorage.setItem(SHOW_DOTFILES_KEY, val));
 const openedFile = ref(null); // { path, content, loading }
 const fileEditorRef = ref(null);
 
@@ -170,6 +172,7 @@ watch(filesFilter, (query) => {
       type: 'files:search',
       query: query.trim(),
       projectPath: filesCurrentPath.value,
+      showDotfiles: showDotfiles.value,
     });
   }, 150);
 });
@@ -583,18 +586,17 @@ function loadChatInput() {
   }
 }
 
-// Save chat input to localStorage
+// Save chat input to localStorage + schedule server sync (debounced together)
 function saveChatInput() {
+  const draft = inputValue.value;
+
+  // localStorage — immediate
   if (chatInputStorageKey.value) {
-    if (inputValue.value) {
-      localStorage.setItem(chatInputStorageKey.value, inputValue.value);
+    if (draft) {
+      localStorage.setItem(chatInputStorageKey.value, draft);
       // Clear backup when user starts typing new content (only if there's actual text being typed)
       // This ensures backup persists when input is cleared via the clear button
-      if (
-        chatInputBackupKey.value &&
-        hasBackup.value &&
-        inputValue.value.trim() !== ''
-      ) {
+      if (chatInputBackupKey.value && hasBackup.value && draft.trim() !== '') {
         localStorage.removeItem(chatInputBackupKey.value);
         hasBackupState.value = false;
       }
@@ -602,6 +604,17 @@ function saveChatInput() {
       // Clear storage when input is empty
       localStorage.removeItem(chatInputStorageKey.value);
     }
+  }
+
+  // Server sync — debounced, writes the same value that localStorage just wrote
+  // Skip server sync while a conflict is unresolved to preserve the server copy
+  if (!draftConflict.value) {
+    if (draftSyncTimer) clearTimeout(draftSyncTimer);
+    draftSyncTimer = setTimeout(() => {
+      const sessionId = sessionParam.value;
+      if (!sessionId || sessionId === 'new') return;
+      send({ type: 'draft:set', sessionId, draft });
+    }, 1500);
   }
 }
 
@@ -612,8 +625,43 @@ function clearChatInput() {
   }
 }
 
+// Pull server draft after loading a session; detect conflict if localStorage has something different
+function fetchServerDraft() {
+  const sessionId = sessionParam.value;
+  if (!sessionId || sessionId === 'new') return;
+  send({ type: 'draft:get', sessionId });
+}
+
+// Resolve conflict: use local version (already in editor), just dismiss and push to server
+function resolveWithLocal() {
+  draftConflict.value = null;
+  showDraftConflictModal.value = false;
+  // Push local draft to server immediately
+  const sessionId = sessionParam.value;
+  if (sessionId && sessionId !== 'new') {
+    send({ type: 'draft:set', sessionId, draft: inputValue.value });
+  }
+}
+
+// Resolve conflict: use server version
+function resolveWithServer() {
+  const serverDraft = draftConflict.value?.server ?? '';
+  draftConflict.value = null;
+  showDraftConflictModal.value = false;
+  inputValue.value = serverDraft;
+  if (editorInstance.value) {
+    editorInstance.value.setContent(serverDraft);
+  }
+  saveChatInput();
+}
+
 // Reactive backup state (since localStorage isn't reactive)
 const hasBackupState = ref(false);
+
+// Draft sync state
+const draftConflict = ref(null); // { local: string, server: string } when conflict detected
+const showDraftConflictModal = ref(false); // controlled by user clicking the indicator button
+let draftSyncTimer = null; // debounce timer for pushing drafts to server
 
 // Check if there's a backup available for undo
 const hasBackup = computed(() => {
@@ -770,15 +818,55 @@ function initTinyMDE() {
           handleChatInputTab(e);
         }
       });
+
+      // Fix mobile backspace: on soft keyboards, deleteContentBackward at col=0
+      // doesn't merge lines via the DOM — intercept it and merge manually.
+      editorEl.value.addEventListener('beforeinput', (e) => {
+        if (e.inputType !== 'deleteContentBackward') return;
+        const editor = editorInstance.value;
+        if (!editor) return;
+        const sel = editor.getSelection();
+        if (!sel || sel.col !== 0 || sel.row === 0) return;
+        // Cursor is at start of a non-first line — merge with previous line
+        e.preventDefault();
+        const content = editor.getContent();
+        const lines = content.split('\n');
+        const prevLine = lines[sel.row - 1];
+        const curLine = lines[sel.row];
+        const mergedCol = prevLine.length;
+        lines.splice(sel.row - 1, 2, prevLine + curLine);
+        editor.setContent(lines.join('\n'));
+        editor.setSelection({ row: sel.row - 1, col: mergedCol });
+        inputValue.value = editor.getContent();
+      });
     }
   });
 }
 
+// Re-check server draft when tab regains visibility (catches edits made on another device/tab)
+function handleVisibilityChange() {
+  if (document.visibilityState !== 'visible') return;
+  if (contextReady.value) {
+    fetchServerDraft();
+  }
+  // If not ready yet (WS reconnecting), the contextReady watcher below will fire instead
+}
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+});
+
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
   // Cleanup TinyMDE instance
   if (editorInstance.value) {
     editorInstance.value = null;
+  }
+  // Cancel any pending draft sync
+  if (draftSyncTimer) {
+    clearTimeout(draftSyncTimer);
+    draftSyncTimer = null;
   }
 });
 
@@ -876,6 +964,15 @@ watch(
 
     // Load input for new session
     if (newSession !== oldSession) {
+      // Cancel any pending draft sync from the previous session
+      if (draftSyncTimer) {
+        clearTimeout(draftSyncTimer);
+        draftSyncTimer = null;
+      }
+      // Dismiss any stale conflict from the previous session
+      draftConflict.value = null;
+      showDraftConflictModal.value = false;
+
       // Prevent the inputValue watcher from overwriting during transition
       isLoadingSession = true;
 
@@ -890,11 +987,20 @@ watch(
         }
         // Re-enable auto-save after loading is complete
         isLoadingSession = false;
+        // Draft fetch is handled by the contextReady watcher (covers both ready-now and reconnect cases)
       });
     }
   },
   { immediate: true },
 );
+
+// Fetch server draft whenever context becomes ready (covers initial load + reconnects).
+// Also checks tab visibility so we don't trigger on background reconnects.
+watch(contextReady, (ready) => {
+  if (ready && document.visibilityState === 'visible') {
+    fetchServerDraft();
+  }
+});
 
 // Model selection - persisted globally (not per-session)
 const MODEL_STORAGE_KEY = 'claude-web:model';
@@ -1096,6 +1202,11 @@ function handleSubmit() {
 
   // Clear saved input on successful submit
   clearChatInput();
+  // Also clear server draft on submit
+  const submittedSessionId = sessionParam.value;
+  if (submittedSessionId && submittedSessionId !== 'new') {
+    send({ type: 'draft:set', sessionId: submittedSessionId, draft: '' });
+  }
 
   const options = {
     model: modelSelection.value,
@@ -1974,6 +2085,32 @@ function handleFileMessage(msg) {
 // Register message handler (returns unsubscribe fn, auto-cleaned up on unmount by composable)
 onMessage(handleFileMessage);
 
+// Handle server draft value responses
+onMessage((msg) => {
+  if (msg.type === 'draft:value') {
+    const sessionId = sessionParam.value;
+    // Ignore responses for other sessions or while transitioning
+    if (msg.sessionId !== sessionId || isLoadingSession) return;
+    const serverDraft = msg.draft ?? '';
+    const localDraft = inputValue.value;
+    // No server draft — nothing to compare
+    if (!serverDraft) return;
+    // No local draft — silently restore from server
+    if (!localDraft) {
+      inputValue.value = serverDraft;
+      if (editorInstance.value) {
+        editorInstance.value.setContent(serverDraft);
+      }
+      saveChatInput();
+      return;
+    }
+    // Both exist and differ — show conflict modal
+    if (serverDraft !== localDraft) {
+      draftConflict.value = { local: localDraft, server: serverDraft };
+    }
+  }
+});
+
 // Handle bookmark and watch responses from server
 onMessage((msg) => {
   if (msg.type === 'terminal:bookmarks') {
@@ -2713,6 +2850,14 @@ watch(
             <line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
+        <!-- Draft conflict indicator — click to open resolution modal -->
+        <button
+          v-if="draftConflict"
+          type="button"
+          class="draft-conflict-indicator"
+          title="Draft conflict — click to resolve"
+          @click.stop="showDraftConflictModal = true"
+        >⚠</button>
         <!-- Reconnecting overlay -->
         <span v-if="!contextReady" class="reconnecting-indicator" title="Reconnecting to server...">
           <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3036,6 +3181,26 @@ watch(
       @delete="deleteQueuedMessage"
       @clear="clearQueuedMessages"
     />
+
+    <!-- Draft conflict modal -->
+    <div v-if="showDraftConflictModal && draftConflict" class="modal-overlay" @click="showDraftConflictModal = false">
+      <div class="modal draft-conflict-modal" @click.stop>
+        <h3>Draft Conflict</h3>
+        <p class="draft-conflict-desc">Your local draft differs from the version stored on the server. Choose which one to keep.</p>
+        <div class="draft-conflict-panels">
+          <div class="draft-conflict-panel">
+            <div class="draft-conflict-panel-label">This device</div>
+            <pre class="draft-conflict-preview">{{ draftConflict.local }}</pre>
+            <button class="modal-btn confirm" @click="resolveWithLocal">Use this device's draft</button>
+          </div>
+          <div class="draft-conflict-panel">
+            <div class="draft-conflict-panel-label">Server (another device)</div>
+            <pre class="draft-conflict-preview">{{ draftConflict.server }}</pre>
+            <button class="modal-btn confirm" @click="resolveWithServer">Use server draft</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Debug Popover -->
     <DebugPopover
@@ -4889,5 +5054,88 @@ watch(
       -4px 0 12px rgba(255, 255, 255, 0.05);
     pointer-events: auto;
   }
+}
+
+/* Draft conflict indicator (purely visual — modal auto-shows when conflict is detected) */
+.draft-conflict-indicator {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: #f59e0b;
+  color: #000;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  cursor: pointer;
+  padding: 0;
+  animation: conflict-pulse 1.5s ease-in-out infinite;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.draft-conflict-indicator:hover {
+  background: #fbbf24;
+  transform: scale(1.15);
+  animation: none;
+}
+
+@keyframes conflict-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Draft conflict modal */
+.draft-conflict-modal {
+  min-width: min(600px, 90vw);
+  max-width: 780px;
+  width: 90vw;
+}
+
+.draft-conflict-desc {
+  margin: 0 0 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.draft-conflict-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.draft-conflict-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.draft-conflict-panel-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.draft-conflict-preview {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  margin: 0;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+  color: var(--text-primary);
 }
 </style>

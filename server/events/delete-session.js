@@ -85,6 +85,20 @@ export function handler(ws, message, context) {
     // Clear any queued messages for this session
     clearQueue(sessionId);
 
+    // Remove draft entry for this session from .drafts.json
+    const draftsPath = join(sessionsDir, '.drafts.json');
+    if (existsSync(draftsPath)) {
+      try {
+        const drafts = JSON.parse(readFileSync(draftsPath, 'utf-8'));
+        if (drafts[sessionId]) {
+          delete drafts[sessionId];
+          writeFileSync(draftsPath, JSON.stringify(drafts, null, 2));
+        }
+      } catch {
+        // Non-fatal — drafts cleanup is best-effort
+      }
+    }
+
     // Broadcast to all clients so UI updates everywhere
     broadcast({
       type: 'session_deleted',

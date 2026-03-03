@@ -9,6 +9,7 @@ import { handler as answerQuestion } from './answer-question.js';
 import { handler as browseFolder } from './browse-folder.js';
 import { handler as cancelTask } from './cancel-task.js';
 import { handler as deleteSession } from './delete-session.js';
+import { getHandler as draftGet, setHandler as draftSet } from './draft.js';
 import {
   handleFilesBrowse,
   handleFilesCreate,
@@ -111,4 +112,6 @@ export const handlers = {
   'queue:delete': queueDelete,
   'queue:clear': queueClear,
   'queue:get': queueGet,
+  'draft:set': draftSet,
+  'draft:get': draftGet,
 };
