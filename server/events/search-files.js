@@ -180,6 +180,21 @@ async function searchFiles(
 
         const matches = filenameMatches || fullPathMatches || folderPathMatches;
 
+        // Score filename match quality (lower = better):
+        //   0 = exact name match
+        //   1 = prefix match
+        //   2 = substring match
+        //   3 = fuzzy match
+        function filenameScore(name) {
+          if (!filenameMatches) return 99;
+          const q = lowerQuery;
+          const n = name.toLowerCase();
+          if (n === q) return 0;
+          if (n.startsWith(q)) return 1;
+          if (n.includes(q)) return 2;
+          return 3;
+        }
+
         if (entry.isDirectory()) {
           // Add matching directories to results
           if (filenameMatches) {
@@ -189,7 +204,8 @@ async function searchFiles(
               relativePath,
               directory: path.dirname(relativePath),
               isDirectory: true,
-              matchType: 'folder', // For sorting priority
+              matchType: 'folder',
+              score: filenameScore(entry.name),
             });
           }
           // Always recurse into directories
@@ -208,6 +224,7 @@ async function searchFiles(
                 : fullPathMatches
                   ? 'fullpath'
                   : 'folderpath',
+              score: filenameScore(entry.name),
             });
           }
         }
@@ -219,20 +236,22 @@ async function searchFiles(
 
   await search(dirPath, 0);
 
-  // Sort results: folders first, then files by filename match, then by folder path match
+  // Sort results: folders first, then by match quality, then alphabetically
   results.sort((a, b) => {
     // Folders first
     if (a.isDirectory && !b.isDirectory) return -1;
     if (!a.isDirectory && b.isDirectory) return 1;
 
-    // For files, prioritize: filename > fullpath > folderpath
-    if (!a.isDirectory && !b.isDirectory) {
-      const rank = { filename: 0, fullpath: 1, folderpath: 2 };
-      const diff = (rank[a.matchType] ?? 2) - (rank[b.matchType] ?? 2);
-      if (diff !== 0) return diff;
-    }
+    // matchType rank: filename > fullpath > folderpath
+    const rank = { filename: 0, folder: 0, fullpath: 1, folderpath: 2 };
+    const typeDiff = (rank[a.matchType] ?? 2) - (rank[b.matchType] ?? 2);
+    if (typeDiff !== 0) return typeDiff;
 
-    // Alphabetically by name
+    // Within same matchType, rank by match quality (exact > prefix > substring > fuzzy)
+    const scoreDiff = (a.score ?? 3) - (b.score ?? 3);
+    if (scoreDiff !== 0) return scoreDiff;
+
+    // Alphabetically by name as tiebreaker
     return a.name.localeCompare(b.name);
   });
 
