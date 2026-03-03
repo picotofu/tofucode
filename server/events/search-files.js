@@ -89,9 +89,10 @@ async function searchFiles(
         if (results.length >= maxResults) break;
 
         // Skip hidden files/folders (unless showDotfiles) and common build directories
+        // skipDirs only applies to directories — don't skip files named the same (e.g. .env file)
         if (
           (!showDotfiles && entry.name.startsWith('.')) ||
-          skipDirs.has(entry.name)
+          (entry.isDirectory() && skipDirs.has(entry.name))
         ) {
           continue;
         }

@@ -133,6 +133,6 @@ export function renderMarkdown(text) {
   const html = marked.parse(text);
   // Allow data-code-id for copy button functionality (handled via event delegation)
   return DOMPurify.sanitize(html, {
-    ADD_ATTR: ['data-code-id'],
+    ADD_ATTR: ['data-code-id', 'target', 'rel'],
   });
 }

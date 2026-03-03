@@ -12,15 +12,6 @@ const props = defineProps({
 // Dotfiles toggle — synced with files tab via localStorage
 const SHOW_DOTFILES_KEY = 'tofucode:show-dotfiles';
 const showDotfiles = ref(localStorage.getItem(SHOW_DOTFILES_KEY) === 'true');
-watch(showDotfiles, (val) => {
-  localStorage.setItem(SHOW_DOTFILES_KEY, val);
-  // Re-trigger search or browse to reflect the new state
-  if (searchQuery.value.trim()) {
-    triggerSearch(searchQuery.value);
-  } else {
-    triggerBrowse();
-  }
-});
 
 const emit = defineEmits(['close', 'select', 'reference', 'download']);
 
@@ -109,14 +100,27 @@ function triggerBrowse() {
   });
 }
 
+// Re-trigger search/browse when dotfiles toggle changes
+watch(showDotfiles, (val) => {
+  localStorage.setItem(SHOW_DOTFILES_KEY, val);
+  searching.value = true;
+  if (searchQuery.value.trim()) {
+    triggerSearch(searchQuery.value);
+  } else {
+    triggerBrowse();
+  }
+});
+
 // Debounced search
 let searchTimeout = null;
 watch(searchQuery, (query) => {
   clearTimeout(searchTimeout);
 
   if (!query.trim()) {
+    // Cleared input — restore browse listing (same as initial open)
     results.value = [];
-    searching.value = false;
+    searching.value = true;
+    triggerBrowse();
     return;
   }
 
