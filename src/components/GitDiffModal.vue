@@ -192,8 +192,8 @@ function handleKeydown(e) {
           }}</span>
           <span v-else>Git Changes</span>
         </h2>
-        <!-- Close button: desktop always, mobile only on list view -->
-        <button class="close-btn" :class="{ 'mobile-hidden': mobileView === 'diff' }" @click="close">
+        <!-- Close button: desktop always, hidden on mobile (bottom action bar handles it) -->
+        <button class="close-btn desktop-only" @click="close">
           <svg
             width="20"
             height="20"
@@ -204,36 +204,6 @@ function handleKeydown(e) {
           >
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
-        </button>
-      </div>
-
-      <!-- Mobile bottom action bar -->
-      <div class="mobile-action-bar mobile-only">
-        <button v-if="mobileView === 'diff'" class="mobile-action-btn" @click="goBackToList">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
-          <span>Back</span>
-        </button>
-        <button class="mobile-action-btn mobile-action-close" @click="close">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-          <span>Close</span>
         </button>
       </div>
 
@@ -352,6 +322,36 @@ function handleKeydown(e) {
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Mobile bottom action bar -->
+      <div class="mobile-action-bar mobile-only">
+        <button v-if="mobileView === 'diff'" class="mobile-action-btn" @click="goBackToList">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M19 12H5M12 5l-7 7 7 7" />
+          </svg>
+          <span>Back</span>
+        </button>
+        <button class="mobile-action-btn mobile-action-close" @click="close">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+          <span>Close</span>
+        </button>
       </div>
     </div>
   </div>
@@ -772,10 +772,6 @@ function handleKeydown(e) {
 
   .diff-layout {
     flex-direction: column;
-  }
-
-  .mobile-hidden {
-    display: none;
   }
 }
 </style>
