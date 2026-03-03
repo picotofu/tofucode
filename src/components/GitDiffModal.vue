@@ -240,7 +240,7 @@ function handleKeydown(e) {
 
         <div v-else class="diff-layout">
           <!-- File list sidebar (desktop always visible; mobile only in 'list' view) -->
-          <div class="file-list" :class="{ 'mobile-hidden': mobileView === 'diff' }">
+          <div class="file-list" :class="{ 'mobile-screen-hidden': mobileView === 'diff' }">
             <div class="file-list-header">
               <span class="file-count">{{ files.length }} changed files</span>
             </div>
@@ -281,30 +281,28 @@ function handleKeydown(e) {
           <div
             ref="diffViewerRef"
             class="diff-viewer"
-            :class="{ 'mobile-hidden': mobileView === 'list' }"
+            :class="{ 'mobile-screen-hidden': mobileView === 'list' }"
           >
             <!-- Desktop: single selected file diff -->
-            <template class="desktop-only">
-              <div v-if="!selectedFile" class="diff-placeholder desktop-only">
-                Select a file to view changes
-              </div>
-              <div v-else-if="!selectedDiff" class="diff-placeholder desktop-only">
-                No diff available for this file
-              </div>
-              <div v-else class="diff-scroll desktop-only">
-                <div class="diff-content">
-                  <div
-                    v-for="(line, index) in selectedDiff"
-                    :key="index"
-                    :class="['diff-line', line.type]"
-                  >
-                    <span class="line-num old-num">{{ line.oldNum ?? '' }}</span>
-                    <span class="line-num new-num">{{ line.newNum ?? '' }}</span>
-                    <span class="line-content">{{ line.content }}</span>
-                  </div>
+            <div v-if="!selectedFile" class="diff-placeholder desktop-only">
+              Select a file to view changes
+            </div>
+            <div v-else-if="!selectedDiff" class="diff-placeholder desktop-only">
+              No diff available for this file
+            </div>
+            <div v-else class="diff-scroll desktop-only">
+              <div class="diff-content">
+                <div
+                  v-for="(line, index) in selectedDiff"
+                  :key="index"
+                  :class="['diff-line', line.type]"
+                >
+                  <span class="line-num old-num">{{ line.oldNum ?? '' }}</span>
+                  <span class="line-num new-num">{{ line.newNum ?? '' }}</span>
+                  <span class="line-content">{{ line.content }}</span>
                 </div>
               </div>
-            </template>
+            </div>
 
             <!-- Mobile: all files concatenated -->
             <div class="mobile-only mobile-all-diffs">
@@ -792,7 +790,7 @@ function handleKeydown(e) {
     max-height: none;
   }
 
-  .file-list.mobile-hidden {
+  .file-list.mobile-screen-hidden {
     display: none;
   }
 
@@ -802,7 +800,7 @@ function handleKeydown(e) {
     overflow-x: auto;
   }
 
-  .diff-viewer.mobile-hidden {
+  .diff-viewer.mobile-screen-hidden {
     display: none;
   }
 
