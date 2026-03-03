@@ -11,6 +11,10 @@ const props = defineProps({
     type: String,
     default: null,
   },
+  presorted: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -32,9 +36,10 @@ const contextMenu = ref({
   item: null,
 });
 
-// Sort: folders first, then files, alphabetically
+// Sort: folders first, then files, alphabetically (skipped when presorted=true)
 const sortedItems = computed(() => {
   if (!props.items) return [];
+  if (props.presorted) return props.items;
   return [...props.items].sort((a, b) => {
     if (a.isDirectory && !b.isDirectory) return -1;
     if (!a.isDirectory && b.isDirectory) return 1;

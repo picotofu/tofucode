@@ -2447,6 +2447,7 @@ watch(
         ref="fileExplorerRef"
         :current-path="filesCurrentPath"
         :items="filesSearchResults ?? filteredFilesItems"
+        :presorted="filesSearchResults !== null"
         :loading="filesLoading || filesSearching"
         :project-path="projectStatus.cwd"
         @navigate="handleFilesNavigate"

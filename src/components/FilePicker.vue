@@ -51,8 +51,9 @@ function transformItem(item) {
 // Handle search results and browse results
 onMessage((msg) => {
   if (msg.type === 'files:search:result') {
+    // Preserve server-side ranking order (exact > prefix > substring > fuzzy)
     const items = (msg.results || []).map(transformItem);
-    results.value = sortResults(items);
+    results.value = items;
     currentCwd.value = msg.projectPath || '';
     searching.value = false;
   } else if (msg.type === 'files:search:error') {
