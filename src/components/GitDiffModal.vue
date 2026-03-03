@@ -88,24 +88,39 @@ function parseDiff(diffText) {
 
   const lines = diffText.split('\n');
   const parsedLines = [];
+  let oldLine = 0;
+  let newLine = 0;
 
   for (const line of lines) {
     let type = 'unchanged';
     let content = line;
+    let oldNum = null;
+    let newNum = null;
 
     if (line.startsWith('+++') || line.startsWith('---')) {
       type = 'header';
     } else if (line.startsWith('@@')) {
       type = 'hunk';
+      // Parse @@ -oldStart[,oldCount] +newStart[,newCount] @@
+      const match = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (match) {
+        oldLine = Number.parseInt(match[1], 10);
+        newLine = Number.parseInt(match[2], 10);
+      }
     } else if (line.startsWith('+')) {
       type = 'added';
-      content = line.substring(1); // Remove the leading +
+      content = line.substring(1);
+      newNum = newLine++;
     } else if (line.startsWith('-')) {
       type = 'removed';
-      content = line.substring(1); // Remove the leading -
+      content = line.substring(1);
+      oldNum = oldLine++;
+    } else {
+      oldNum = oldLine++;
+      newNum = newLine++;
     }
 
-    parsedLines.push({ content, type });
+    parsedLines.push({ content, type, oldNum, newNum });
   }
 
   return parsedLines;
@@ -283,6 +298,8 @@ function handleKeydown(e) {
                     :key="index"
                     :class="['diff-line', line.type]"
                   >
+                    <span class="line-num old-num">{{ line.oldNum ?? '' }}</span>
+                    <span class="line-num new-num">{{ line.newNum ?? '' }}</span>
                     <span class="line-content">{{ line.content }}</span>
                   </div>
                 </div>
@@ -313,6 +330,8 @@ function handleKeydown(e) {
                       :key="index"
                       :class="['diff-line', line.type]"
                     >
+                      <span class="line-num old-num">{{ line.oldNum ?? '' }}</span>
+                      <span class="line-num new-num">{{ line.newNum ?? '' }}</span>
                       <span class="line-content">{{ line.content }}</span>
                     </div>
                   </div>
@@ -595,22 +614,43 @@ function handleKeydown(e) {
 
 .diff-line {
   display: flex;
-  padding: 0 16px;
+  align-items: baseline;
   min-height: 21px;
   white-space: pre;
+}
+
+.line-num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  min-width: 40px;
+  padding: 0 8px;
+  text-align: right;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.line-num:first-child {
+  border-right: 1px solid var(--border-color);
+}
+
+.line-num:nth-child(2) {
+  border-right: 1px solid var(--border-color);
+  margin-right: 8px;
 }
 
 .diff-line.header {
   background: var(--bg-tertiary);
   color: var(--text-secondary);
   font-weight: 500;
-  padding: 4px 16px;
+  padding: 4px 0;
 }
 
 .diff-line.hunk {
   background: rgba(96, 165, 250, 0.1);
   color: #60a5fa;
-  padding: 4px 16px;
+  padding: 4px 0;
 }
 
 .diff-line.added {
