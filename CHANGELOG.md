@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-03-03
+
 ### Added
 - **Mobile git diff** — Git diff modal is now mobile-friendly: file list and diff view are separate full-screen panels; tapping a file navigates to the diff view (all files concatenated, scrolled to the selected file); back button returns to the file list; each file's diff section scrolls independently; desktop layout unchanged
+- **Git diff line numbers** — Two-column gutter (old | new) with accurate line numbers parsed from hunk headers; gutter is non-selectable and styled to not compete with diff content
 - **Server-side draft sync** — Chat input drafts are now persisted server-side (per session) in addition to localStorage. On session load, the server draft is fetched: if no local draft exists it is silently restored; if both exist and differ, a yellow `⚠` indicator appears on the input form and a conflict modal lets you choose between the local (this device) and server (another device) version. Drafts are cleared server-side on submit.
 - **Sidebar project toolbar** — Pinned toolbar in the Projects tab with three actions: New Project (opens Cmd+K folder selector), Sort A-Z toggle (persists within session), and Clone Repository icon button; the old full-width clone button is removed
 - **Cmd+K folder selector** — New Project toggle in Cmd+K switches the palette into a folder browser mode; navigate subdirectories with arrow keys or click, Cmd+Enter selects the current folder to start a new session, Escape returns to session search
@@ -21,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Cmd+Enter references the selected item in chat (instead of opening it)
   - Legend below the CWD bar: `↵ open · ⌘↵ reference`
   - Download button added alongside the reference button (files only)
+  - Dotfile toggle synced with Files tab state
 - **Files tab server-side search** — Search box in the files tab now uses the same server-side fuzzy/glob search as Cmd+P, scoped to the currently viewed folder (not the project root); searching across subfolders works naturally as you navigate
 - **Hide footer when viewing a file** — Footer (breadcrumb, toolbar, search, mode tabs) is hidden when a file is open in the files tab, giving the editor full vertical space
 
@@ -29,6 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Binary and unsupported files no longer cause a flash loop — server returns file info instead of an error, frontend shows a "Binary file" info view
 - Files larger than 10MB now show a "File too large to preview" info view instead of looping
 - File URL watcher no longer re-fetches on loading state changes — only triggers on path open/close
+- Links in chat now open in a new tab (`target="_blank"`) — DOMPurify allowlist updated for `target` and `rel` attributes
+- Clone modal now closes on Escape key via document-level listener
+- Clone and git diff icons replaced with cleaner fork/branch shape
+
+### Security
+- **Fixed upload filename injection** — `originalname` is now sanitised via `path.basename()` and the final path re-validated; prevents path traversal via crafted filenames
+- **Removed client-controlled `projectPath` from upload** — upload path validation no longer accepts a client-supplied root, only allowing writes under `homedir()` or `config.rootPath`
+- **Fixed symlink escape in non-rootPath mode** — `realpathSync` now applied in both `files.js` and `upload.js` for all path validation, not just when `--root` is set
+- **Genericised error messages** — filesystem error details no longer forwarded to clients; full detail logged server-side only
+- **Draft entry limit** — `.drafts.json` capped at 100 entries per project with LRU eviction to prevent unbounded file growth
+- **Dependency updates** — minimatch (ReDoS), multer (DoS), rollup (path traversal) patched via `npm audit fix`
+- See [v1.2.0 Security Report](docs/security_report_v1.2.0.md) for full audit details
 
 ## [1.1.0] - 2026-02-25
 
