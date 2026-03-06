@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.2.1] - 2026-03-03
+## [1.2.1] - 2026-03-06
 
 ### Fixed
 - Cmd+P / Files tab search now ranks exact filename matches above prefix, substring, and fuzzy matches — previously client-side alphabetical sort was overriding server-side match quality ranking
