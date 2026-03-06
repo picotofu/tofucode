@@ -505,11 +505,36 @@ async function copyOutput(proc, e) {
   }
 }
 
-// Expose navigation functions for parent component
+// navState: a plain ref updated by a watcher so the parent's computed can track it reliably
+const navState = ref({
+  show: false,
+  current: 1,
+  total: 1,
+  hasPrev: false,
+  hasNext: false,
+});
+watch(
+  [currentCommandIndex, () => allProcesses.value.length, () => props.activeTab],
+  () => {
+    const len = allProcesses.value.length;
+    const idx = currentCommandIndex.value;
+    navState.value = {
+      show: props.activeTab === 'history',
+      current: idx + 1,
+      total: len,
+      hasPrev: idx > 0,
+      hasNext: idx < len - 1,
+    };
+  },
+  { immediate: true },
+);
+
+// Expose navigation functions and navState for parent footer nav bar
 defineExpose({
   scrollHistoryToBottom,
   goToPreviousCommand,
   goToNextCommand,
+  navState,
 });
 </script>
 
@@ -920,30 +945,6 @@ defineExpose({
       </div>
     </div>
 
-    <!-- Command navigation buttons (bottom-right, only in history tab) -->
-    <div class="command-navigation" v-if="activeTab === 'history' && allProcesses.length > 1">
-      <button
-        class="command-nav-btn"
-        :disabled="currentCommandIndex <= 0"
-        @click="goToPreviousCommand"
-        title="Previous command"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 15l-6-6-6 6"/>
-        </svg>
-      </button>
-      <span class="command-counter">{{ currentCommandIndex + 1 }}/{{ allProcesses.length }}</span>
-      <button
-        class="command-nav-btn"
-        :disabled="currentCommandIndex >= allProcesses.length - 1"
-        @click="goToNextCommand"
-        title="Next command"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M6 9l6 6 6-6"/>
-        </svg>
-      </button>
-    </div>
   </div>
 </template>
 
@@ -1399,52 +1400,6 @@ defineExpose({
   color: var(--text-muted);
 }
 
-/* Command navigation buttons (matches chat turn navigation) */
-.command-navigation {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 20px;
-  padding: 4px;
-  z-index: 10;
-  box-shadow: var(--shadow-md);
-}
-
-.command-nav-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  color: var(--text-secondary);
-  background: transparent;
-  transition: background 0.15s, color 0.15s;
-}
-
-.command-nav-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.command-nav-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.command-counter {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text-muted);
-  padding: 0 4px;
-  min-width: 36px;
-  text-align: center;
-}
 
 /* Bookmark row wrapper (includes watch panel) */
 .bookmark-row-wrapper {

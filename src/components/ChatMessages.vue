@@ -356,8 +356,50 @@ watch(
   },
 );
 
-// Expose scrollToBottom and navigation functions for parent to call
-defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn });
+// navState: a plain ref updated by a watcher so the parent's computed can track it reliably
+// (exposed computeds across component boundaries have unreliable reactivity tracking)
+const navState = ref({
+  show: false,
+  current: 1,
+  total: 1,
+  hasPrev: false,
+  hasNext: false,
+});
+watch(
+  [
+    currentTurnIndex,
+    () => conversationTurns.value.length,
+    () => props.hasOlderMessages,
+    () => props.totalTurns,
+    () => props.loadedTurns,
+  ],
+  () => {
+    const len = conversationTurns.value.length;
+    const idx = currentTurnIndex.value;
+    const total = props.totalTurns > 0 ? props.totalTurns : len;
+    const current =
+      props.totalTurns > 0
+        ? Math.max(
+            1,
+            Math.min(
+              props.totalTurns,
+              props.totalTurns - props.loadedTurns + idx + 1,
+            ),
+          )
+        : idx + 1;
+    navState.value = {
+      show: true,
+      current,
+      total,
+      hasPrev: idx > 0 || props.hasOlderMessages,
+      hasNext: idx < len - 1,
+    };
+  },
+  { immediate: true },
+);
+
+// Expose scrollToBottom, navigation functions, and navState for parent footer nav bar
+defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn, navState });
 </script>
 
 <template>
@@ -428,31 +470,6 @@ defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn });
         <span class="dot"></span>
       </div>
     </main>
-
-    <!-- Turn navigation buttons (bottom-right) -->
-    <div class="turn-navigation" v-if="conversationTurns.length > 1">
-      <button
-        class="turn-nav-btn"
-        :disabled="currentTurnIndex <= 0 && !hasOlderMessages"
-        @click="goToPreviousTurn"
-        title="Previous message (scroll up)"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 15l-6-6-6 6"/>
-        </svg>
-      </button>
-      <span class="turn-counter">{{ totalTurns > 0 ? Math.max(1, Math.min(totalTurns, totalTurns - loadedTurns + currentTurnIndex + 1)) : (currentTurnIndex + 1) }}/{{ totalTurns > 0 ? totalTurns : conversationTurns.length }}</span>
-      <button
-        class="turn-nav-btn"
-        :disabled="currentTurnIndex >= conversationTurns.length - 1"
-        @click="goToNextTurn"
-        title="Next message (scroll down)"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M6 9l6 6 6-6"/>
-        </svg>
-      </button>
-    </div>
 
     <!-- Jump to bottom button (floats within chat area) -->
     <button
@@ -702,50 +719,4 @@ defineExpose({ scrollToBottom, goToPreviousTurn, goToNextTurn });
   gap: 16px;
 }
 
-/* Turn navigation */
-.turn-navigation {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 20px;
-  padding: 4px;
-  z-index: 10;
-  box-shadow: var(--shadow-md);
-}
-
-.turn-nav-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  color: var(--text-secondary);
-  background: transparent;
-  transition: background 0.15s, color 0.15s;
-}
-
-.turn-nav-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.turn-nav-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.turn-counter {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text-muted);
-  padding: 0 4px;
-  min-width: 36px;
-  text-align: center;
-}
 </style>

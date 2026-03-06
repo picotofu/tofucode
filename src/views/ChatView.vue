@@ -1228,6 +1228,57 @@ function scrollToBottom() {
 
 // Note: Auto-scroll on messages and isRunning are now handled by ChatMessages component
 
+// Content navigation bar (unified turn/command nav in footer)
+// Reads navState ref exposed from child components — ref is auto-unwrapped, reliably reactive
+const showContentNav = computed(() => {
+  if (currentMode.value === 'chat')
+    return chatMessagesRef.value?.navState?.show ?? false;
+  if (currentMode.value === 'terminal')
+    return terminalOutputRef.value?.navState?.show ?? false;
+  return false;
+});
+
+const canNavPrev = computed(() => {
+  if (currentMode.value === 'chat')
+    return chatMessagesRef.value?.navState?.hasPrev ?? false;
+  if (currentMode.value === 'terminal')
+    return terminalOutputRef.value?.navState?.hasPrev ?? false;
+  return false;
+});
+
+const canNavNext = computed(() => {
+  if (currentMode.value === 'chat')
+    return chatMessagesRef.value?.navState?.hasNext ?? false;
+  if (currentMode.value === 'terminal')
+    return terminalOutputRef.value?.navState?.hasNext ?? false;
+  return false;
+});
+
+const navLabel = computed(() => {
+  let state = null;
+  if (currentMode.value === 'chat') state = chatMessagesRef.value?.navState;
+  else if (currentMode.value === 'terminal')
+    state = terminalOutputRef.value?.navState;
+  if (!state) return '';
+  return `${state.current} / ${state.total}`;
+});
+
+function navPrev() {
+  if (currentMode.value === 'chat') {
+    chatMessagesRef.value?.goToPreviousTurn();
+  } else if (currentMode.value === 'terminal') {
+    terminalOutputRef.value?.goToPreviousCommand();
+  }
+}
+
+function navNext() {
+  if (currentMode.value === 'chat') {
+    chatMessagesRef.value?.goToNextTurn();
+  } else if (currentMode.value === 'terminal') {
+    terminalOutputRef.value?.goToNextCommand();
+  }
+}
+
 // Initialize terminal mode when connection is ready
 watch(connected, (isConnected) => {
   if (isConnected && currentMode.value === 'terminal') {
@@ -2524,6 +2575,34 @@ watch(
     </div>
 
     <footer v-if="!(currentMode === 'files' && openedFile)" class="footer">
+      <!-- Content navigation bar -->
+      <div v-if="showContentNav" class="content-nav">
+        <!-- Turn/command navigator (right-aligned) -->
+        <div class="content-nav-pager">
+          <button
+            class="content-nav-btn"
+            :disabled="!canNavPrev"
+            @click="navPrev"
+            title="Previous"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 15l-6-6-6 6"/>
+            </svg>
+          </button>
+          <span class="content-nav-counter">{{ navLabel }}</span>
+          <button
+            class="content-nav-btn"
+            :disabled="!canNavNext"
+            @click="navNext"
+            title="Next"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
       <!-- Files explorer header (only in files mode) - moved above toolbar -->
       <div v-if="currentMode === 'files'" class="files-explorer-header">
         <div class="files-breadcrumb">
@@ -3754,6 +3833,53 @@ watch(
   border-top: 1px solid var(--border-color);
 }
 
+/* Content navigation bar (turn/command nav) */
+.content-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.content-nav-pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.content-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--text-muted);
+  background: transparent;
+  transition: background 0.15s, color 0.15s;
+}
+
+.content-nav-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.content-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.content-nav-counter {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 0 4px;
+  min-width: 36px;
+  text-align: center;
+  font-family: var(--font-mono);
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -4658,6 +4784,7 @@ watch(
   border-radius: var(--radius-md);
   background: var(--bg-secondary);
   font-family: var(--font-mono);
+  overflow: hidden;
 }
 
 .terminal-form:focus-within {
