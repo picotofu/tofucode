@@ -22,7 +22,8 @@ const props = defineProps({
 const emit = defineEmits(['close']);
 
 const router = useRouter();
-const { browseFolder, folderContents, currentFolder } = useWebSocket();
+const { browseFolder, createFolder, folderContents, currentFolder, onMessage } =
+  useWebSocket();
 
 const searchQuery = ref('');
 const selectedIndex = ref(0);
@@ -55,9 +56,26 @@ const folderItems = computed(() => {
     .sort((a, b) => a.name.localeCompare(b.name));
 });
 
+// New folder inline creation
+const isCreatingFolder = ref(false);
+const newFolderName = ref('');
+const folderCreateRef = ref(null);
+const createFolderError = ref('');
+
+// Listen for folder creation errors — re-open form with error message
+const unsubCreateFolder = onMessage((msg) => {
+  if (msg.type === 'files:create:error') {
+    createFolderError.value = msg.error || 'Failed to create folder';
+    isCreatingFolder.value = true;
+    nextTick(() => folderCreateRef.value?.focus());
+  }
+});
+onUnmounted(() => unsubCreateFolder());
+
 function navigateFolder(path) {
   browseFolder(path);
   selectedIndex.value = 0;
+  isCreatingFolder.value = false;
 }
 
 function goUpFolder() {
@@ -65,6 +83,30 @@ function goUpFolder() {
   const parent = currentFolder.value.split('/').slice(0, -1).join('/') || '/';
   browseFolder(parent);
   selectedIndex.value = 0;
+  isCreatingFolder.value = false;
+}
+
+function startCreatingFolder() {
+  isCreatingFolder.value = true;
+  newFolderName.value = '';
+  createFolderError.value = '';
+  nextTick(() => folderCreateRef.value?.focus());
+}
+
+function confirmCreateFolder() {
+  const name = newFolderName.value.trim();
+  if (!name || !currentFolder.value) return;
+  createFolderError.value = '';
+  const folderPath = `${currentFolder.value}/${name}`.replace(/\/+/g, '/');
+  createFolder(folderPath);
+  isCreatingFolder.value = false;
+  newFolderName.value = '';
+}
+
+function cancelCreateFolder() {
+  isCreatingFolder.value = false;
+  newFolderName.value = '';
+  createFolderError.value = '';
 }
 
 function selectFolder(folderPath) {
@@ -306,6 +348,33 @@ const formatTime = formatRelativeTime;
             <span class="palette-folder-select-label">Use this folder</span>
             <span class="palette-folder-select-path">{{ currentFolder }}</span>
             <kbd class="palette-folder-select-hint">⌘↵</kbd>
+          </div>
+          <!-- Create new folder -->
+          <form v-if="isCreatingFolder" class="palette-folder-create-form" @click.stop @submit.prevent="confirmCreateFolder">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              <line x1="12" y1="11" x2="12" y2="17"/>
+              <line x1="9" y1="14" x2="15" y2="14"/>
+            </svg>
+            <input
+              ref="folderCreateRef"
+              type="text"
+              v-model="newFolderName"
+              class="palette-folder-create-input"
+              placeholder="folder-name"
+              @keydown.escape.prevent="cancelCreateFolder"
+            />
+            <button type="submit" class="palette-folder-create-btn" :disabled="!newFolderName.trim()">Create</button>
+            <button type="button" class="palette-folder-create-btn cancel" @click="cancelCreateFolder">Cancel</button>
+            <span v-if="createFolderError" class="palette-folder-create-error">{{ createFolderError }}</span>
+          </form>
+          <div v-else class="palette-folder-create-row" @click="startCreatingFolder">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              <line x1="12" y1="11" x2="12" y2="17"/>
+              <line x1="9" y1="14" x2="15" y2="14"/>
+            </svg>
+            <span class="palette-folder-create-label">New folder</span>
           </div>
           <!-- Subdirectories -->
           <div
@@ -688,5 +757,90 @@ const formatTime = formatRelativeTime;
 .palette-folder-arrow {
   flex-shrink: 0;
   color: var(--text-muted);
+}
+
+/* New folder creation row + form */
+.palette-folder-create-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.1s;
+  color: var(--text-muted);
+}
+
+.palette-folder-create-row:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.palette-folder-create-label {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.palette-folder-create-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+}
+
+.palette-folder-create-input {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.palette-folder-create-input:focus {
+  outline: none;
+  border-color: var(--text-muted);
+}
+
+.palette-folder-create-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.palette-folder-create-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.palette-folder-create-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.palette-folder-create-btn.cancel {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.palette-folder-create-btn.cancel:hover {
+  color: var(--text-primary);
+}
+
+.palette-folder-create-error {
+  font-size: 11px;
+  color: var(--error-color, #ef4444);
+  white-space: nowrap;
 }
 </style>

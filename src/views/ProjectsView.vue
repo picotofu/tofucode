@@ -1,5 +1,5 @@
 <script setup>
-import { computed, inject, nextTick, onMounted, ref } from 'vue';
+import { computed, inject, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useWebSocket } from '../composables/useWebSocket';
 import { formatRelativeTime } from '../utils/format.js';
@@ -18,12 +18,30 @@ const {
   getProjects,
   getRecentSessionsImmediate,
   browseFolder,
+  createFolder,
   openCloneDialog,
+  onMessage,
 } = useWebSocket();
 
 const isEditingPath = ref(false);
 const manualPath = ref('');
 const pathInputRef = ref(null);
+
+// New folder state
+const isCreatingFolder = ref(false);
+const newFolderName = ref('');
+const folderInputRef = ref(null);
+const createFolderError = ref('');
+
+// Listen for folder creation errors — re-open form with error message
+const unsubscribe = onMessage((msg) => {
+  if (msg.type === 'files:create:error') {
+    createFolderError.value = msg.error || 'Failed to create folder';
+    isCreatingFolder.value = true;
+    nextTick(() => folderInputRef.value?.focus());
+  }
+});
+onUnmounted(() => unsubscribe());
 
 // Get top 5 recent sessions for quick access cards
 const quickSessions = computed(() => recentSessions.value.slice(0, 5));
@@ -101,6 +119,29 @@ function submitManualPath() {
 function cancelEditingPath() {
   isEditingPath.value = false;
   manualPath.value = '';
+}
+
+function startCreatingFolder() {
+  isCreatingFolder.value = true;
+  newFolderName.value = '';
+  createFolderError.value = '';
+  nextTick(() => folderInputRef.value?.focus());
+}
+
+function confirmCreateFolder() {
+  const name = newFolderName.value.trim();
+  if (!name || !currentFolder.value) return;
+  createFolderError.value = '';
+  const folderPath = `${currentFolder.value}/${name}`.replace(/\/+/g, '/');
+  createFolder(folderPath);
+  isCreatingFolder.value = false;
+  newFolderName.value = '';
+}
+
+function cancelCreateFolder() {
+  isCreatingFolder.value = false;
+  newFolderName.value = '';
+  createFolderError.value = '';
 }
 </script>
 
@@ -209,10 +250,37 @@ function cancelEditingPath() {
             </svg>
             Clone
           </button>
+          <button class="clone-btn" @click="startCreatingFolder" :disabled="!currentFolder" title="Create a new folder here">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              <line x1="12" y1="11" x2="12" y2="17"/>
+              <line x1="9" y1="14" x2="15" y2="14"/>
+            </svg>
+            New Folder
+          </button>
           <button class="select-btn" @click="startNewSession(currentFolder)" :disabled="!currentFolder">
             Select This Folder
           </button>
         </div>
+
+        <form v-if="isCreatingFolder" class="new-folder-form" @submit.prevent="confirmCreateFolder">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            <line x1="12" y1="11" x2="12" y2="17"/>
+            <line x1="9" y1="14" x2="15" y2="14"/>
+          </svg>
+          <input
+            ref="folderInputRef"
+            type="text"
+            v-model="newFolderName"
+            class="new-folder-input"
+            placeholder="folder-name"
+            @keydown.escape.prevent="cancelCreateFolder"
+          />
+          <button type="submit" class="new-folder-confirm" :disabled="!newFolderName.trim()">Create</button>
+          <button type="button" class="new-folder-cancel" @click="cancelCreateFolder">Cancel</button>
+          <span v-if="createFolderError" class="new-folder-error">{{ createFolderError }}</span>
+        </form>
 
         <ul class="folders" v-if="folderContents.length > 0">
           <li
@@ -567,6 +635,71 @@ function cancelEditingPath() {
 .select-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.new-folder-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+}
+
+.new-folder-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+
+.new-folder-input:focus {
+  outline: none;
+  border-color: var(--text-muted);
+}
+
+.new-folder-confirm,
+.new-folder-cancel {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.new-folder-confirm {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.new-folder-confirm:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.new-folder-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.new-folder-cancel {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.new-folder-cancel:hover {
+  color: var(--text-primary);
+}
+
+.new-folder-error {
+  font-size: 12px;
+  color: var(--error-color, #ef4444);
+  white-space: nowrap;
 }
 
 .empty, .loading {

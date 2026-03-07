@@ -295,6 +295,18 @@ function handleGlobalMessage(msg) {
         sessionStatuses.value = newStatuses;
       }
       break;
+
+    case 'files:create:result':
+      // Auto-refresh folder browser after successful folder creation
+      if (msg.isDirectory && currentFolder.value) {
+        browseFolder(currentFolder.value);
+      }
+      break;
+
+    case 'files:create:error':
+      // Logged here; components listen via onMessage for user-facing feedback
+      console.error('File creation error:', msg.error);
+      break;
   }
   // Call all registered message listeners
   for (const listener of globalMessageListeners) {
@@ -387,6 +399,10 @@ function browseFolder(path) {
   sendGlobal({ type: 'browse_folder', path });
 }
 
+function createFolder(folderPath) {
+  sendGlobal({ type: 'files:create', path: folderPath, isDirectory: true });
+}
+
 function setSessionTitle(sessionId, title) {
   sendGlobal({ type: 'set_session_title', sessionId, title });
 }
@@ -448,6 +464,7 @@ export function useWebSocket() {
     getRecentSessions,
     getRecentSessionsImmediate,
     browseFolder,
+    createFolder,
     setSessionTitle,
     deleteSession: deleteSessionGlobal,
     dismissUpdate,
