@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Markdown TOC mobile toggle** — In the file editor, the table of contents sidebar is now hidden by default on mobile (≤768px) and toggles as a right-side overlay via a new list icon button in the stat bar; tapping the editor content area dismisses it; desktop layout unchanged
+- **New Folder in project browsers** — Both the homepage folder browser and the Cmd+K New Project folder selector now have a "New Folder" button; clicking it shows an inline form to name and create the folder in the current directory; the list refreshes automatically on success; errors (e.g. folder already exists, permission denied) are shown inline with the form re-opened for retry
 
 ## [1.2.2] - 2026-03-07
 
