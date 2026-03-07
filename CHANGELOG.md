@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Markdown TOC mobile toggle** — In the file editor, the table of contents sidebar is now hidden by default on mobile (≤768px) and toggles as a right-side overlay via a new list icon button in the stat bar; tapping the editor content area dismisses it; desktop layout unchanged
+
 ## [1.2.2] - 2026-03-07
 
 ### Fixed

@@ -175,9 +175,29 @@ const markdownHeadings = computed(() => {
   return headings;
 });
 
-const showToc = computed(() => {
+// Whether the document has a TOC (used by parent to show/hide the toggle button)
+const hasToc = computed(() => {
   return fileType.value === 'markdown' && markdownHeadings.value.length > 0;
 });
+
+// TOC visibility — desktop: open by default; mobile (≤768px): hidden by default, toggled via stat bar button
+const isMobile = window.matchMedia('(max-width: 768px)').matches;
+const tocVisible = ref(!isMobile);
+
+const showToc = computed(() => {
+  return hasToc.value && tocVisible.value;
+});
+
+function toggleToc() {
+  tocVisible.value = !tocVisible.value;
+}
+
+// On mobile, clicking the editor content area closes the TOC overlay
+function handleEditorContentClick() {
+  if (isMobile && tocVisible.value) {
+    tocVisible.value = false;
+  }
+}
 
 // Scroll to heading
 function scrollToHeading(heading) {
@@ -500,8 +520,11 @@ function handleKeydown(event) {
 defineExpose({
   isDirty,
   isSaving,
+  hasToc,
+  tocVisible,
   save: handleSave,
   close: handleClose,
+  toggleToc,
 });
 
 onMounted(() => {
@@ -520,8 +543,8 @@ onUnmounted(() => {
 
 <template>
   <div class="file-editor" :class="{ 'with-toc': showToc }">
-    <!-- Editor content -->
-    <div class="editor-content">
+    <!-- Editor content — clicking here dismisses the TOC overlay on mobile -->
+    <div class="editor-content" @click="handleEditorContentClick">
       <div v-if="loading" class="editor-loading">Loading...</div>
       <div v-else-if="isBinary" class="binary-info">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -920,6 +943,35 @@ onUnmounted(() => {
     min-width: 36px;
     height: 36px;
     font-size: 15px;
+  }
+
+  /* On mobile, TOC overlays the editor instead of taking up grid space */
+  .file-editor.with-toc {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .file-editor.with-toc .editor-content {
+    grid-column: unset;
+    grid-row: unset;
+    border-right: none;
+  }
+
+  .file-editor.with-toc .symbol-toolbar {
+    grid-column: unset;
+    grid-row: unset;
+  }
+
+  .toc-sidebar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 220px; /* slightly narrower than desktop (240px) to save screen space */
+    z-index: 20;
+    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.18);
+    border-left: 1px solid var(--border-color);
   }
 }
 </style>

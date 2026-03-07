@@ -2548,6 +2548,19 @@ watch(
         <span class="stat-item" :title="`Total characters: ${totalChars}`">∑ {{ totalChars }}</span>
       </span>
       <button
+        v-if="fileEditorRef?.hasToc"
+        class="action-btn toc-toggle-btn"
+        :class="{ active: fileEditorRef?.tocVisible }"
+        title="Toggle table of contents"
+        @click="fileEditorRef?.toggleToc()"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="15" y2="12"/>
+          <line x1="3" y1="18" x2="18" y2="18"/>
+        </svg>
+      </button>
+      <button
         v-if="isHtmlFile && !openedFile.loading && !openedFile.isBinary"
         class="action-btn"
         :class="{ active: htmlRenderMode }"
