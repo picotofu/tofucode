@@ -590,6 +590,12 @@ function loadChatInput() {
 function saveChatInput() {
   const draft = inputValue.value;
 
+  // If WS is disconnected, the debounced draft:set will be dropped by send().
+  // Mark as pending so the reconnect handler can push the local copy to server.
+  if (!connected.value) {
+    draftSyncPending = true;
+  }
+
   // localStorage — immediate
   if (chatInputStorageKey.value) {
     if (draft) {
@@ -662,6 +668,7 @@ const hasBackupState = ref(false);
 const draftConflict = ref(null); // { local: string, server: string } when conflict detected
 const showDraftConflictModal = ref(false); // controlled by user clicking the indicator button
 let draftSyncTimer = null; // debounce timer for pushing drafts to server
+let draftSyncPending = false; // true = local draft modified while WS was disconnected; push to server on reconnect
 
 // Check if there's a backup available for undo
 const hasBackup = computed(() => {
@@ -846,10 +853,18 @@ function initTinyMDE() {
 // Re-check server draft when tab regains visibility (catches edits made on another device/tab)
 function handleVisibilityChange() {
   if (document.visibilityState !== 'visible') return;
-  if (contextReady.value) {
+  if (!contextReady.value) return; // contextReady watcher will fire instead
+
+  if (draftSyncPending) {
+    // Local draft is authoritative — push it and skip the fetch/conflict flow
+    const sessionId = sessionParam.value;
+    if (sessionId && sessionId !== 'new') {
+      send({ type: 'draft:set', sessionId, draft: inputValue.value });
+    }
+    draftSyncPending = false;
+  } else {
     fetchServerDraft();
   }
-  // If not ready yet (WS reconnecting), the contextReady watcher below will fire instead
 }
 
 onMounted(() => {
@@ -972,6 +987,8 @@ watch(
       // Dismiss any stale conflict from the previous session
       draftConflict.value = null;
       showDraftConflictModal.value = false;
+      // Reset pending sync flag — previous session's draft is no longer relevant
+      draftSyncPending = false;
 
       // Prevent the inputValue watcher from overwriting during transition
       isLoadingSession = true;
@@ -997,7 +1014,17 @@ watch(
 // Fetch server draft whenever context becomes ready (covers initial load + reconnects).
 // Also checks tab visibility so we don't trigger on background reconnects.
 watch(contextReady, (ready) => {
-  if (ready && document.visibilityState === 'visible') {
+  if (!ready || document.visibilityState !== 'visible') return;
+
+  if (draftSyncPending) {
+    // Local draft is authoritative — user typed while WS was down.
+    // Push it to server immediately instead of fetching (avoids spurious conflict modal).
+    const sessionId = sessionParam.value;
+    if (sessionId && sessionId !== 'new') {
+      send({ type: 'draft:set', sessionId, draft: inputValue.value });
+    }
+    draftSyncPending = false;
+  } else {
     fetchServerDraft();
   }
 });
@@ -4701,23 +4728,24 @@ watch(
 }
 
 .input-form.reconnecting .input {
-  pointer-events: none;
+  pointer-events: auto;
+  opacity: 1;
 }
 
 .reconnecting-indicator {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  bottom: 6px;
+  right: 36px;
   display: flex;
   align-items: center;
   gap: 6px;
   color: var(--text-muted);
   font-size: 12px;
   background: var(--bg-primary);
-  padding: 4px 10px;
+  padding: 2px 8px;
   border-radius: 4px;
   z-index: 10;
+  pointer-events: none;
 }
 
 .reconnecting-indicator .spinner {

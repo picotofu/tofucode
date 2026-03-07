@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-03-07
+
+### Fixed
+- Allow typing in chat input during WebSocket reconnection — input is no longer blocked by `pointer-events: none`; the reconnecting indicator is repositioned to the bottom-right corner so it doesn't obstruct the text area
+- Draft sync failsafe on reconnect — if the user typed while disconnected, the local draft is pushed to the server immediately on reconnect instead of triggering a spurious conflict modal
+
 ## [1.2.1] - 2026-03-06
 
 ### Fixed
