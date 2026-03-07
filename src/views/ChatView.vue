@@ -2577,6 +2577,40 @@ watch(
     <footer v-if="!(currentMode === 'files' && openedFile)" class="footer">
       <!-- Content navigation bar -->
       <div v-if="showContentNav" class="content-nav">
+        <!-- Tofu character (inline SVG pixel art) -->
+        <svg class="tofu-character" :class="{ running: isRunning }" viewBox="0 0 12 13" width="22" height="24" shape-rendering="crispEdges">
+          <!-- Body -->
+          <g class="tofu-body">
+            <!-- Row 0: top edge -->
+            <rect x="2" y="0" width="8" height="1" fill="#e8e4dc"/>
+            <!-- Row 1 -->
+            <rect x="1" y="1" width="10" height="1" fill="#e8e4dc"/>
+            <!-- Row 2-3: full width + highlight -->
+            <rect x="0" y="2" width="12" height="2" fill="#e8e4dc"/>
+            <rect x="11" y="2" width="1" height="2" fill="#f4f1eb"/>
+            <!-- Row 4: eyes -->
+            <rect x="0" y="4" width="12" height="1" fill="#e8e4dc"/>
+            <rect x="11" y="4" width="1" height="1" fill="#f4f1eb"/>
+            <rect class="tofu-eye left-eye" x="3" y="4" width="1" height="1" fill="#1a1a1a"/>
+            <rect class="tofu-eye right-eye" x="8" y="4" width="1" height="1" fill="#1a1a1a"/>
+            <!-- Row 5 -->
+            <rect x="0" y="5" width="12" height="1" fill="#e8e4dc"/>
+            <!-- Row 6: mouth -->
+            <rect x="0" y="6" width="12" height="1" fill="#e8e4dc"/>
+            <rect x="4" y="6" width="1" height="1" fill="#c8c4bc"/>
+            <rect x="7" y="6" width="1" height="1" fill="#c8c4bc"/>
+            <!-- Row 7 -->
+            <rect x="0" y="7" width="12" height="1" fill="#e8e4dc"/>
+            <!-- Row 8: bottom edge -->
+            <rect x="1" y="8" width="10" height="1" fill="#e8e4dc"/>
+            <!-- Row 9: more trimmed -->
+            <rect x="2" y="9" width="8" height="1" fill="#e8e4dc"/>
+          </g>
+          <!-- Feet -->
+          <rect class="tofu-foot left-foot" x="2" y="10" width="3" height="1" fill="#e8e4dc"/>
+          <rect class="tofu-foot right-foot" x="7" y="10" width="3" height="1" fill="#e8e4dc"/>
+        </svg>
+
         <!-- Turn/command navigator (right-aligned) -->
         <div class="content-nav-pager">
           <button
@@ -3878,6 +3912,69 @@ watch(
   min-width: 36px;
   text-align: center;
   font-family: var(--font-mono);
+}
+
+/* Tofu character — inline SVG pixel art */
+.tofu-character {
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+/* Idle: gentle breathing */
+.tofu-body {
+  transform-origin: 6px 10px; /* center bottom of body */
+  animation: tofu-breathe 3s ease-in-out infinite;
+}
+
+/* Idle: blink eyes */
+.tofu-eye {
+  animation: tofu-blink 4s step-end infinite;
+}
+
+/* Running: bounce body */
+.tofu-character.running .tofu-body {
+  animation: tofu-bounce 0.4s ease-in-out infinite;
+}
+
+/* Running: no blink (eyes focused) */
+.tofu-character.running .tofu-eye {
+  animation: none;
+}
+
+/* Running: feet alternate stepping */
+.tofu-character.running .left-foot {
+  animation: tofu-step-left 0.4s ease-in-out infinite;
+}
+
+.tofu-character.running .right-foot {
+  animation: tofu-step-right 0.4s ease-in-out infinite;
+}
+
+@keyframes tofu-breathe {
+  0%, 100% { transform: scaleY(1) translateY(0); }
+  50% { transform: scaleY(1.04) translateY(-0.3px); }
+}
+
+@keyframes tofu-blink {
+  0%, 90%, 100% { fill: #1a1a1a; }
+  93%, 97% { fill: #e8e4dc; }
+}
+
+@keyframes tofu-bounce {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-2px); }
+}
+
+@keyframes tofu-step-left {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(1px); }
+  75% { transform: translateY(-0.5px); }
+}
+
+@keyframes tofu-step-right {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-0.5px); }
+  75% { transform: translateY(1px); }
 }
 
 .toolbar {
