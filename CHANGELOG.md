@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.2.3] - 2026-03-08
+## [1.2.1] - 2026-03-08
 
 ### Added
 - **Markdown TOC mobile toggle** — In the file editor, the table of contents sidebar is now hidden by default on mobile (≤768px) and toggles as a right-side overlay via a new list icon button in the stat bar; tapping the editor content area dismisses it; desktop layout unchanged
@@ -16,16 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Allow typing in chat input during WebSocket reconnection — input is no longer blocked by `pointer-events: none`; the reconnecting indicator is repositioned to the bottom-right corner so it doesn't obstruct the text area
 - Draft sync failsafe on reconnect — if the user typed while disconnected, the local draft is pushed to the server immediately on reconnect instead of triggering a spurious conflict modal
-
-## [1.2.2] - 2026-03-07
-
-### Fixed
-- Allow typing in chat input during WebSocket reconnection — input is no longer blocked by `pointer-events: none`; the reconnecting indicator is repositioned to the bottom-right corner so it doesn't obstruct the text area
-- Draft sync failsafe on reconnect — if the user typed while disconnected, the local draft is pushed to the server immediately on reconnect instead of triggering a spurious conflict modal
-
-## [1.2.1] - 2026-03-06
-
-### Fixed
 - Cmd+P / Files tab search now ranks exact filename matches above prefix, substring, and fuzzy matches — previously client-side alphabetical sort was overriding server-side match quality ranking
 
 ## [1.2.0] - 2026-03-03

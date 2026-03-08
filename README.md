@@ -359,6 +359,7 @@ See the **[Discord Setup Guide](./docs/DISCORD_SETUP_GUIDE.md)** for full setup 
 
 Independent security assessments are conducted before each release to ensure user safety:
 
+- **[v1.2.1 Security Report](./docs/security_report_v1.2.1.md)** - Multer DoS fix, DOMPurify XSS fix, new feature code review (no issues found)
 - **[v1.2.0 Security Report](./docs/security_report_v1.2.0.md)** - Upload path injection fix, symlink escape prevention, error info leaks, draft entry limits
 - **[v1.1.0 Security Report](./docs/security_report_v1.1.0.md)** - WebSocket hardening, security headers, auth improvements, process file permissions
 - **[v1.0.5 Security Report](./docs/security_report_v1.0.5.md)** - Command injection fix, input validation hardening, DoS protection

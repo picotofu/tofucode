@@ -148,35 +148,45 @@ npm run check
 - Feature branches merge into the release branch, then release branch merges into `main`
 - Version bump type: `patch` for bug fixes, `minor` for new features, `major` for breaking changes
 
-### Version Number
+### Determine Version to Release
 
-The version in `package.json` is typically bumped at the **start** of the release branch, not at publish time. So at release time, check first:
+Before starting any prep, reconcile the version from three sources:
 
 ```bash
-node -p "require('./package.json').version"
+node -p "require('./package.json').version"   # local package.json
+git tag --list "v*" --sort=-v:refname | head  # git tags
+npm info tofucode version                      # what's actually published on npm
 ```
 
-- **If version is already correct** (was bumped when branching): skip `npm version`, just tag manually
-- **If version still needs bumping**: run `npm version minor` (or `patch`/`major`) — this updates `package.json`, `package-lock.json`, and creates a git tag automatically
+- Use the npm published version as the ground truth for "last released"
+- Git tags may include phantom tags not actually published — cross-check with npm
+- Decide the next version: `patch` for fixes, `minor` for new features, `major` for breaking changes
 
 ### Pre-Release Checklist
 
-1. **Security Audit** (static code review — no pentest scripts required)
-   - Review all new code: auth, file access, WebSocket, input validation, credentials
-   - Run `npm audit` to check for new dependency vulnerabilities
-   - Fix all Critical and High severity issues before proceeding
-   - Create `docs/security_report_v{version}.md` with findings, fixes, and accepted risks
-   - All Critical/High must be resolved; document accepted Low/Medium risks
-
-2. **Update CHANGELOG**
-   - Move `## [Unreleased]` section content to `## [{version}] - {date}`
+1. **Update CHANGELOG**
+   - Move `## [Unreleased]` content to `## [{version}] - {date}`
    - Add a new empty `## [Unreleased]` section at the top
+   - Consolidate any phantom/draft version sections that were never published
+
+2. **Security Audit** (static code review — no pentest scripts required)
+   - Review all new code: auth, file access, WebSocket, input validation, credentials
+   - Run `npm audit` to check for dependency vulnerabilities
+   - Run `npm audit fix` to apply safe fixes (no breaking changes)
+   - Fix all Critical and High severity issues before proceeding
+   - If a High/Critical cannot be fixed without breaking changes, document the rationale as an accepted risk — a fix is not always possible
+   - Create `docs/security_report_v{version}.md` with findings, fixes, and accepted risks
+   - All Critical/High must be resolved or formally accepted; document Low/Moderate risks
 
 3. **Update README**
    - Add new security report link in the Security section
    - Format: `- **[v{version} Security Report](./docs/security_report_v{version}.md)** - brief summary`
 
-4. **Final build verification**
+4. **Bump version**
+   - Use `--no-git-tag-version` to decouple the commit from the tag (tag is created separately in Release Steps)
+   - `npm version patch --no-git-tag-version` (or `minor`/`major`)
+
+5. **Final build verification**
    - `npm run check` — lint + format (Biome)
    - `npm run build` — production frontend build
    - Confirm no errors
@@ -184,24 +194,29 @@ node -p "require('./package.json').version"
 ### Release Steps
 
 ```bash
-# 1. Push the release branch to origin
+# 1. Commit all release prep changes (CHANGELOG, README, package.json, package-lock.json, security report)
+git add CHANGELOG.md README.md package.json package-lock.json docs/security_report_v{version}.md
+git commit -m "Release v{version}"
+
+# 2. Create release branch and push
+git checkout -b release/v{version}
 git push origin release/v{version}
 
-# 2. Tag the release (if not already tagged by npm version)
+# 3. Tag the release
 git tag v{version}
 git push origin v{version}
 
-# 3. Publish to npm
+# 4. Publish to npm
 npm publish
 
-# 4. Build and push Docker multi-arch image
+# 5. Build and push Docker multi-arch image
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   --tag picotofu/tofucode:{version} \
   --tag picotofu/tofucode:latest \
   --push .
 
-# 5. Merge release branch into main
+# 6. Merge release branch into main
 git checkout main
 git merge release/v{version}
 git push origin main
