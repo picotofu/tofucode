@@ -240,27 +240,29 @@ function cancelCreateFolder() {
               @keydown.escape.prevent="cancelEditingPath"
             />
           </form>
-          <button class="clone-btn" @click="openCloneDialog(currentFolder)" :disabled="!currentFolder" title="Clone a git repository into this folder">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="18" r="3"/>
-              <circle cx="6" cy="6" r="3"/>
-              <circle cx="18" cy="6" r="3"/>
-              <path d="M6 9v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/>
-              <line x1="12" y1="15" x2="12" y2="12"/>
-            </svg>
-            Clone
-          </button>
-          <button class="clone-btn" @click="startCreatingFolder" :disabled="!currentFolder" title="Create a new folder here">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-              <line x1="12" y1="11" x2="12" y2="17"/>
-              <line x1="9" y1="14" x2="15" y2="14"/>
-            </svg>
-            New Folder
-          </button>
-          <button class="select-btn" @click="startNewSession(currentFolder)" :disabled="!currentFolder">
-            Select This Folder
-          </button>
+          <div class="folder-header-actions">
+            <button class="clone-btn" @click="openCloneDialog(currentFolder)" :disabled="!currentFolder" title="Clone a git repository into this folder">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="18" r="3"/>
+                <circle cx="6" cy="6" r="3"/>
+                <circle cx="18" cy="6" r="3"/>
+                <path d="M6 9v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/>
+                <line x1="12" y1="15" x2="12" y2="12"/>
+              </svg>
+              Clone
+            </button>
+            <button class="clone-btn" @click="startCreatingFolder" :disabled="!currentFolder" title="Create a new folder here">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                <line x1="12" y1="11" x2="12" y2="17"/>
+                <line x1="9" y1="14" x2="15" y2="14"/>
+              </svg>
+              New Folder
+            </button>
+            <button class="select-btn" @click="startNewSession(currentFolder)" :disabled="!currentFolder">
+              Select This Folder
+            </button>
+          </div>
         </div>
 
         <form v-if="isCreatingFolder" class="new-folder-form" @submit.prevent="confirmCreateFolder">
@@ -518,6 +520,42 @@ function cancelCreateFolder() {
   margin: 0 -12px 12px;
   background: var(--bg-secondary);
   border-radius: var(--radius-md);
+  flex-wrap: wrap;
+}
+
+.folder-header-actions {
+  display: contents;
+}
+
+@media (max-width: 480px) {
+  .folder-header {
+    row-gap: 8px;
+  }
+
+  .path-container,
+  .path-form {
+    /* Keep path as first row with up-btn */
+    order: 0;
+  }
+
+  .folder-header-actions {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+    order: 1;
+  }
+
+  .clone-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .select-btn {
+    flex: 2;
+    white-space: nowrap;
+  }
 }
 
 .up-btn {
