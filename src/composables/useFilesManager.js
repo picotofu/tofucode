@@ -27,16 +27,13 @@ export function useFilesManager({
   // ─── State ─────────────────────────────────────────────────────────────────
 
   const filesCurrentPath = ref('');
-  // The topmost browsable path — always homePath (root config ?? homedir()).
+  // The topmost browsable path — always derived from homePath (root config ?? homedir()).
+  // Computed so it stays live if homePath is a ref that resolves after mount (connected message).
   // Empty string means no restriction (no homePath provided).
   const isRef = homePath && typeof homePath === 'object' && 'value' in homePath;
-  const filesRootPath = ref(isRef ? (homePath.value ?? '') : (homePath ?? ''));
-  // If homePath is a ref, sync whenever it resolves (arrives after the connected message)
-  if (isRef) {
-    watch(homePath, (val) => {
-      if (val) filesRootPath.value = val;
-    });
-  }
+  const filesRootPath = computed(() =>
+    isRef ? (homePath.value ?? '') : (homePath ?? ''),
+  );
   const filesItems = ref([]);
   const filesLoading = ref(false);
   const filesFilter = ref('');
@@ -249,8 +246,7 @@ export function useFilesManager({
 
   function resetState() {
     filesCurrentPath.value = '';
-    // Restore root to homePath if available, so root guard stays active after session changes
-    filesRootPath.value = isRef ? (homePath.value ?? '') : (homePath ?? '');
+    // filesRootPath is a computed from homePath — no need to reset it
     filesItems.value = [];
     filesLoading.value = false;
     openedFile.value = null;
