@@ -27,13 +27,14 @@ export function useFilesManager({
   // ─── State ─────────────────────────────────────────────────────────────────
 
   const filesCurrentPath = ref('');
-  // The topmost browsable path — set from homePath option if provided, else inferred from first browse result
+  // The topmost browsable path — always homePath (root config ?? homedir()).
+  // Empty string means no restriction (no homePath provided).
   const isRef = homePath && typeof homePath === 'object' && 'value' in homePath;
   const filesRootPath = ref(isRef ? (homePath.value ?? '') : (homePath ?? ''));
-  // If homePath is a ref (from useWebSocket), sync once it resolves (arrives after connected message)
+  // If homePath is a ref, sync whenever it resolves (arrives after the connected message)
   if (isRef) {
     watch(homePath, (val) => {
-      if (val && !filesRootPath.value) filesRootPath.value = val;
+      if (val) filesRootPath.value = val;
     });
   }
   const filesItems = ref([]);
@@ -155,8 +156,6 @@ export function useFilesManager({
   function handleFileMessage(msg) {
     switch (msg.type) {
       case 'files:browse:result':
-        // Fallback: infer root from first browse result if homePath wasn't provided
-        if (!filesRootPath.value) filesRootPath.value = msg.path;
         filesCurrentPath.value = msg.path;
         filesItems.value = msg.items;
         filesLoading.value = false;

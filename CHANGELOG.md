@@ -10,8 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **3-tab homepage** — Homepage now has a bottom tab nav (Sessions, Folders, Files) with Heroicons; Sessions tab shows recent sessions and recent projects; Folders tab is a directory-only browser for launching sessions; Files tab is a standalone file browser defaulting to the home directory
 - **Independent file browser** — Files tab on homepage provides a full-featured file browser (browse, search, open, edit, create, rename, delete) outside of any session, defaulting to the home directory and persisting the last visited path in localStorage
-- **Home folder traversal guard** — File browser in all views (homepage and session) enforces a topmost browsable path (home directory or `--root` if configured); breadcrumb segments above home are shown as muted static text; up button and path edit are clamped to this boundary; applies consistently across session changes
-- **Session files tab defaults to project path** — In a chat session the files tab opens at the project working directory while still allowing traversal up to the home folder
+- **Traversal root guard** — File browser enforces a topmost browsable path (`--root` config if set, otherwise `homedir()`); breadcrumb segments above the root are shown as muted static text; up button and path edit are clamped to this boundary; session files tab defaults to the project path but allows traversal up to the root; homepage files tab defaults to the root itself
 - **Server `homePath` in connected message** — Server includes `homePath` (root config path or `homedir()`) in the `connected` WebSocket message; clients use this to set the traversal root without a separate request
 
 ### Changed
