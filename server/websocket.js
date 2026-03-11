@@ -5,6 +5,7 @@
  * Each connection maintains its own context (currentProjectPath, currentSessionId).
  */
 
+import { homedir } from 'node:os';
 import { config } from './config.js';
 import { handlers } from './events/index.js';
 import { logger } from './lib/logger.js';
@@ -34,6 +35,7 @@ export function handleWebSocket(ws) {
     type: 'connected',
     version: getCurrentVersion(),
     rootPath: config.rootPath || null,
+    homePath: config.rootPath || homedir(),
   });
 
   // Send update notification if available

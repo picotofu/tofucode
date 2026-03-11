@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **3-tab homepage** — Homepage now has a bottom tab nav (Sessions, Folders, Files) with Heroicons; Sessions tab shows recent sessions and recent projects; Folders tab is a directory-only browser for launching sessions; Files tab is a standalone file browser defaulting to the home directory
+- **Independent file browser** — Files tab on homepage provides a full-featured file browser (browse, search, open, edit, create, rename, delete) outside of any session, defaulting to the home directory and persisting the last visited path in localStorage
+- **Home folder traversal guard** — File browser in all views (homepage and session) enforces a topmost browsable path (home directory or `--root` if configured); breadcrumb segments above home are shown as muted static text; up button and path edit are clamped to this boundary; applies consistently across session changes
+- **Session files tab defaults to project path** — In a chat session the files tab opens at the project working directory while still allowing traversal up to the home folder
+- **Server `homePath` in connected message** — Server includes `homePath` (root config path or `homedir()`) in the `connected` WebSocket message; clients use this to set the traversal root without a separate request
+
+### Changed
+- **Files toolbar moved into FilesPanel** — Dotfiles toggle, New File, New Folder, and MD Mode buttons are now part of the `FilesPanel` component rather than injected via slot, eliminating duplicate rendering when the component is reused
+- **Breadcrumb path edit UX** — Tapping the path bar no longer opens edit mode; a pencil icon button toggles edit mode; a check button submits; Escape cancels; edit is clamped to root
+- **Mobile toolbar layout** — On mobile (≤639px) the toolbar buttons wrap to their own row above the path bar, right-aligned
+
+### Fixed
+- Files tab on homepage was starting at filesystem root instead of home directory — server-side null path now defaults to `homedir()` before validation
+- Traversal guard lost after session change — `resetState()` now restores `filesRootPath` to `homePath` instead of clearing it
+- Muted breadcrumb segments were still receiving hover highlight — fixed with `pointer-events: none`
+- Mobile session/project list now uses list view instead of cards (desktop retains card layout)
+
 ## [1.2.1] - 2026-03-08
 
 ### Added

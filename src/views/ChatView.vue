@@ -13,12 +13,12 @@ import { useRoute, useRouter } from 'vue-router';
 import AskUserQuestionModal from '../components/AskUserQuestionModal.vue';
 import ChatMessages from '../components/ChatMessages.vue';
 import DebugPopover from '../components/DebugPopover.vue';
-import FileEditor from '../components/FileEditor.vue';
-import FileExplorer from '../components/FileExplorer.vue';
+import FilesPanel from '../components/FilesPanel.vue';
 import GitDiffModal from '../components/GitDiffModal.vue';
 import QueueModal from '../components/QueueModal.vue';
 import TerminalOutput from '../components/TerminalOutput.vue';
 import { useDebugMode } from '../composables/useDebugMode';
+import { useFilesManager } from '../composables/useFilesManager';
 import { useChatWebSocket, useWebSocket } from '../composables/useWebSocket';
 import { getShortPath } from '../utils/format.js';
 
@@ -31,7 +31,8 @@ const router = useRouter();
 const route = useRoute();
 
 // Get recent sessions and terminal counts from global WebSocket
-const { recentSessions, sessionStatuses, terminalCounts } = useWebSocket();
+const { recentSessions, sessionStatuses, terminalCounts, homePath } =
+  useWebSocket();
 
 // Use scoped WebSocket - each ChatView gets its own connection
 const {
@@ -115,119 +116,23 @@ const terminalInput = ref('');
 const terminalCwd = ref(''); // Editable CWD for terminal commands
 const terminalInputRef = ref(null);
 const terminalOutputRef = ref(null);
-const pathEditInputRef = ref(null);
 const manualExpandState = ref(new Map()); // Map<processId, boolean> for user-toggled items
 
 // Computed for backwards compatibility
 const terminalMode = computed(() => currentMode.value === 'terminal');
 const filesMode = computed(() => currentMode.value === 'files');
 
-// Filtered files list based on dotfiles toggle and MD mode (used when no search query)
-const filteredFilesItems = computed(() => {
-  let items = filesItems.value;
-
-  // Filter dotfiles if toggle is off
-  if (!showDotfiles.value) {
-    items = items.filter((item) => !item.name.startsWith('.'));
-  }
-
-  // Filter for .md files only in MD mode (show directories that contain .md files)
-  if (mdMode.value) {
-    items = items.filter(
-      (item) =>
-        (item.isDirectory && item.hasMarkdown) ||
-        item.name.toLowerCase().endsWith('.md'),
-    );
-  }
-
-  return items;
+// ─── Files manager (composable) ─────────────────────────────────────────────
+const fm = useFilesManager({
+  send,
+  onMessage,
+  autoSave: autoSaveFilesEnabled,
+  onReference: handleReferenceFromFiles,
+  homePath,
 });
 
-// Files mode state
-const filesCurrentPath = ref('');
-const filesItems = ref([]);
-const filesLoading = ref(false);
-const filesFilter = ref(''); // Search query for server-side file search
-const filesSearchResults = ref(null); // null = not searching; array = search results
-const filesSearching = ref(false); // true while waiting for search results
-const SHOW_DOTFILES_KEY = 'tofucode:show-dotfiles';
-const showDotfiles = ref(localStorage.getItem(SHOW_DOTFILES_KEY) === 'true');
-watch(showDotfiles, (val) => localStorage.setItem(SHOW_DOTFILES_KEY, val));
-const openedFile = ref(null); // { path, content, loading }
-const fileEditorRef = ref(null);
-
-// Debounced server-side search for files tab (scoped to current viewed folder)
-let filesSearchTimeout = null;
-watch(filesFilter, (query) => {
-  clearTimeout(filesSearchTimeout);
-  if (!query.trim()) {
-    filesSearchResults.value = null;
-    filesSearching.value = false;
-    return;
-  }
-  filesSearching.value = true;
-  filesSearchResults.value = null;
-  filesSearchTimeout = setTimeout(() => {
-    send({
-      type: 'files:search',
-      query: query.trim(),
-      projectPath: filesCurrentPath.value,
-      showDotfiles: showDotfiles.value,
-    });
-  }, 150);
-});
-const fileExplorerRef = ref(null);
-const savedFileListScrollTop = ref(0);
-const htmlRenderMode = ref(false); // HTML render toggle (only active for .html/.htm files)
-
-const isHtmlFile = computed(() => {
-  const ext = openedFile.value?.path?.split('.').pop()?.toLowerCase();
-  return ext === 'html' || ext === 'htm';
-});
-
-const openedFileName = computed(() => {
-  if (!openedFile.value?.path) return '';
-  return openedFile.value.path.split('/').pop();
-});
-
-// File statistics
-const fileSize = computed(() => {
-  if (!openedFile.value?.content) return '0 B';
-  const bytes = new Blob([openedFile.value.content]).size;
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-});
-
-const totalLines = computed(() => {
-  if (!openedFile.value?.content) return 0;
-  return openedFile.value.content.split('\n').length;
-});
-
-const totalChars = computed(() => {
-  if (!openedFile.value?.content) return 0;
-  return openedFile.value.content.length;
-});
-
-// MD mode - filter for .md files only, with auto-save
-const mdModeKey = 'tofucode:md-mode';
-const mdMode = ref(localStorage.getItem(mdModeKey) === 'true');
-
-watch(mdMode, (newValue) => {
-  localStorage.setItem(mdModeKey, newValue ? 'true' : 'false');
-});
-const fileModals = ref({
-  createFile: false,
-  createFileName: '',
-  createFolder: false,
-  createFolderName: '',
-  rename: null,
-  renameNewName: '',
-  delete: null,
-  editPath: false,
-  editPathValue: '',
-  pendingFileToOpen: null, // Track file to open after creation
-});
+// Convenience aliases for memo logic and URL sync
+const openedFile = fm.openedFile;
 
 // Git Diff Modal
 const showGitDiffModal = ref(false);
@@ -377,24 +282,24 @@ function handleKeydown(e) {
   // Escape: Close modals first, then blur input
   if (e.key === 'Escape') {
     // Close any open modals first (highest priority)
-    if (fileModals.value.createFile) {
-      fileModals.value.createFile = false;
+    if (fm.fileModals.value.createFile) {
+      fm.fileModals.value.createFile = false;
       return;
     }
-    if (fileModals.value.createFolder) {
-      fileModals.value.createFolder = false;
+    if (fm.fileModals.value.createFolder) {
+      fm.fileModals.value.createFolder = false;
       return;
     }
-    if (fileModals.value.rename) {
-      fileModals.value.rename = null;
+    if (fm.fileModals.value.rename) {
+      fm.fileModals.value.rename = null;
       return;
     }
-    if (fileModals.value.delete) {
-      fileModals.value.delete = null;
+    if (fm.fileModals.value.delete) {
+      fm.fileModals.value.delete = null;
       return;
     }
-    if (fileModals.value.editPath) {
-      cancelEditPath();
+    if (fm.fileModals.value.editPath) {
+      fm.cancelEditPath();
       return;
     }
     if (editingSessionTitle.value) {
@@ -1702,52 +1607,6 @@ const runningProcessCount = computed(() => {
   return terminalCounts.value.get(projectSlug.value) || 0;
 });
 
-// Files mode computed
-const filesBreadcrumbs = computed(() => {
-  if (!filesCurrentPath.value) return [];
-  const parts = filesCurrentPath.value.split('/').filter(Boolean);
-  return parts.map((part, index) => ({
-    name: part,
-    path: `/${parts.slice(0, index + 1).join('/')}`,
-  }));
-});
-
-// Files mode functions
-function goUpDirectory() {
-  // If a file is open, close it first instead of navigating up
-  if (openedFile.value) {
-    fileEditorRef.value?.close();
-    return;
-  }
-  if (!filesCurrentPath.value || filesCurrentPath.value === '/') return;
-  const parentPath =
-    filesCurrentPath.value.split('/').slice(0, -1).join('/') || '/';
-  handleFilesNavigate(parentPath);
-}
-
-function handleFilesNavigate(path) {
-  filesCurrentPath.value = path;
-  filesLoading.value = true;
-
-  send({
-    type: 'files:browse',
-    path,
-  });
-}
-
-function handleFileSelect(file) {
-  // Save scroll position before switching to file editor
-  savedFileListScrollTop.value = fileExplorerRef.value?.getScrollTop() ?? 0;
-  // file.path is already absolute from backend
-  htmlRenderMode.value = false;
-  openedFile.value = { path: file.path, content: '', loading: true };
-
-  send({
-    type: 'files:read',
-    path: file.path,
-  });
-}
-
 // Memo modal/sidebar state
 const memoOpen = ref(false);
 const quickAccessFile = ref(null); // { path, content, loading }
@@ -1866,58 +1725,7 @@ watch(
   },
 );
 
-function handleFileSave(data) {
-  send({
-    type: 'files:write',
-    path: data.path,
-    content: data.content,
-  });
-}
-
-function handleFileDownload() {
-  const file = openedFile.value;
-  if (!file || file.loading || !file.content) return;
-
-  const fileName = file.path.split('/').pop();
-  let href;
-
-  if (file.content.startsWith('data:')) {
-    // Image: already a data URL
-    href = file.content;
-  } else {
-    // Text/code: create a blob
-    const blob = new Blob([file.content], { type: 'text/plain' });
-    href = URL.createObjectURL(blob);
-  }
-
-  const a = document.createElement('a');
-  a.href = href;
-  a.download = fileName;
-  a.click();
-
-  if (!file.content.startsWith('data:')) {
-    URL.revokeObjectURL(href);
-  }
-}
-
-function handleFileClose() {
-  openedFile.value = null;
-  htmlRenderMode.value = false;
-  // Restore scroll position after FileExplorer remounts
-  nextTick(() => {
-    fileExplorerRef.value?.setScrollTop(savedFileListScrollTop.value);
-  });
-}
-
-function handleCreateFile() {
-  fileModals.value.createFile = true;
-}
-
-function handleCreateFolder() {
-  fileModals.value.createFolder = true;
-}
-
-function handleReference(item) {
+function handleReferenceFromFiles(item) {
   const reference = `@${item.path}`;
   const currentContent = inputValue.value;
 
@@ -1957,211 +1765,31 @@ function handleReference(item) {
   });
 }
 
-function handleRename(item) {
-  fileModals.value.rename = item;
-  fileModals.value.renameNewName = item.name; // Pre-fill with current name
-}
-
-function handleDelete(item) {
-  fileModals.value.delete = item;
-}
-
-function handleEditPath() {
-  // Open inline path editing
-  fileModals.value.editPath = true;
-  fileModals.value.editPathValue = filesCurrentPath.value;
-  nextTick(() => {
-    pathEditInputRef.value?.focus();
-    pathEditInputRef.value?.select();
-  });
-}
-
-function cancelEditPath() {
-  fileModals.value.editPath = false;
-  fileModals.value.editPathValue = '';
-}
-
-// Modal confirmation functions
-function confirmCreateFile() {
-  const fileName = fileModals.value.createFileName.trim();
-  if (!fileName) return;
-
-  const filePath = `${filesCurrentPath.value}/${fileName}`.replace(/\/+/g, '/');
-
-  // Store the path to open after creation
-  fileModals.value.pendingFileToOpen = filePath;
-
-  send({
-    type: 'files:create',
-    path: filePath,
-    isDirectory: false,
-  });
-
-  fileModals.value.createFile = false;
-  fileModals.value.createFileName = '';
-}
-
-function confirmCreateFolder() {
-  const folderName = fileModals.value.createFolderName.trim();
-  if (!folderName) return;
-
-  const folderPath = `${filesCurrentPath.value}/${folderName}`.replace(
-    /\/+/g,
-    '/',
-  );
-  send({
-    type: 'files:create',
-    path: folderPath,
-    isDirectory: true,
-  });
-
-  fileModals.value.createFolder = false;
-  fileModals.value.createFolderName = '';
-}
-
-function confirmRename() {
-  const item = fileModals.value.rename;
-  const newName = fileModals.value.renameNewName.trim();
-  if (!item || !newName) return;
-
-  const oldPath = item.path;
-  const parentDir = oldPath.substring(0, oldPath.lastIndexOf('/'));
-  const newPath = `${parentDir}/${newName}`.replace(/\/+/g, '/');
-
-  send({
-    type: 'files:rename',
-    oldPath,
-    newPath,
-  });
-
-  fileModals.value.rename = null;
-  fileModals.value.renameNewName = '';
-}
-
-function confirmDelete() {
-  const item = fileModals.value.delete;
-  if (!item) return;
-
-  send({
-    type: 'files:delete',
-    path: item.path,
-  });
-
-  fileModals.value.delete = null;
-}
-
-function confirmEditPath() {
-  const newPath = fileModals.value.editPathValue.trim();
-  if (!newPath) return;
-
-  handleFilesNavigate(newPath);
-  fileModals.value.editPath = false;
-  fileModals.value.editPathValue = '';
-}
-
-// File message handlers
-function handleFileMessage(msg) {
-  switch (msg.type) {
-    case 'files:browse:result':
-      filesCurrentPath.value = msg.path;
-      filesItems.value = msg.items;
-      filesLoading.value = false;
-      // Clear search when navigating to a new directory
-      filesFilter.value = '';
-      filesSearchResults.value = null;
-      filesSearching.value = false;
-      break;
-    case 'files:browse:error':
-      console.error('Browse error:', msg.error);
-      filesLoading.value = false;
-      break;
-    case 'files:search:result':
-      if (filesFilter.value.trim()) {
-        filesSearchResults.value = msg.results || [];
-      }
-      filesSearching.value = false;
-      break;
-    case 'files:search:error':
-      console.error('File search error:', msg.error);
-      filesSearchResults.value = [];
-      filesSearching.value = false;
-      break;
-    case 'files:read:result':
-      // Handle regular file editor
-      if (openedFile.value && openedFile.value.path === msg.path) {
-        openedFile.value = {
-          path: msg.path,
-          content: msg.content,
-          size: msg.size,
-          isBinary: msg.isBinary || false,
-          binaryReason: msg.reason || null,
-          loading: false,
-        };
-      }
-      // Handle quick access file
-      if (quickAccessFile.value && quickAccessFile.value.path === msg.path) {
-        quickAccessFile.value = {
-          path: msg.path,
-          content: msg.content,
-          loading: false,
-        };
-        // Clear quick access attempt flag on success
-        if (memoAttempt === msg.path) {
-          memoAttempt = null;
-        }
-      }
-      break;
-    case 'files:read:error':
-      console.error('Read error:', msg.error);
-      // If this was a quick access file that doesn't exist, create it
-      if (memoAttempt && quickAccessFile.value?.path === memoAttempt) {
-        const path = memoAttempt;
-        memoAttempt = null; // Clear the attempt flag
-        // Create the file with empty content
-        send({
-          type: 'files:write',
-          path: path,
-          content: '',
-        });
-        // Open the newly created file in quick access
-        quickAccessFile.value = { path: path, content: '', loading: false };
-      } else if (memoAttempt && openedFile.value?.path === memoAttempt) {
-        // Legacy: handle old quick access logic for regular file editor
-        const path = memoAttempt;
-        memoAttempt = null;
-        send({
-          type: 'files:write',
-          path: path,
-          content: '',
-        });
-        openedFile.value = { path: path, content: '', loading: false };
-      } else if (openedFile.value) {
-        openedFile.value = null;
-      }
-      break;
-    case 'files:write:result':
-      // File saved successfully
-      break;
-    case 'files:write:error':
-      console.error('Write error:', msg.error);
-      break;
-    case 'files:create:result':
-      // If we have a pending file to open, open it now
-      if (fileModals.value.pendingFileToOpen === msg.path) {
-        openedFile.value = { path: msg.path, content: '', loading: true };
-        send({ type: 'files:read', path: msg.path });
-        fileModals.value.pendingFileToOpen = null;
-      }
-      break;
-    case 'files:create:error':
-      console.error('Create error:', msg.error);
-      fileModals.value.pendingFileToOpen = null;
-      break;
+// Memo-specific file message handler (quick access file read/error — not handled by fm)
+onMessage((msg) => {
+  if (msg.type === 'files:read:result') {
+    if (quickAccessFile.value && quickAccessFile.value.path === msg.path) {
+      quickAccessFile.value = {
+        path: msg.path,
+        content: msg.content,
+        loading: false,
+      };
+      if (memoAttempt === msg.path) memoAttempt = null;
+    }
+  } else if (msg.type === 'files:read:error') {
+    if (memoAttempt && quickAccessFile.value?.path === memoAttempt) {
+      const path = memoAttempt;
+      memoAttempt = null;
+      send({ type: 'files:write', path, content: '' });
+      quickAccessFile.value = { path, content: '', loading: false };
+    } else if (memoAttempt && openedFile.value?.path === memoAttempt) {
+      const path = memoAttempt;
+      memoAttempt = null;
+      send({ type: 'files:write', path, content: '' });
+      openedFile.value = { path, content: '', loading: false };
+    }
   }
-}
-
-// Register message handler (returns unsubscribe fn, auto-cleaned up on unmount by composable)
-onMessage(handleFileMessage);
+});
 
 // Handle server draft value responses
 onMessage((msg) => {
@@ -2218,9 +1846,13 @@ watch(
 
 // Initialize files mode when switching to it OR when projectStatus becomes available
 watch(currentMode, (mode) => {
-  if (mode === 'files' && !filesCurrentPath.value && projectStatus.value.cwd) {
+  if (
+    mode === 'files' &&
+    !fm.filesCurrentPath.value &&
+    projectStatus.value.cwd
+  ) {
     // Start from project root
-    handleFilesNavigate(projectStatus.value.cwd);
+    fm.handleFilesNavigate(projectStatus.value.cwd);
   }
 });
 
@@ -2232,15 +1864,19 @@ watch(
     if (
       status.cwd &&
       currentMode.value === 'files' &&
-      !filesCurrentPath.value
+      !fm.filesCurrentPath.value
     ) {
-      handleFilesNavigate(status.cwd);
+      fm.handleFilesNavigate(status.cwd);
 
       // Restore opened file from URL if specified
       const query = route.query;
       if (query.file) {
         nextTick(() => {
-          openedFile.value = { path: query.file, content: '', loading: true };
+          fm.openedFile.value = {
+            path: query.file,
+            content: '',
+            loading: true,
+          };
           send({ type: 'files:read', path: query.file });
         });
       }
@@ -2251,14 +1887,8 @@ watch(
 
 // Clear files state when session changes (files mode is per-session, not per-project like terminal)
 watch(currentSession, () => {
-  // Clear all files state immediately
-  filesCurrentPath.value = '';
-  filesItems.value = [];
-  filesLoading.value = false;
-  openedFile.value = null;
-  filesFilter.value = '';
-  filesSearchResults.value = null;
-  filesSearching.value = false;
+  // Clear all files state immediately via composable helper
+  fm.resetState();
 
   // Close git diff modal on session change to avoid stale data
   showGitDiffModal.value = false;
@@ -2505,116 +2135,14 @@ watch(
     </main>
 
     <!-- Files Mode -->
-    <main v-else-if="currentMode === 'files'" class="files-mode">
-      <FileEditor
-        v-if="openedFile"
-        ref="fileEditorRef"
-        :file-path="openedFile.path"
-        :content="openedFile.content"
-        :loading="openedFile.loading"
-        :is-binary="openedFile.isBinary"
-        :binary-reason="openedFile.binaryReason"
-        :file-size="openedFile.size"
-        :auto-save="autoSaveFilesEnabled"
-        :render-html="htmlRenderMode"
-        @save="handleFileSave"
-        @close="handleFileClose"
-      />
-      <FileExplorer
-        v-else
-        ref="fileExplorerRef"
-        :current-path="filesCurrentPath"
-        :items="filesSearchResults ?? filteredFilesItems"
-        :presorted="filesSearchResults !== null"
-        :loading="filesLoading || filesSearching"
-        :project-path="projectStatus.cwd"
-        @navigate="handleFilesNavigate"
-        @select-file="handleFileSelect"
-        @reference="handleReference"
-        @rename="handleRename"
-        @delete="handleDelete"
-        @upload-done="handleFilesNavigate"
-      />
-    </main>
+    <FilesPanel
+      v-else-if="currentMode === 'files'"
+      :manager="fm"
+      :show-reference="true"
+      @reference="handleReferenceFromFiles"
+    />
 
-    <!-- File editor header (above footer, only when editing a file) -->
-    <div v-if="currentMode === 'files' && openedFile" class="editor-header">
-      <span class="editor-file-name">{{ openedFileName }}</span>
-      <span v-if="fileEditorRef?.isDirty" class="editor-dirty-indicator" title="Unsaved changes">*</span>
-      <div class="editor-header-spacer"></div>
-      <span class="editor-stats">
-        <span class="stat-item" :title="`File size: ${fileSize}`">{{ fileSize }}</span>
-        <span class="stat-item" :title="`Total lines: ${totalLines}`">≡ {{ totalLines }}</span>
-        <span class="stat-item" :title="`Total characters: ${totalChars}`">∑ {{ totalChars }}</span>
-      </span>
-      <button
-        v-if="fileEditorRef?.hasToc"
-        class="action-btn toc-toggle-btn"
-        :class="{ active: fileEditorRef?.tocVisible }"
-        title="Toggle table of contents"
-        @click="fileEditorRef?.toggleToc()"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="3" y1="6" x2="21" y2="6"/>
-          <line x1="3" y1="12" x2="15" y2="12"/>
-          <line x1="3" y1="18" x2="18" y2="18"/>
-        </svg>
-      </button>
-      <button
-        v-if="isHtmlFile && !openedFile.loading && !openedFile.isBinary"
-        class="action-btn"
-        :class="{ active: htmlRenderMode }"
-        :title="htmlRenderMode ? 'View source' : 'Render HTML'"
-        @click="htmlRenderMode = !htmlRenderMode"
-      >
-        <!-- Eye icon: switch to render mode -->
-        <svg v-if="!htmlRenderMode" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-          <circle cx="12" cy="12" r="3"/>
-        </svg>
-        <!-- Code icon: switch back to source -->
-        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="16 18 22 12 16 6"/>
-          <polyline points="8 6 2 12 8 18"/>
-        </svg>
-      </button>
-      <button
-        v-if="!openedFile.loading && openedFile.content"
-        class="action-btn"
-        title="Download"
-        @click="handleFileDownload"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-      </button>
-      <button
-        class="action-btn"
-        :disabled="!fileEditorRef?.isDirty || fileEditorRef?.isSaving"
-        title="Save (Cmd+S)"
-        @click="fileEditorRef?.save()"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-          <polyline points="17 21 17 13 7 13 7 21"/>
-          <polyline points="7 3 7 8 15 8"/>
-        </svg>
-      </button>
-      <button
-        class="action-btn"
-        title="Close"
-        @click="fileEditorRef?.close()"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-
-    <footer v-if="!(currentMode === 'files' && openedFile)" class="footer">
+    <footer class="footer">
       <!-- Content navigation bar -->
       <div v-if="showContentNav" class="content-nav">
         <!-- Turn/command navigator (right-aligned) -->
@@ -2638,69 +2166,6 @@ watch(
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M6 9l6 6 6-6"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Files explorer header (only in files mode) - moved above toolbar -->
-      <div v-if="currentMode === 'files'" class="files-explorer-header">
-        <div class="files-breadcrumb">
-          <button
-            class="breadcrumb-btn"
-            @click="goUpDirectory"
-            :disabled="!filesCurrentPath || filesCurrentPath === '/'"
-            title="Go up"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
-          </button>
-          <button
-            class="breadcrumb-btn"
-            @click="projectStatus.cwd && handleFilesNavigate(projectStatus.cwd)"
-            :disabled="!projectStatus.cwd || filesCurrentPath === projectStatus.cwd"
-            title="Go to project root"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-              <polyline points="9 22 9 12 15 12 15 22"/>
-            </svg>
-          </button>
-          <!-- Path editing inline input -->
-          <form v-if="fileModals.editPath" class="breadcrumb-edit-form" @submit.prevent="confirmEditPath">
-            <input
-              ref="pathEditInputRef"
-              type="text"
-              v-model="fileModals.editPathValue"
-              class="breadcrumb-edit-input"
-              placeholder="/path/to/folder"
-              @keydown.escape.prevent="cancelEditPath"
-              @blur="cancelEditPath"
-            />
-          </form>
-          <!-- Path display with breadcrumbs -->
-          <div v-else class="breadcrumb-scroll" @click="handleEditPath">
-            <span class="breadcrumb-path">
-              <template v-if="!filesCurrentPath || filesCurrentPath === '/'">/</template>
-              <template v-else>
-                <span
-                  v-for="(crumb, index) in filesBreadcrumbs"
-                  :key="index"
-                  class="breadcrumb-item"
-                >
-                  <span class="breadcrumb-separator">/</span>
-                  <button class="breadcrumb-link" @click.stop="handleFilesNavigate(crumb.path)">
-                    {{ crumb.name }}
-                  </button>
-                </span>
-              </template>
-            </span>
-          </div>
-          <button v-if="!fileModals.editPath" class="breadcrumb-btn" @click="handleEditPath" title="Edit path">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
           </button>
         </div>
@@ -2734,54 +2199,6 @@ watch(
           </span>
         </div>
         <div class="toolbar-right">
-          <!-- Files mode tool icons -->
-          <button
-            v-if="filesMode"
-            class="action-btn"
-            :class="{ active: showDotfiles }"
-            @click="showDotfiles = !showDotfiles"
-            title="Show dotfiles"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <circle cx="12" cy="12" r="1"/>
-            </svg>
-          </button>
-          <button
-            v-if="filesMode"
-            class="action-btn"
-            @click="fileModals.createFile = true"
-            title="New file"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="12" y1="18" x2="12" y2="12"/>
-              <line x1="9" y1="15" x2="15" y2="15"/>
-            </svg>
-          </button>
-          <button
-            v-if="filesMode"
-            class="action-btn"
-            @click="fileModals.createFolder = true"
-            title="New folder"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-              <line x1="12" y1="11" x2="12" y2="17"/>
-              <line x1="9" y1="14" x2="15" y2="14"/>
-            </svg>
-          </button>
-          <button
-            v-if="filesMode"
-            class="action-btn md-btn"
-            :class="{ active: mdMode }"
-            @click="mdMode = !mdMode"
-            title="Markdown mode - filter .md files only with auto-save"
-          >
-            MD
-          </button>
-
           <!-- Terminal clear button (terminal mode, history tab only) — placed before subnav to avoid layout shift -->
           <button
             v-if="terminalMode && terminalSubTab === 'history'"
@@ -3029,33 +2446,6 @@ watch(
         </div>
       </form>
 
-      <!-- Files search input -->
-      <div v-else-if="currentMode === 'files'" class="files-filter-form">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
-          <circle cx="11" cy="11" r="8"/>
-          <path d="m21 21-4.35-4.35"/>
-        </svg>
-        <input
-          v-model="filesFilter"
-          type="text"
-          class="files-filter-input"
-          placeholder="Search files... (fuzzy & glob: *.md)"
-        />
-        <span v-if="filesSearching" class="files-filter-searching">Searching...</span>
-        <button
-          v-if="filesFilter"
-          type="button"
-          class="clear-btn"
-          @click="filesFilter = ''"
-          title="Clear search"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-
       <!-- Mode tabs at bottom: Chat | Terminal | Files -->
       <div class="mode-tabs">
         <!-- Hamburger button -->
@@ -3197,84 +2587,6 @@ watch(
         </div>
       </div>
     </footer>
-
-    <!-- File operation modals -->
-    <Teleport to="body">
-      <!-- Create file modal -->
-      <div v-if="fileModals.createFile" class="modal-overlay" @click="fileModals.createFile = false">
-        <div class="modal" @click.stop>
-          <h3>Create New File</h3>
-          <form @submit.prevent="confirmCreateFile">
-            <input
-              ref="createFileInputRef"
-              type="text"
-              v-model="fileModals.createFileName"
-              placeholder="filename.txt"
-              class="modal-input"
-              autofocus
-            />
-            <div class="modal-actions">
-              <button type="button" @click="fileModals.createFile = false" class="modal-btn cancel">Cancel</button>
-              <button type="submit" class="modal-btn confirm">Create</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- Create folder modal -->
-      <div v-if="fileModals.createFolder" class="modal-overlay" @click="fileModals.createFolder = false">
-        <div class="modal" @click.stop>
-          <h3>Create New Folder</h3>
-          <form @submit.prevent="confirmCreateFolder">
-            <input
-              type="text"
-              v-model="fileModals.createFolderName"
-              placeholder="folder-name"
-              class="modal-input"
-              autofocus
-            />
-            <div class="modal-actions">
-              <button type="button" @click="fileModals.createFolder = false" class="modal-btn cancel">Cancel</button>
-              <button type="submit" class="modal-btn confirm">Create</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- Rename modal -->
-      <div v-if="fileModals.rename" class="modal-overlay" @click="fileModals.rename = null">
-        <div class="modal" @click.stop>
-          <h3>Rename</h3>
-          <form @submit.prevent="confirmRename">
-            <input
-              type="text"
-              v-model="fileModals.renameNewName"
-              :placeholder="fileModals.rename?.name"
-              class="modal-input"
-              autofocus
-            />
-            <div class="modal-actions">
-              <button type="button" @click="fileModals.rename = null" class="modal-btn cancel">Cancel</button>
-              <button type="submit" class="modal-btn confirm">Rename</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- Delete confirmation modal -->
-      <div v-if="fileModals.delete" class="modal-overlay" @click="fileModals.delete = null">
-        <div class="modal" @click.stop>
-          <h3>Delete {{ fileModals.delete?.isDirectory ? 'Folder' : 'File' }}</h3>
-          <p>Are you sure you want to delete <strong>{{ fileModals.delete?.name }}</strong>?</p>
-          <p v-if="fileModals.delete?.isDirectory" class="warning">This will delete the folder and all its contents!</p>
-          <div class="modal-actions">
-            <button type="button" @click="fileModals.delete = null" class="modal-btn cancel">Cancel</button>
-            <button type="button" @click="confirmDelete" class="modal-btn danger">Delete</button>
-          </div>
-        </div>
-      </div>
-
-    </Teleport>
 
     <!-- Git Diff Modal -->
     <GitDiffModal
@@ -3796,78 +3108,6 @@ watch(
   }
 }
 
-/* File editor header (between main content and footer) */
-.editor-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
-  border-top: 1px solid var(--border-color);
-}
-
-.editor-file-name {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.editor-dirty-indicator {
-  color: var(--warning-color);
-  font-size: 14px;
-  font-weight: bold;
-  line-height: 1;
-  flex-shrink: 0;
-  margin-left: -4px;
-}
-
-.editor-stats {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 11px;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-.editor-stats .stat-item {
-  white-space: nowrap;
-}
-
-.editor-header-spacer {
-  flex: 1;
-  min-width: 0;
-}
-
-.editor-header .action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  color: var(--text-secondary);
-  background: transparent;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s, color 0.15s, opacity 0.15s;
-  flex-shrink: 0;
-}
-
-.editor-header .action-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.editor-header .action-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.editor-header .action-btn.active {
-  color: var(--text-primary);
-}
-
 .footer {
   padding: 12px 16px;
   border-top: 1px solid var(--border-color);
@@ -4307,148 +3547,6 @@ watch(
   }
 }
 
-/* Files explorer header (above toolbar) */
-.files-explorer-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-  background: var(--bg-primary);
-}
-
-.files-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
-
-.files-explorer-header .breadcrumb-scroll {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: var(--text-muted) transparent;
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s;
-}
-
-.files-explorer-header .breadcrumb-scroll:hover {
-  background: var(--bg-hover);
-}
-
-.breadcrumb-edit-form {
-  flex: 1;
-  min-width: 0;
-}
-
-.breadcrumb-edit-input {
-  width: 100%;
-  padding: 4px 8px;
-  font-size: 13px;
-  font-family: var(--font-mono);
-  background: var(--bg-primary);
-  border: 1px solid var(--text-muted);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  outline: none;
-}
-
-.breadcrumb-edit-input:focus {
-  border-color: var(--text-primary);
-}
-
-.files-explorer-header .breadcrumb-scroll::-webkit-scrollbar {
-  height: 4px;
-}
-
-.files-explorer-header .breadcrumb-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.files-explorer-header .breadcrumb-scroll::-webkit-scrollbar-thumb {
-  background: var(--text-muted);
-  border-radius: 2px;
-}
-
-.files-explorer-header .breadcrumb-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  color: var(--text-secondary);
-  background: transparent;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s, color 0.15s;
-  flex-shrink: 0;
-}
-
-.files-explorer-header .breadcrumb-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.files-explorer-header .breadcrumb-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.files-explorer-header .breadcrumb-path {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.files-explorer-header .breadcrumb-separator {
-  color: var(--text-muted);
-  margin: 0 4px;
-}
-
-.files-explorer-header .breadcrumb-link {
-  color: var(--text-secondary);
-  background: transparent;
-  padding: 4px 6px;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s, color 0.15s;
-  white-space: nowrap;
-}
-
-.files-explorer-header .breadcrumb-link:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-
-.files-explorer-header .action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  color: var(--text-secondary);
-  background: transparent;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s, color 0.15s;
-}
-
-.files-explorer-header .action-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.files-explorer-header .action-btn.active {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
 /* Recent sessions switcher */
 .recent-sessions-group {
   display: flex;
@@ -4871,65 +3969,6 @@ watch(
   color: var(--text-muted);
 }
 
-/* Files filter form */
-.files-filter-form {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-}
-
-.files-filter-form:focus-within {
-  border-color: var(--text-muted);
-}
-
-.files-filter-form .search-icon {
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-.files-filter-input {
-  flex: 1;
-  font-size: 13px;
-  line-height: 1.5;
-  background: transparent;
-  color: var(--text-primary);
-  border: none;
-  outline: none;
-  min-width: 0;
-}
-
-.files-filter-input::placeholder {
-  color: var(--text-muted);
-}
-
-.files-filter-searching {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-style: italic;
-  flex-shrink: 0;
-}
-
-.files-filter-form .clear-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  color: var(--text-muted);
-  background: transparent;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s, color 0.15s;
-  flex-shrink: 0;
-}
-
-.files-filter-form .clear-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
 .terminal-prompt {
   color: var(--success-color);
   font-weight: 500;
@@ -4970,22 +4009,6 @@ watch(
 
 .run-btn:disabled {
   opacity: 0.4;
-}
-
-/* Files mode styles */
-.files-mode {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.files-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--text-secondary);
 }
 
 /* Modal styles */

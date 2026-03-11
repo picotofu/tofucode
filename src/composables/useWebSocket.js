@@ -25,6 +25,8 @@ const updateAvailable = ref(null); // { currentVersion, latestVersion, updateUrl
 
 // Root path restriction (if --root is set on server)
 const rootPath = ref(null);
+// Home path — topmost browsable directory (rootPath if set, otherwise server home)
+const homePath = ref(null);
 
 // Clone dialog state (global so sidebar + homepage can both trigger it)
 const showCloneDialog = ref(false);
@@ -134,6 +136,9 @@ function handleGlobalMessage(msg) {
       }
       if (msg.rootPath) {
         rootPath.value = msg.rootPath;
+      }
+      if (msg.homePath) {
+        homePath.value = msg.homePath;
       }
       break;
 
@@ -446,6 +451,7 @@ export function useWebSocket() {
     currentVersion: readonly(currentVersion),
     updateAvailable: readonly(updateAvailable),
     rootPath: readonly(rootPath),
+    homePath: readonly(homePath),
 
     // Clone dialog
     showCloneDialog: readonly(showCloneDialog),

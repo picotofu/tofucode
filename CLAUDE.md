@@ -79,7 +79,17 @@ npm run check
 - Use Vue 3 Composition API with `<script setup>`
 - Prefer composables for shared state (`useWebSocket`)
 - **Always run `npm run check` after implementation** - this runs Biome for linting, formatting, and import ordering
-- After code changes, rebuild frontend with `npm run build`
+- After frontend changes, always rebuild with `npm run build`
+
+### Post-Implementation Code Review
+
+After every implementation, always perform a code review before considering the task done:
+
+- **Remove dead code**: unused variables, functions, imports, or unreachable branches
+- **Check for regressions**: verify existing features are unaffected by the change
+- **Keep it lean**: no over-engineering — favour simple, direct solutions that still allow future expansion
+- **Clean code**: consistent naming, no leftover debug logs, no unnecessary comments
+- Fix any issues found, then re-run `npm run check` and `npm run build`
 
 ### Environment Variables
 

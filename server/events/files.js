@@ -134,8 +134,13 @@ export async function handleFilesBrowse(ws, payload, context) {
   let { path: folderPath } = payload;
 
   try {
+    // Default to home directory when no path is provided
+    if (!folderPath) {
+      folderPath = homedir();
+    }
+
     // Handle project slug (starts with -)
-    if (folderPath?.startsWith('-')) {
+    if (folderPath.startsWith('-')) {
       folderPath = slugToPath(folderPath);
     }
 
