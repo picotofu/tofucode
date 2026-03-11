@@ -237,7 +237,9 @@ function onReferenceItem(item) {
               <button v-if="crumb.navigable" class="breadcrumb-link" @click.stop="handleFilesNavigate(crumb.path)">
                 {{ crumb.name }}
               </button>
-              <span v-else class="breadcrumb-link breadcrumb-static">{{ crumb.name }}</span>
+              <button v-else class="breadcrumb-link breadcrumb-static" :title="`Top level: ${filesRootPath}`" @click.stop="handleFilesNavigate(filesRootPath)">
+                {{ crumb.name }}
+              </button>
             </span>
           </template>
         </span>
@@ -602,9 +604,7 @@ function onReferenceItem(item) {
 }
 
 .files-explorer-header .breadcrumb-static {
-  cursor: default;
   opacity: 0.5;
-  pointer-events: none;
 }
 
 .files-toolbar {
