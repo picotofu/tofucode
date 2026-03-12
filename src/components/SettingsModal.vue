@@ -137,6 +137,7 @@ const SLACK_DEFAULTS = {
   botToken: '',
   appToken: '',
   projectRootPath: '',
+  sessionLogPath: '',
   watchedChannels: [],
   identity: { name: '', role: '', tone: 'concise, professional' },
   classifier: {
@@ -739,6 +740,22 @@ async function handleClearCacheAndUpdate() {
               v-model="slackLocal.projectRootPath"
               class="setting-input"
               placeholder="/home/user/projects"
+            />
+          </div>
+
+          <!-- Session Log Path -->
+          <div class="setting-item">
+            <div class="setting-header">
+              <span class="setting-title">Session Log Path <span class="optional-tag">optional</span></span>
+            </div>
+            <p class="setting-description">
+              Folder to persist Claude Code session logs from work triggers. Each session is saved as <code>{sessionId}.log</code>. Leave empty to disable.
+            </p>
+            <input
+              type="text"
+              v-model="slackLocal.sessionLogPath"
+              class="setting-input"
+              placeholder="/home/user/slack-sessions"
             />
           </div>
 
@@ -1556,5 +1573,19 @@ async function handleClearCacheAndUpdate() {
 
 .slack-status-row .restart-btn {
   margin-top: 0;
+}
+
+.optional-tag {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 </style>

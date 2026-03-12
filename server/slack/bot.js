@@ -141,11 +141,29 @@ export async function startSlackBot() {
 
     const eventType = event?.type;
     const channelType = event?.channel_type;
+    const channel = event?.channel;
 
-    // Raw receive log — before any filtering
-    logger.debug(
-      `[Slack] ← event=${eventType} channelType=${channelType} channel=${event?.channel} user=${event?.user} retry=${retry_num} text="${(event?.text || '').substring(0, 60)}"`,
-    );
+    // Only log events from watched channels (or DMs)
+    const isWatched =
+      channelType === 'im' ||
+      slackConfig.watchedChannels.some((c) => c.id === channel);
+
+    if (isWatched && !retry_num) {
+      const channelLabel =
+        channelType === 'im'
+          ? 'DM'
+          : (slackConfig.watchedChannels.find((c) => c.id === channel)?.name ??
+            channel);
+      const isMention = (event?.text || '').includes(
+        `<@${slackConfig.selfUserId}>`,
+      );
+      const mentionTag = isMention ? ' [@mentioned]' : '';
+      const isSelf = event?.user === slackConfig.selfUserId;
+      const selfTag = isSelf ? ' [self]' : '';
+      logger.log(
+        `[Slack] #${channelLabel} | user=${event?.user}${selfTag}${mentionTag} | "${(event?.text || '').substring(0, 100)}"`,
+      );
+    }
 
     // Skip retries (already processed)
     if (retry_num) return;

@@ -16,58 +16,14 @@
  *               gathering, work with uncertain project mapping, etc.)
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import Anthropic from '@anthropic-ai/sdk';
-import { config } from '../../config.js';
+import { query } from '@anthropic-ai/claude-agent-sdk';
+import { config, pathToSlug } from '../../config.js';
 import { logger } from '../../lib/logger.js';
+import { setTitle } from '../../lib/session-titles.js';
 import { loadNotionConfig } from '../../lib/task-providers/notion-config.js';
 import { formatThreadContext } from './formatter.js';
-
-/** @type {Anthropic|null} */
-let client = null;
-
-/** @type {string|null} Cached global CLAUDE.md content */
-let cachedClaudeMd = null;
-
-/**
- * Get or create Anthropic client (lazy init)
- * @returns {Anthropic}
- */
-function getClient() {
-  if (!client) {
-    client = new Anthropic();
-  }
-  return client;
-}
-
-/**
- * Load global CLAUDE.md content (cached after first load)
- * @returns {string}
- */
-function loadClaudeMd() {
-  if (cachedClaudeMd !== null) return cachedClaudeMd;
-
-  try {
-    const claudeMdPath = join(homedir(), '.claude', 'CLAUDE.md');
-    if (existsSync(claudeMdPath)) {
-      cachedClaudeMd = readFileSync(claudeMdPath, 'utf-8');
-      return cachedClaudeMd;
-    }
-  } catch {
-    // Ignore errors
-  }
-  cachedClaudeMd = '';
-  return cachedClaudeMd;
-}
-
-/**
- * Clear cached CLAUDE.md (call when config changes)
- */
-export function clearClaudeMdCache() {
-  cachedClaudeMd = null;
-}
 
 /**
  * List available project directories under a root path
@@ -197,12 +153,6 @@ Set needsContext to true if answering well would require looking up additional i
 function buildUserPrompt({ message, threadHistory, channelInfo, senderName }) {
   const parts = [];
 
-  // Context: CLAUDE.md knowledge
-  const claudeMd = loadClaudeMd();
-  if (claudeMd) {
-    parts.push(`[Your knowledge / instructions]\n${claudeMd}`);
-  }
-
   // Context: Channel
   if (channelInfo) {
     const channelName = channelInfo.name || channelInfo.id;
@@ -254,22 +204,87 @@ function shouldEscalateToSonnet(result) {
 
 /**
  * Run a single classification pass against a model.
- * @param {Anthropic} anthropic
+ * Uses the agent SDK query() (handles OAuth auth automatically).
+ * No tools. If sessionLogPath is set, persists session JSONL to that path
+ * (readable in tofucode web UI). Otherwise runs ephemeral with no disk writes.
  * @param {string} model
  * @param {string} systemPrompt
  * @param {string} userPrompt
- * @returns {Promise<Classification>}
+ * @param {string|null} sessionLogPath
+ * @returns {Promise<{ classification: Classification, sessionId: string|null }>}
  */
-async function runClassification(anthropic, model, systemPrompt, userPrompt) {
-  const response = await anthropic.messages.create({
-    model,
-    max_tokens: 2048,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userPrompt }],
+async function runClassification(
+  model,
+  systemPrompt,
+  userPrompt,
+  sessionLogPath,
+) {
+  const modelSlug = config.models[model] ?? model;
+
+  const stream = query({
+    prompt: userPrompt,
+    options: {
+      model: modelSlug,
+      allowedTools: [],
+      permissionMode: 'default',
+      systemPrompt,
+      persistSession: !!sessionLogPath,
+      ...(sessionLogPath ? { cwd: sessionLogPath } : {}),
+    },
   });
 
-  const text = response.content[0]?.text || '';
-  return parseClassification(text);
+  let text = '';
+  let sessionId = null;
+  for await (const message of stream) {
+    if (message.type === 'system' && message.subtype === 'init') {
+      sessionId = message.session_id ?? null;
+    }
+    if (message.type === 'assistant') {
+      for (const block of message.message?.content || []) {
+        if ('text' in block) text += block.text;
+      }
+    }
+  }
+
+  return { classification: parseClassification(text), sessionId };
+}
+
+/**
+ * Build a human-readable session title from classification context.
+ * Format: [#channel] action: message snippet
+ * @param {Classification} classification
+ * @param {Object} [channelInfo]
+ * @param {string} messageText
+ * @returns {string}
+ */
+function buildSessionTitle(classification, channelInfo, messageText) {
+  const channel = channelInfo?.name
+    ? `#${channelInfo.name}`
+    : channelInfo?.id
+      ? `#${channelInfo.id}`
+      : '#slack';
+  const snippet = (messageText || '').substring(0, 60).trim();
+  const ellipsis = messageText?.length > 60 ? '…' : '';
+  return `[${channel}] ${classification.action}: ${snippet}${ellipsis}`;
+}
+
+/**
+ * Assign a session title to a persisted classifier session.
+ * @param {string} sessionId
+ * @param {string} sessionLogPath
+ * @param {string} title
+ */
+function assignSessionTitle(sessionId, sessionLogPath, title) {
+  if (!sessionId || !sessionLogPath) return;
+  try {
+    const slug = pathToSlug(sessionLogPath);
+    setTitle(slug, sessionId, title);
+    logger.log(
+      `[Slack Classifier] Session title set: "${title}" (${sessionId})`,
+    );
+  } catch (err) {
+    logger.warn('[Slack Classifier] Could not set session title:', err.message);
+  }
 }
 
 /**
@@ -290,10 +305,7 @@ export async function classifyMessage({
   senderName,
   config: slackConfig,
 }) {
-  const anthropic = getClient();
-  const haikuModel = config.models.haiku || 'claude-haiku-4-5';
-  const sonnetModel = config.models.sonnet || 'claude-sonnet-4-5';
-
+  const sessionLogPath = slackConfig.sessionLogPath || null;
   const systemPrompt = buildSystemPrompt(slackConfig);
   const userPrompt = buildUserPrompt({
     message,
@@ -304,12 +316,13 @@ export async function classifyMessage({
 
   try {
     // Pass 1: Haiku (fast, cheap)
-    const initial = await runClassification(
-      anthropic,
-      haikuModel,
-      systemPrompt,
-      userPrompt,
-    );
+    const { classification: initial, sessionId: haikusSessionId } =
+      await runClassification(
+        'haiku',
+        systemPrompt,
+        userPrompt,
+        sessionLogPath,
+      );
 
     // Pass 2: Sonnet (escalate if needed)
     if (shouldEscalateToSonnet(initial)) {
@@ -317,11 +330,24 @@ export async function classifyMessage({
         `[Slack Classifier] Escalating to Sonnet — action=${initial.action} confidence=${initial.confidence} needsContext=${initial.needsContext}`,
       );
       try {
-        const escalated = await runClassification(
-          anthropic,
-          sonnetModel,
-          systemPrompt,
-          userPrompt,
+        const { classification: escalated, sessionId: sonnetSessionId } =
+          await runClassification(
+            'sonnet',
+            systemPrompt,
+            userPrompt,
+            sessionLogPath,
+          );
+        const title = buildSessionTitle(
+          escalated,
+          channelInfo,
+          message.text || '',
+        );
+        assignSessionTitle(sonnetSessionId, sessionLogPath, title);
+        // Also title the Haiku session so both are identifiable in the UI
+        assignSessionTitle(
+          haikusSessionId,
+          sessionLogPath,
+          `${title} [haiku→sonnet]`,
         );
         return escalated;
       } catch (err) {
@@ -329,10 +355,18 @@ export async function classifyMessage({
           '[Slack Classifier] Sonnet escalation failed, using Haiku result:',
           err.message,
         );
+        const title = buildSessionTitle(
+          initial,
+          channelInfo,
+          message.text || '',
+        );
+        assignSessionTitle(haikusSessionId, sessionLogPath, title);
         return initial;
       }
     }
 
+    const title = buildSessionTitle(initial, channelInfo, message.text || '');
+    assignSessionTitle(haikusSessionId, sessionLogPath, title);
     return initial;
   } catch (err) {
     logger.error('[Slack Classifier] Error:', err.message);
@@ -359,7 +393,28 @@ function parseClassification(text) {
       return { action: 'ignore', reasoning: 'Failed to parse classification' };
     }
 
-    const parsed = JSON.parse(text.substring(start));
+    // Find matching closing brace to handle trailing text after the JSON object
+    let depth = 0;
+    let end = -1;
+    for (let i = start; i < text.length; i++) {
+      if (text[i] === '{') depth++;
+      else if (text[i] === '}') {
+        depth--;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    if (end === -1) {
+      logger.warn(
+        '[Slack Classifier] Could not find closing brace in response:',
+        text.substring(0, 200),
+      );
+      return { action: 'ignore', reasoning: 'Failed to parse classification' };
+    }
+
+    const parsed = JSON.parse(text.substring(start, end + 1));
 
     // Validate action
     const validActions = ['ignore', 'acknowledge', 'answer', 'ticket', 'work'];

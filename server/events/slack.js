@@ -47,6 +47,7 @@ export async function handleSaveConfig(ws, message) {
       ...existing,
       enabled: incoming.enabled ?? existing.enabled,
       projectRootPath: incoming.projectRootPath ?? existing.projectRootPath,
+      sessionLogPath: incoming.sessionLogPath ?? existing.sessionLogPath,
       watchedChannels: incoming.watchedChannels ?? existing.watchedChannels,
       identity: {
         ...existing.identity,
