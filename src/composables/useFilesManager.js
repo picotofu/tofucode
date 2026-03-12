@@ -87,10 +87,17 @@ export function useFilesManager({
   const filesBreadcrumbs = computed(() => {
     if (!filesCurrentPath.value) return [];
     const parts = filesCurrentPath.value.split('/').filter(Boolean);
+    console.log(
+      '[FilesManager] filesRootPath:',
+      filesRootPath.value,
+      'currentPath:',
+      filesCurrentPath.value,
+    );
     return parts.map((part, index) => {
       const path = `/${parts.slice(0, index + 1).join('/')}`;
       const navigable =
         !filesRootPath.value || path.startsWith(filesRootPath.value);
+      console.log('[FilesManager] crumb:', path, 'navigable:', navigable);
       return { name: part, path, navigable };
     });
   });

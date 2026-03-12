@@ -38,6 +38,12 @@ import {
   updateHandler as mcpUpdate,
 } from './mcp.js';
 import { handler as newSession } from './new-session.js';
+import {
+  handleAnalyseDatabase as notionAnalyse,
+  handleGetConfig as notionGetConfig,
+  handleSaveConfig as notionSaveConfig,
+  handleTestConnection as notionTest,
+} from './notion.js';
 import { handler as prompt } from './prompt.js';
 import {
   clearHandler as queueClear,
@@ -49,6 +55,12 @@ import { handleFilesSearch } from './search-files.js';
 import { handler as selectProject } from './select-project.js';
 import { handler as selectSession } from './select-session.js';
 import { handler as setSessionTitle } from './set-session-title.js';
+import {
+  handleGetConfig as slackGetConfig,
+  handleRestart as slackRestart,
+  handleSaveConfig as slackSaveConfig,
+  handleTestConnection as slackTest,
+} from './slack.js';
 import {
   clearHandler as terminalClear,
   execHandler as terminalExec,
@@ -114,4 +126,12 @@ export const handlers = {
   'queue:get': queueGet,
   'draft:set': draftSet,
   'draft:get': draftGet,
+  'slack:get_config': slackGetConfig,
+  'slack:save_config': slackSaveConfig,
+  'slack:test': slackTest,
+  'slack:restart': slackRestart,
+  'notion:get_config': notionGetConfig,
+  'notion:save_config': notionSaveConfig,
+  'notion:test': notionTest,
+  'notion:analyse': notionAnalyse,
 };

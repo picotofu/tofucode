@@ -50,6 +50,16 @@ export function handleWebSocket(ws) {
     });
   }
 
+  // Send current Slack bot socket status (async import to avoid circular deps)
+  import('./slack/bot.js')
+    .then(({ getSlackBotConnected }) => {
+      send(ws, { type: 'slack:status', connected: getSlackBotConnected() });
+    })
+    .catch(() => {
+      // Slack bot module may not be loaded — send disconnected
+      send(ws, { type: 'slack:status', connected: false });
+    });
+
   ws.on('message', async (data) => {
     let message;
     try {

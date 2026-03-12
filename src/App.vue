@@ -56,7 +56,18 @@ const settings = ref({
 
 // Server capability flags (not user settings — set by server environment)
 const discordEnabled = ref(false);
+const slackEnabled = ref(false);
 const maxFileSizeMb = ref(10);
+
+// Slack config state (separate from general settings)
+const slackConfig = ref(null);
+const slackTestResult = ref(null);
+const slackBotConnected = ref(false);
+
+// Notion config state (independent of Slack)
+const notionConfig = ref(null);
+const notionTestResult = ref(null);
+const notionAnalyseResult = ref(null);
 
 function openSettings() {
   showSettings.value = true;
@@ -129,6 +140,43 @@ function handleRestart() {
   send({ type: 'restart' });
 }
 
+// Slack event handlers
+function fetchSlackConfig() {
+  send({ type: 'slack:get_config' });
+}
+
+function saveSlackConfig(config) {
+  send({ type: 'slack:save_config', config });
+}
+
+function testSlackConnection() {
+  slackTestResult.value = null;
+  send({ type: 'slack:test' });
+}
+
+function restartSlackBot() {
+  send({ type: 'slack:restart' });
+}
+
+// Notion event handlers
+function fetchNotionConfig() {
+  send({ type: 'notion:get_config' });
+}
+
+function saveNotionConfig(config) {
+  send({ type: 'notion:save_config', config });
+}
+
+function testNotionConnection() {
+  notionTestResult.value = null;
+  send({ type: 'notion:test' });
+}
+
+function analyseNotionDatabase(ticketDatabaseUrl) {
+  notionAnalyseResult.value = null;
+  send({ type: 'notion:analyse', ticketDatabaseUrl });
+}
+
 // Handle settings, usage, and MCP messages
 onMessage((msg) => {
   if (msg.type === 'settings') {
@@ -136,9 +184,30 @@ onMessage((msg) => {
     if (msg.discordEnabled !== undefined) {
       discordEnabled.value = msg.discordEnabled;
     }
+    if (msg.slackEnabled !== undefined) {
+      slackEnabled.value = msg.slackEnabled;
+    }
     if (msg.maxFileSizeMb !== undefined) {
       maxFileSizeMb.value = msg.maxFileSizeMb;
     }
+  } else if (msg.type === 'slack:config') {
+    slackConfig.value = msg.config;
+  } else if (msg.type === 'slack:status') {
+    slackBotConnected.value = msg.connected;
+  } else if (msg.type === 'slack:test_result') {
+    slackTestResult.value = msg;
+  } else if (msg.type === 'slack:save_result') {
+    // Save acknowledged — config will follow as separate slack:config message
+  } else if (msg.type === 'slack:restart_result') {
+    // Restart acknowledged
+  } else if (msg.type === 'notion:config') {
+    notionConfig.value = msg.config;
+  } else if (msg.type === 'notion:test_result') {
+    notionTestResult.value = msg;
+  } else if (msg.type === 'notion:save_result') {
+    // Save acknowledged — config will follow as separate notion:config message
+  } else if (msg.type === 'notion:analyse_result') {
+    notionAnalyseResult.value = msg;
   } else if (msg.type === 'settings_updated') {
     if (msg.success) {
       settings.value = msg.settings;
@@ -383,10 +452,25 @@ onUnmounted(() => {
       :connected="connected"
       :usage-stats="usageStats"
       :discord-enabled="discordEnabled"
+      :slack-enabled="slackEnabled"
+      :slack-config="slackConfig"
+      :slack-test-result="slackTestResult"
+      :slack-bot-connected="slackBotConnected"
+      :notion-config="notionConfig"
+      :notion-test-result="notionTestResult"
+      :notion-analyse-result="notionAnalyseResult"
       @close="closeSettings"
       @update="updateSettings"
       @restart="handleRestart"
       @fetch-usage="fetchUsageStats"
+      @slack-fetch-config="fetchSlackConfig"
+      @slack-save-config="saveSlackConfig"
+      @slack-test="testSlackConnection"
+      @slack-restart="restartSlackBot"
+      @notion-fetch-config="fetchNotionConfig"
+      @notion-save-config="saveNotionConfig"
+      @notion-test="testNotionConnection"
+      @notion-analyse="analyseNotionDatabase"
     />
     <GitCloneModal
       :show="showCloneDialog"
