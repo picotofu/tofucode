@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Mobile toolbar layout** — On mobile (≤639px) the toolbar buttons wrap to their own row above the path bar, right-aligned
 
 ### Fixed
+- **Memo sidebar broken** — `FileEditor` import was inadvertently removed during the 3-tab homepage refactor; memo overlay is now restored
+- **Android back button** — pressing back now closes the memo sidebar, settings modal, and sessions sidebar (mobile only) instead of navigating away; implemented via a new `useBackButton` composable using the history sentinel pattern
+- **Settings modal mobile layout** — now renders full-screen on mobile instead of a floating card
+- **`isDesktop` not reactive** — sidebar initial state now uses `window.matchMedia` with a resize listener; switching to mobile auto-closes the sidebar
+- **File download race condition** — concurrent file downloads no longer collide; tracking moved from a single ref to a `Map`
+- **Slack settings save** — blocks save with an alert if Slack is enabled but bot token is empty
+- **Notion field mapping overwrite** — "Analyse Structure" now prompts for confirmation before replacing existing manual mappings
+- **`isUpdatingFromProps` timing** — replaced fragile `setTimeout(0)` with `nextTick` in SettingsModal
+- **Silent `~/.claude.json` parse failure** — Slack MCP token fallback now logs a warning instead of swallowing the error
 - Files tab on homepage was starting at filesystem root instead of home directory — server-side null path now defaults to `homedir()` before validation
 - Traversal guard lost after session change — `resetState()` now restores `filesRootPath` to `homePath` instead of clearing it
 - Muted breadcrumb segments were still receiving hover highlight — fixed with `pointer-events: none`

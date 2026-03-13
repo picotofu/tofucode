@@ -9,6 +9,7 @@ import McpModal from './components/McpModal.vue';
 import PwaPrompt from './components/PwaPrompt.vue';
 import SettingsModal from './components/SettingsModal.vue';
 import Sidebar from './components/Sidebar.vue';
+import { useBackButton } from './composables/useBackButton.js';
 import { useWebSocket } from './composables/useWebSocket';
 
 const {
@@ -76,6 +77,9 @@ function openSettings() {
 function closeSettings() {
   showSettings.value = false;
 }
+
+// Android back button closes settings modal instead of navigating away
+useBackButton(showSettings, closeSettings);
 
 // Help modal state
 const showHelp = ref(false);
@@ -230,9 +234,13 @@ onMessage((msg) => {
     }
   } else if (msg.type === 'mcp:test_result') {
     mcpModalRef.value?.handleTestResult(msg);
-  } else if (msg.type === 'files:read:result' && pendingDownloadPath.value) {
+  } else if (
+    msg.type === 'files:read:result' &&
+    pendingDownloads.has(msg.path)
+  ) {
     // Handle download triggered from FilePicker
-    if (msg.path === pendingDownloadPath.value && msg.content !== undefined) {
+    if (msg.content !== undefined) {
+      pendingDownloads.delete(msg.path);
       const fileName = msg.path.split('/').pop();
       let href;
       if (msg.content.startsWith('data:')) {
@@ -246,7 +254,6 @@ onMessage((msg) => {
       a.download = fileName;
       a.click();
       if (!msg.content.startsWith('data:')) URL.revokeObjectURL(href);
-      pendingDownloadPath.value = null;
     }
   }
 });
@@ -358,12 +365,12 @@ function handleFileReference(file) {
   closeFilePicker();
 }
 
-// Pending download path (set when download is triggered from FilePicker)
-const pendingDownloadPath = ref(null);
+// Pending downloads — Map<path, true> to support concurrent downloads without race conditions
+const pendingDownloads = new Map();
 
 function handleFilePickerDownload(file) {
   if (!file || file.isDirectory) return;
-  pendingDownloadPath.value = file.path;
+  pendingDownloads.set(file.path, true);
   // Request file content via WebSocket
   send({
     type: 'files:read',
@@ -374,11 +381,21 @@ function handleFilePickerDownload(file) {
 }
 
 // Sidebar state - shared across all pages
-const isDesktop = window.innerWidth > 768;
+const desktopMq = window.matchMedia('(min-width: 769px)');
+const isDesktop = ref(desktopMq.matches);
+function onDesktopMqChange(e) {
+  isDesktop.value = e.matches;
+  // Auto-close sidebar when switching to mobile
+  if (!e.matches) {
+    closeSidebar();
+  }
+}
+desktopMq.addEventListener('change', onDesktopMqChange);
+
 const storedSidebarState = localStorage.getItem('sidebarOpen');
 // On mobile, always start closed. On desktop, use stored state or default to open.
 const sidebarOpen = ref(
-  isDesktop
+  isDesktop.value
     ? storedSidebarState !== null
       ? storedSidebarState === 'true'
       : true
@@ -394,6 +411,9 @@ function closeSidebar() {
   sidebarOpen.value = false;
   localStorage.setItem('sidebarOpen', 'false');
 }
+
+// Android back button closes sessions sidebar on mobile instead of navigating away
+useBackButton(sidebarOpen, closeSidebar, { mobileOnly: true });
 
 // Provide sidebar state to child components
 provide('sidebar', {
@@ -424,6 +444,7 @@ onMounted(() => {
 onUnmounted(() => {
   disconnect();
   document.removeEventListener('keydown', handleGlobalKeydown);
+  desktopMq.removeEventListener('change', onDesktopMqChange);
 });
 </script>
 

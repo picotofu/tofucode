@@ -1,5 +1,5 @@
 <script setup>
-import { onUnmounted, ref, watch } from 'vue';
+import { nextTick, onUnmounted, ref, watch } from 'vue';
 import UsageStats from './UsageStats.vue';
 
 const props = defineProps({
@@ -83,9 +83,9 @@ watch(
     isUpdatingFromProps = true;
     localSettings.value = { ...newSettings };
     // Reset flag after Vue's reactivity system has processed the change
-    setTimeout(() => {
+    nextTick(() => {
       isUpdatingFromProps = false;
-    }, 0);
+    });
   },
   { deep: true },
 );
@@ -201,6 +201,10 @@ watch(activeTab, (tab) => {
 
 function slackSave() {
   if (!slackLocal.value) return;
+  if (slackLocal.value.enabled && !slackLocal.value.botToken?.trim()) {
+    alert('Bot token is required when Slack is enabled.');
+    return;
+  }
   slackSaving.value = true;
   emit('slack-save-config', slackLocal.value);
   setTimeout(() => {
@@ -285,6 +289,13 @@ watch(
     notionAnalyseDisplay.value = result;
     // Auto-populate field mappings from analyse result
     if (result?.success && result.fields?.length && notionLocal.value) {
+      const hasExisting = (notionLocal.value.fieldMappings?.length ?? 0) > 0;
+      if (
+        hasExisting &&
+        !confirm('Replace current field mappings with the analysed results?')
+      ) {
+        return;
+      }
       notionLocal.value.fieldMappings = result.fields.map((f) => ({
         field: f.field,
         type: f.type,
@@ -1587,5 +1598,20 @@ async function handleClearCacheAndUpdate() {
   vertical-align: middle;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+@media (max-width: 768px) {
+  .modal-overlay {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .modal-content {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
 }
 </style>

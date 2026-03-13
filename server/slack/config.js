@@ -69,8 +69,11 @@ function resolveBotToken(config) {
         return slackMcp.env.SLACK_BOT_TOKEN;
       }
     }
-  } catch {
-    // Ignore parse errors
+  } catch (err) {
+    logger.warn(
+      '[Slack] Failed to parse ~/.claude.json for MCP token fallback:',
+      err.message,
+    );
   }
 
   return '';

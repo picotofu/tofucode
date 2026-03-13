@@ -13,10 +13,12 @@ import { useRoute, useRouter } from 'vue-router';
 import AskUserQuestionModal from '../components/AskUserQuestionModal.vue';
 import ChatMessages from '../components/ChatMessages.vue';
 import DebugPopover from '../components/DebugPopover.vue';
+import FileEditor from '../components/FileEditor.vue';
 import FilesPanel from '../components/FilesPanel.vue';
 import GitDiffModal from '../components/GitDiffModal.vue';
 import QueueModal from '../components/QueueModal.vue';
 import TerminalOutput from '../components/TerminalOutput.vue';
+import { useBackButton } from '../composables/useBackButton.js';
 import { useDebugMode } from '../composables/useDebugMode';
 import { useFilesManager } from '../composables/useFilesManager';
 import { useChatWebSocket, useWebSocket } from '../composables/useWebSocket';
@@ -1642,6 +1644,9 @@ function closeMemo() {
   quickAccessFile.value = null;
   memoAttempt = null;
 }
+
+// Android back button closes memo instead of navigating away
+useBackButton(memoOpen, closeMemo);
 
 function toggleMemo() {
   if (memoOpen.value) {
