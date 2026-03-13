@@ -32,8 +32,10 @@ export async function dispatchAction({
   config,
 }) {
   const { channel, ts, thread_ts: threadTs } = event;
-  // Thread root ts is the anchor for replies and ticket lookups
-  const threadRootTs = threadTs || ts;
+  // DMs use channel ID as the session key (1 session per user/DM).
+  // Threads use thread_ts as the anchor. Top-level channel messages fall back to ts.
+  const isDm = channelConfig?.name === 'DM';
+  const threadRootTs = isDm ? channel : threadTs || ts;
 
   switch (classification.action) {
     case 'ignore':

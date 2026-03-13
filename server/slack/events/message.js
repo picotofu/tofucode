@@ -34,7 +34,6 @@ export async function handleMessage({ event, slackApi, config }) {
   if (!channelConfig) return;
 
   // Apply respond mode
-  if (channelConfig.respondMode === 'muted') return;
   if (channelConfig.respondMode === 'mention-only') {
     // Only respond if the bot is mentioned directly or via a group tag
     const mentioned = await isBotMentioned(text, config.selfUserId, slackApi);

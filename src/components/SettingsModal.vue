@@ -143,6 +143,7 @@ const SLACK_DEFAULTS = {
   appToken: '',
   projectRootPath: '',
   sessionLogPath: '',
+  respondDm: true,
   watchedChannels: [],
   identity: { name: '', role: '', tone: 'concise, professional' },
   classifier: {
@@ -706,7 +707,7 @@ async function handleClearCacheAndUpdate() {
               <span class="setting-title">Enable Slack Bot</span>
             </label>
             <p class="setting-description">
-              Listen and respond to messages in watched channels, DMs, and @mentions
+              Listen and respond to messages in watched channels and @mentions
             </p>
             <div class="slack-status-row">
               <div class="connection-pill" :class="{ connected: slackBotConnected }">
@@ -829,6 +830,21 @@ async function handleClearCacheAndUpdate() {
           <!-- Watched Channels -->
           <div class="section-heading">Watched Channels</div>
 
+          <!-- Respond to DMs -->
+          <div class="setting-item">
+            <label class="setting-label">
+              <input
+                type="checkbox"
+                v-model="slackLocal.respondDm"
+                class="setting-checkbox"
+              />
+              <span class="setting-title">Respond to Direct Messages</span>
+            </label>
+            <p class="setting-description">
+              Classify and respond to DMs sent directly to you
+            </p>
+          </div>
+
           <div
             v-for="(ch, i) in slackLocal.watchedChannels"
             :key="ch.id || i"
@@ -853,7 +869,6 @@ async function handleClearCacheAndUpdate() {
               <select v-model="ch.respondMode" class="setting-select">
                 <option value="auto">Auto</option>
                 <option value="mention-only">Mention Only</option>
-                <option value="muted">Muted</option>
               </select>
             </div>
             <button class="remove-btn" @click="removeWatchedChannel(i)" title="Remove channel">

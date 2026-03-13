@@ -27,6 +27,7 @@ const DEFAULT_CONFIG = {
   selfUserId: '', // Cached from auth.test — for self-reply prevention
   projectRootPath: '', // Root path for project discovery (e.g. /home/user/projects)
   sessionLogPath: '', // Optional: folder path to persist session logs (e.g. /home/user/slack-sessions)
+  respondDm: true, // Whether to respond to direct messages
   watchedChannels: [],
   identity: {
     name: '',

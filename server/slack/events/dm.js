@@ -2,7 +2,7 @@
  * Slack DM Handler
  *
  * Handles direct messages to the user.
- * Always processes — DMs are always relevant.
+ * Only processes if config.respondDm is enabled.
  */
 
 import { logger } from '../../lib/logger.js';
@@ -21,6 +21,9 @@ const threadLocks = new Map();
  */
 export async function handleDM({ event, slackApi, config }) {
   const { user, channel, ts, thread_ts: threadTs, text } = event;
+
+  // Skip if DM responses are disabled
+  if (!config.respondDm) return;
 
   // Skip own messages
   if (user === config.selfUserId) return;

@@ -13,7 +13,6 @@ import { logger } from '../lib/logger.js';
 import { broadcast } from '../lib/ws.js';
 import { loadSlackConfig, saveSlackConfig } from './config.js';
 import { handleDM } from './events/dm.js';
-import { handleMention } from './events/mention.js';
 import { handleMessage } from './events/message.js';
 import { createSlackAPI } from './lib/api.js';
 import { isDirectMention } from './lib/mentions.js';
@@ -175,9 +174,7 @@ export async function startSlackBot() {
     if (isDuplicate(eventId)) return;
 
     try {
-      if (eventType === 'app_mention') {
-        await handleMention({ event, slackApi, config: slackConfig });
-      } else if (eventType === 'message') {
+      if (eventType === 'message') {
         // Skip message subtypes that aren't actual new messages
         if (event.subtype && event.subtype !== 'thread_broadcast') return;
 
@@ -193,7 +190,6 @@ export async function startSlackBot() {
   };
 
   socketClient.on('message', handleEvent);
-  socketClient.on('app_mention', handleEvent);
 
   // Error handling
   socketClient.on('error', (err) => {
