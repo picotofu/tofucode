@@ -16,6 +16,7 @@ import { handleDM } from './events/dm.js';
 import { handleMention } from './events/mention.js';
 import { handleMessage } from './events/message.js';
 import { createSlackAPI } from './lib/api.js';
+import { isDirectMention } from './lib/mentions.js';
 
 let socketClient = null;
 let slackApi = null;
@@ -154,14 +155,15 @@ export async function startSlackBot() {
           ? 'DM'
           : (slackConfig.watchedChannels.find((c) => c.id === channel)?.name ??
             channel);
-      const isMention = (event?.text || '').includes(
-        `<@${slackConfig.selfUserId}>`,
-      );
+      const text = event?.text || '';
+      const isMention =
+        isDirectMention(text, slackConfig.selfUserId) ||
+        text.includes('<!subteam^');
       const mentionTag = isMention ? ' [@mentioned]' : '';
       const isSelf = event?.user === slackConfig.selfUserId;
       const selfTag = isSelf ? ' [self]' : '';
       logger.log(
-        `[Slack] #${channelLabel} | user=${event?.user}${selfTag}${mentionTag} | "${(event?.text || '').substring(0, 100)}"`,
+        `[Slack] #${channelLabel} | user=${event?.user}${selfTag}${mentionTag} | "${text.substring(0, 100)}"`,
       );
     }
 

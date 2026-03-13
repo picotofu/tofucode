@@ -212,7 +212,7 @@ class SlackAPI {
    */
   async getPermalink(channel, messageTs) {
     try {
-      const data = await this.call('chat.getPermalink', {
+      const data = await this.get('chat.getPermalink', {
         channel,
         message_ts: messageTs,
       });
@@ -229,6 +229,26 @@ class SlackAPI {
    */
   async authTest() {
     return this.call('auth.test');
+  }
+
+  /**
+   * Get the list of user IDs in a usergroup (subteam)
+   * @param {string} usergroupId - Subteam ID (e.g. 'S0AAV3SB925')
+   * @returns {Promise<string[]>} Array of user IDs, or empty array on failure
+   */
+  async getUsergroupMembers(usergroupId) {
+    try {
+      const data = await this.get('usergroups.users.list', {
+        usergroup: usergroupId,
+      });
+      return data.users ?? [];
+    } catch (err) {
+      logger.warn(
+        `[Slack API] getUsergroupMembers(${usergroupId}) failed:`,
+        err.message,
+      );
+      return [];
+    }
   }
 
   /**

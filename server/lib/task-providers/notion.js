@@ -293,6 +293,7 @@ function buildProperties(title, schema) {
 
 /**
  * Split a long string into Notion rich_text content chunks (≤2000 chars each).
+ * Plain text only — use buildRichText for strings that may contain URLs.
  * @param {string} text
  * @returns {Array} Array of rich_text objects
  */
@@ -310,6 +311,39 @@ function chunkRichText(text) {
 }
 
 /**
+ * Build rich_text array from a string, turning any URLs into clickable links.
+ * Splits the text into interleaved plain and URL segments.
+ * @param {string} text
+ * @returns {Array} Array of rich_text objects
+ */
+function buildRichText(text) {
+  const URL_REGEX = /https?:\/\/[^\s]+/g;
+  const result = [];
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(URL_REGEX)) {
+    // Plain text before the URL
+    if (match.index > lastIndex) {
+      result.push(...chunkRichText(text.substring(lastIndex, match.index)));
+    }
+    // URL as a clickable link
+    const url = match[0];
+    result.push({
+      type: 'text',
+      text: { content: url, link: { url } },
+    });
+    lastIndex = match.index + url.length;
+  }
+
+  // Remaining plain text after last URL
+  if (lastIndex < text.length) {
+    result.push(...chunkRichText(text.substring(lastIndex)));
+  }
+
+  return result.length > 0 ? result : chunkRichText(text);
+}
+
+/**
  * Build page content children from body text.
  * Splits into paragraph blocks to respect 2000-char limit.
  * @param {string} body
@@ -323,8 +357,8 @@ function buildBodyChildren(body) {
   const paragraphs = body.split(/\n\n+/).filter((p) => p.trim());
 
   for (const paragraph of paragraphs) {
-    // Further split each paragraph into chunks if needed
-    const richText = chunkRichText(paragraph);
+    // Build rich text with URL linking support
+    const richText = buildRichText(paragraph);
 
     // Each chunk gets its own paragraph block (Notion limit: 100 rich_text per block)
     const BLOCK_CHUNK_SIZE = 100;

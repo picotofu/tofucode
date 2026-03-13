@@ -67,18 +67,8 @@ export async function handleDM({ event, slackApi, config }) {
       `[Slack] DM | ${senderName}: "${text.substring(0, 80)}" → ${classification.action}`,
     );
 
-    // DMs should always get at least an acknowledge (never silent ignore)
-    const effectiveClassification =
-      classification.action === 'ignore'
-        ? {
-            ...classification,
-            action: 'acknowledge',
-            response: 'Got it, thanks.',
-          }
-        : classification;
-
     await dispatchAction({
-      classification: effectiveClassification,
+      classification,
       event,
       channelConfig: { id: channel, name: 'DM', respondMode: 'auto' },
       slackApi,

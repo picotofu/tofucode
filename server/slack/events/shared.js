@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { pathToSlug } from '../../config.js';
 import { logger } from '../../lib/logger.js';
 import { resolveActiveProvider } from '../../lib/task-providers/index.js';
+import { getSessionMapping } from '../config.js';
 import { bold, link } from '../lib/formatter.js';
 import { findTicket, storeTicket } from '../lib/notion-tickets.js';
 import { startWorkSession } from '../lib/sessions.js';
@@ -164,11 +165,10 @@ async function handleTicketAction({
         const urlText = result.url
           ? `\n${link(result.url, 'View in Notion')}`
           : '';
-        await slackApi.postThreadReply(
-          channel,
-          threadRootTs,
-          `:ticket: Ticket created: ${bold(title)}${urlText}`,
-        );
+        const ticketReply = classification.response
+          ? `${classification.response}${urlText}`
+          : `:ticket: Ticket created: ${bold(title)}${urlText}`;
+        await slackApi.postThreadReply(channel, threadRootTs, ticketReply);
         return;
       }
 
@@ -179,9 +179,8 @@ async function handleTicketAction({
   }
 
   // Fallback: post ticket details as text
-  const fallbackParts = [`:ticket: ${bold(title)}`];
-  if (classifierBody) fallbackParts.push(`> ${classifierBody}`);
-  if (permalink) fallbackParts.push(`_Slack thread: ${permalink}_`);
+  const fallbackReply = classification.response || `:ticket: ${bold(title)}`;
+  const fallbackParts = [fallbackReply];
   if (!active) {
     fallbackParts.push(
       '_No task provider configured — ticket logged here for reference._',
@@ -333,12 +332,23 @@ async function handleWorkAction({
     return;
   }
 
-  // ── Create ticket and set In Progress ────────────────────────────────────
+  // ── Check for existing session (thread session reuse) ────────────────────
+  const existingSession = getSessionMapping(threadRootTs);
+  const existingSessionId = existingSession?.sessionId ?? null;
+  const isResume = Boolean(existingSessionId);
+
+  if (isResume) {
+    logger.log(
+      `[Slack] Resuming existing session ${existingSessionId} for thread ${threadRootTs}`,
+    );
+  }
+
+  // ── Create ticket and set In Progress (new sessions only) ────────────────
   let ticketPageId = null;
   let ticketUrl = null;
 
   const active = resolveActiveProvider();
-  if (active) {
+  if (active && !isResume) {
     const title =
       classification.ticketTitle ||
       classification.workPrompt?.substring(0, 80) ||
@@ -400,12 +410,14 @@ async function handleWorkAction({
 
   const workPrompt = classification.workPrompt || classification.response || '';
   const ticketNotice = ticketUrl ? ` ${link(ticketUrl, 'Ticket')}` : '';
+  const workStatusDefault = isResume
+    ? ':arrows_counterclockwise: On it — continuing from where we left off.'
+    : `:construction: On it.${ticketNotice}`;
+  const statusMessage = classification.response
+    ? `${classification.response}${!isResume && ticketNotice ? `\n${ticketNotice}` : ''}`
+    : workStatusDefault;
   try {
-    await slackApi.postThreadReply(
-      channel,
-      threadRootTs,
-      `:construction: Starting work session...${ticketNotice}\n> ${workPrompt.substring(0, 200)}`,
-    );
+    await slackApi.postThreadReply(channel, threadRootTs, statusMessage);
   } catch (err) {
     logger.error('[Slack] Failed to post work status:', err.message);
   }
@@ -418,6 +430,7 @@ async function handleWorkAction({
       threadTs: threadRootTs,
       channelId: channel,
       userId: event.user,
+      existingSessionId,
     });
 
     const durationStr = result.duration

@@ -72,18 +72,8 @@ export async function handleMention({ event, slackApi, config }) {
       `[Slack] @mention in #${channelConfig.name} | ${senderName}: "${text.substring(0, 80)}" → ${classification.action}`,
     );
 
-    // Force at least an acknowledge if classifier says ignore (mentions always deserve a response)
-    const effectiveClassification =
-      classification.action === 'ignore'
-        ? {
-            ...classification,
-            action: 'acknowledge',
-            response: 'Noted, thanks for the ping.',
-          }
-        : classification;
-
     await dispatchAction({
-      classification: effectiveClassification,
+      classification,
       event,
       channelConfig,
       slackApi,

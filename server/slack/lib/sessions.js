@@ -27,6 +27,7 @@ import { executePrompt } from './executor.js';
  * @param {string} params.threadTs - Slack thread timestamp (for mapping)
  * @param {string} params.channelId - Slack channel ID
  * @param {string} params.userId - Slack user who triggered the work
+ * @param {string|null} [params.existingSessionId] - Resume an existing session if provided
  * @returns {Promise<WorkResult>}
  */
 export async function startWorkSession({
@@ -35,8 +36,9 @@ export async function startWorkSession({
   threadTs,
   channelId,
   userId,
+  existingSessionId = null,
 }) {
-  let sessionId = null;
+  let sessionId = existingSessionId;
   let cost = null;
   let duration = null;
   const textChunks = [];
@@ -44,10 +46,10 @@ export async function startWorkSession({
   try {
     for await (const event of executePrompt({
       projectSlug,
-      sessionId: null, // Always new session for work triggers
+      sessionId: existingSessionId,
       prompt,
     })) {
-      // Capture session ID and save mapping
+      // Capture session ID and save mapping (only on new sessions)
       if (event.type === 'session_init' && event.isNew) {
         sessionId = event.sessionId;
         saveSessionMapping(threadTs, {
@@ -59,6 +61,13 @@ export async function startWorkSession({
         });
         logger.log(
           `[Slack] Work session started: ${sessionId} for thread ${threadTs}`,
+        );
+      }
+
+      // On resume, just log continuation (session_init with isNew=false)
+      if (event.type === 'session_init' && !event.isNew) {
+        logger.log(
+          `[Slack] Work session resumed: ${event.sessionId} for thread ${threadTs}`,
         );
       }
 

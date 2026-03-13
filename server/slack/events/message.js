@@ -7,6 +7,7 @@
 
 import { logger } from '../../lib/logger.js';
 import { classifyMessage } from '../lib/classifier.js';
+import { isBotMentioned } from '../lib/mentions.js';
 import { dispatchAction } from './shared.js';
 
 /** Thread lock map — prevents concurrent processing of the same thread */
@@ -35,8 +36,9 @@ export async function handleMessage({ event, slackApi, config }) {
   // Apply respond mode
   if (channelConfig.respondMode === 'muted') return;
   if (channelConfig.respondMode === 'mention-only') {
-    // Only respond if the user is mentioned in the message
-    if (!text.includes(`<@${config.selfUserId}>`)) return;
+    // Only respond if the bot is mentioned directly or via a group tag
+    const mentioned = await isBotMentioned(text, config.selfUserId, slackApi);
+    if (!mentioned) return;
   }
 
   // Thread lock — prevent concurrent processing
