@@ -117,6 +117,32 @@ export async function handleTestConnection(ws) {
 }
 
 /**
+ * List all Slack channels (public + private) accessible with the current bot token
+ */
+export async function handleListChannels(ws) {
+  try {
+    const config = loadSlackConfig();
+
+    if (!config.botToken) {
+      send(ws, {
+        type: 'slack:channels',
+        channels: [],
+        error: 'No Bot Token configured',
+      });
+      return;
+    }
+
+    const { createSlackAPI } = await import('../slack/lib/api.js');
+    const api = createSlackAPI(config.botToken);
+    const channels = await api.listChannels();
+    send(ws, { type: 'slack:channels', channels });
+  } catch (err) {
+    logger.error('[Slack WS] Error listing channels:', err);
+    send(ws, { type: 'slack:channels', channels: [], error: err.message });
+  }
+}
+
+/**
  * Restart the Slack bot
  */
 export async function handleRestart(ws) {

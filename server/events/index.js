@@ -57,6 +57,7 @@ import { handler as selectSession } from './select-session.js';
 import { handler as setSessionTitle } from './set-session-title.js';
 import {
   handleGetConfig as slackGetConfig,
+  handleListChannels as slackListChannels,
   handleRestart as slackRestart,
   handleSaveConfig as slackSaveConfig,
   handleTestConnection as slackTest,
@@ -130,6 +131,7 @@ export const handlers = {
   'slack:save_config': slackSaveConfig,
   'slack:test': slackTest,
   'slack:restart': slackRestart,
+  'slack:list_channels': slackListChannels,
   'notion:get_config': notionGetConfig,
   'notion:save_config': notionSaveConfig,
   'notion:test': notionTest,

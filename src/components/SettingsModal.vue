@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import UsageStats from './UsageStats.vue';
 
 const props = defineProps({
@@ -39,6 +39,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  slackChannels: {
+    type: Array,
+    default: () => [],
+  },
   notionConfig: {
     type: Object,
     default: null,
@@ -64,6 +68,7 @@ const emit = defineEmits([
   'slack-save-config',
   'slack-test',
   'slack-restart',
+  'slack-list-channels',
   'notion-fetch-config',
   'notion-save-config',
   'notion-test',
@@ -189,6 +194,7 @@ watch(activeTab, (tab) => {
     }
     slackLoading.value = true;
     emit('slack-fetch-config');
+    emit('slack-list-channels');
   }
   if (tab === 'notion') {
     if (!notionLocal.value) {
@@ -225,21 +231,69 @@ function slackRestartBot() {
   }, 3000);
 }
 
-function addWatchedChannel() {
-  if (!slackLocal.value) return;
-  if (!slackLocal.value.watchedChannels) {
-    slackLocal.value.watchedChannels = [];
+// --- Channel fuzzy search picker ---
+const channelSearch = ref('');
+const channelPickerOpen = ref(false);
+
+const filteredChannels = computed(() => {
+  const q = channelSearch.value.trim().toLowerCase();
+  const all = props.slackChannels;
+  const watchedIds = new Set(
+    (slackLocal.value?.watchedChannels || []).map((c) => c.id),
+  );
+  const available = all.filter((c) => !watchedIds.has(c.id));
+  if (!q) return available.slice(0, 50);
+  return available
+    .filter(
+      (c) => c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q),
+    )
+    .slice(0, 50);
+});
+
+function openChannelPicker() {
+  channelSearch.value = '';
+  channelPickerOpen.value = true;
+  // Only fetch if we don't have channels yet; tab open already triggers a fetch
+  if (!props.slackChannels.length) {
+    emit('slack-list-channels');
   }
+}
+
+function closeChannelPicker() {
+  channelPickerOpen.value = false;
+  channelSearch.value = '';
+}
+
+function selectChannel(channel) {
+  if (!slackLocal.value) return;
+  if (!slackLocal.value.watchedChannels) slackLocal.value.watchedChannels = [];
   slackLocal.value.watchedChannels.push({
-    id: '',
-    name: '',
+    id: channel.id,
+    name: channel.name,
     respondMode: 'auto',
   });
+  closeChannelPicker();
+}
+
+function addWatchedChannel() {
+  openChannelPicker();
 }
 
 function removeWatchedChannel(index) {
   if (!slackLocal.value?.watchedChannels) return;
   slackLocal.value.watchedChannels.splice(index, 1);
+}
+
+// Helper: look up channel name from fetched list (fallback to stored name)
+function resolveChannelName(ch) {
+  const found = props.slackChannels.find((c) => c.id === ch.id);
+  return found?.name || ch.name || ch.id;
+}
+
+// Helper: look up whether channel is private from fetched list
+function resolveChannelPrivate(ch) {
+  const found = props.slackChannels.find((c) => c.id === ch.id);
+  return found?.is_private ?? ch.is_private ?? false;
 }
 
 // --- Notion Settings ---
@@ -777,22 +831,25 @@ async function handleClearCacheAndUpdate() {
 
           <div
             v-for="(ch, i) in slackLocal.watchedChannels"
-            :key="i"
+            :key="ch.id || i"
             class="channel-row"
           >
-            <div class="channel-fields">
-              <input
-                type="text"
-                v-model="ch.id"
-                class="setting-input channel-input"
-                placeholder="Channel ID (e.g. C06H7BFB2GL)"
-              />
-              <input
-                type="text"
-                v-model="ch.name"
-                class="setting-input channel-input"
-                placeholder="Display name"
-              />
+            <div class="channel-fields channel-fields-watched">
+              <div class="channel-name-cell">
+                <span class="channel-privacy-icon">
+                  <svg v-if="resolveChannelPrivate(ch)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <line x1="4" y1="9" x2="20" y2="9"/>
+                    <line x1="4" y1="15" x2="20" y2="15"/>
+                    <line x1="10" y1="3" x2="8" y2="21"/>
+                    <line x1="16" y1="3" x2="14" y2="21"/>
+                  </svg>
+                </span>
+                <span class="channel-name-text">{{ resolveChannelName(ch) }}</span>
+              </div>
               <select v-model="ch.respondMode" class="setting-select">
                 <option value="auto">Auto</option>
                 <option value="mention-only">Mention Only</option>
@@ -807,13 +864,63 @@ async function handleClearCacheAndUpdate() {
             </button>
           </div>
 
-          <button class="add-channel-btn" @click="addWatchedChannel">
+          <button class="add-channel-btn" @click="openChannelPicker">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
             Add Channel
           </button>
+
+          <!-- Channel Fuzzy Picker -->
+          <div v-if="channelPickerOpen" class="channel-picker-overlay" @click.self="closeChannelPicker">
+            <div class="channel-picker">
+              <div class="channel-picker-header">
+                <input
+                  ref="channelSearchInput"
+                  v-model="channelSearch"
+                  class="channel-picker-search"
+                  placeholder="Search channels..."
+                  autofocus
+                />
+                <button class="remove-btn" @click="closeChannelPicker" title="Close">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              <div class="channel-picker-list">
+                <div v-if="!props.slackChannels.length" class="channel-picker-empty">
+                  No channels loaded. Check your Bot Token.
+                </div>
+                <div v-else-if="!filteredChannels.length" class="channel-picker-empty">
+                  No matching channels.
+                </div>
+                <button
+                  v-for="ch in filteredChannels"
+                  :key="ch.id"
+                  class="channel-picker-item"
+                  @click="selectChannel(ch)"
+                >
+                  <span class="channel-privacy-icon">
+                    <svg v-if="ch.is_private" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                      <line x1="4" y1="9" x2="20" y2="9"/>
+                      <line x1="4" y1="15" x2="20" y2="15"/>
+                      <line x1="10" y1="3" x2="8" y2="21"/>
+                      <line x1="16" y1="3" x2="14" y2="21"/>
+                    </svg>
+                  </span>
+                  <span class="channel-picker-name">{{ ch.name }}</span>
+                  <span class="channel-id-badge">{{ ch.id }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
 
           <hr class="divider" />
 
@@ -1439,9 +1546,9 @@ async function handleClearCacheAndUpdate() {
 
 .channel-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .channel-fields {
@@ -1451,10 +1558,159 @@ async function handleClearCacheAndUpdate() {
   gap: 6px;
 }
 
+.channel-fields-watched {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.channel-name-cell {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 34px;
+  box-sizing: border-box;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.channel-privacy-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  width: 12px;
+}
+
+.channel-name-text {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.channel-id-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.channel-fields-watched .setting-select {
+  width: 130px;
+  height: 34px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.channel-row .remove-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
 .channel-input {
   margin-top: 0 !important;
   font-size: 12px !important;
   padding: 8px !important;
+}
+
+/* Channel fuzzy picker */
+.channel-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.channel-picker {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  width: 380px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.channel-picker-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.channel-picker-search {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.channel-picker-search::placeholder {
+  color: var(--text-muted);
+}
+
+.channel-picker-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.channel-picker-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.channel-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.channel-picker-item:hover {
+  background: var(--bg-secondary);
+}
+
+.channel-picker-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
 }
 
 .setting-select {
@@ -1481,7 +1737,6 @@ async function handleClearCacheAndUpdate() {
 
 .remove-btn {
   padding: 6px;
-  margin-top: 2px;
   background: transparent;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);

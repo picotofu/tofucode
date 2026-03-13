@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Slack Bot Integration** — Baked-in Slack bot that listens to configured channels via Socket Mode and responds as the user's identity using Claude
+  - Two-pass classifier: Haiku (fast/cheap) first, escalates to Sonnet on low confidence or when context is needed
+  - Actions: `ignore`, `acknowledge`, `answer`, `ticket` (creates Notion ticket with Slack thread permalink), `work` (starts a tofucode session in the mapped project)
+  - Confidence gate: low-confidence work actions fall back to ticket creation + waiting for user clarification instead of auto-starting
+  - Notion ticket lifecycle: thread permalink linked on creation, updates on new thread replies, ticket set to In Progress before work starts, PR URL linked on detection
+  - Session visibility: work sessions write JSONL to `~/.claude/projects/<slug>/` — appear naturally in the tofucode Web UI for monitoring
+  - Classifier sessions optionally persisted to a configurable `sessionLogPath` (JSONL, readable in tofucode UI) with auto-generated titles like `[#channel] action: message snippet`
+  - Settings UI: Slack tab with tokens, connectivity pill + Restart Bot button, fuzzy channel picker (public + private), project root path, session log path, identity and classifier prompt override
+  - Channel picker fetches public and private channels via GET (Slack API quirk: POST ignores `types` filter); deduplicates by ID via two separate calls
 - **3-tab homepage** — Homepage now has a bottom tab nav (Sessions, Folders, Files) with Heroicons; Sessions tab shows recent sessions and recent projects; Folders tab is a directory-only browser for launching sessions; Files tab is a standalone file browser defaulting to the home directory
 - **Independent file browser** — Files tab on homepage provides a full-featured file browser (browse, search, open, edit, create, rename, delete) outside of any session, defaulting to the home directory and persisting the last visited path in localStorage
 - **Traversal root guard** — File browser enforces a topmost browsable path (`--root` config if set, otherwise `homedir()`); breadcrumb segments above the root are shown as muted static text; up button and path edit are clamped to this boundary; session files tab defaults to the project path but allows traversal up to the root; homepage files tab defaults to the root itself

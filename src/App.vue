@@ -64,6 +64,7 @@ const maxFileSizeMb = ref(10);
 const slackConfig = ref(null);
 const slackTestResult = ref(null);
 const slackBotConnected = ref(false);
+const slackChannels = ref([]);
 
 // Notion config state (independent of Slack)
 const notionConfig = ref(null);
@@ -162,6 +163,10 @@ function restartSlackBot() {
   send({ type: 'slack:restart' });
 }
 
+function fetchSlackChannels() {
+  send({ type: 'slack:list_channels' });
+}
+
 // Notion event handlers
 function fetchNotionConfig() {
   send({ type: 'notion:get_config' });
@@ -200,6 +205,8 @@ onMessage((msg) => {
     slackBotConnected.value = msg.connected;
   } else if (msg.type === 'slack:test_result') {
     slackTestResult.value = msg;
+  } else if (msg.type === 'slack:channels') {
+    slackChannels.value = msg.channels || [];
   } else if (msg.type === 'slack:save_result') {
     // Save acknowledged — config will follow as separate slack:config message
   } else if (msg.type === 'slack:restart_result') {
@@ -477,6 +484,7 @@ onUnmounted(() => {
       :slack-config="slackConfig"
       :slack-test-result="slackTestResult"
       :slack-bot-connected="slackBotConnected"
+      :slack-channels="slackChannels"
       :notion-config="notionConfig"
       :notion-test-result="notionTestResult"
       :notion-analyse-result="notionAnalyseResult"
@@ -488,6 +496,7 @@ onUnmounted(() => {
       @slack-save-config="saveSlackConfig"
       @slack-test="testSlackConnection"
       @slack-restart="restartSlackBot"
+      @slack-list-channels="fetchSlackChannels"
       @notion-fetch-config="fetchNotionConfig"
       @notion-save-config="saveNotionConfig"
       @notion-test="testNotionConnection"

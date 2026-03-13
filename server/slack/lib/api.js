@@ -43,7 +43,47 @@ class SlackAPI {
   }
 
   /**
-   * Make a Slack Web API call
+   * Make a Slack Web API call via GET with query string params.
+   * Some read-only endpoints (e.g. conversations.list) ignore certain params
+   * when sent as POST JSON body — use this for those.
+   * @param {string} method
+   * @param {Object} params
+   * @param {number} [_retryCount=0]
+   * @returns {Promise<Object>}
+   */
+  async get(method, params = {}, _retryCount = 0) {
+    const qs = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(params).map(([k, v]) => [k, String(v)]),
+      ),
+    );
+    const response = await fetch(`${SLACK_API_BASE}/${method}?${qs}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${this.token}` },
+    });
+
+    const data = await response.json();
+
+    if (!data.ok) {
+      if (data.error === 'ratelimited' && _retryCount < 2) {
+        const retryAfter = Number.parseInt(
+          response.headers.get('Retry-After') || '5',
+          10,
+        );
+        logger.warn(
+          `[Slack API] Rate limited on ${method}, retrying in ${retryAfter}s (attempt ${_retryCount + 1})`,
+        );
+        await sleep(retryAfter * 1000);
+        return this.get(method, params, _retryCount + 1);
+      }
+      throw new SlackAPIError(method, data.error, data);
+    }
+
+    return data;
+  }
+
+  /**
+   * Make a Slack Web API call via POST with JSON body.
    * @param {string} method - API method name (e.g. 'chat.postMessage')
    * @param {Object} params - Request body parameters
    * @param {number} [_retryCount=0] - Internal retry counter
@@ -189,6 +229,50 @@ class SlackAPI {
    */
   async authTest() {
     return this.call('auth.test');
+  }
+
+  /**
+   * List all channels the token has access to (public + private).
+   *
+   * Slack API quirk with xoxp- tokens:
+   * - types=public_channel,private_channel only returns public channels
+   * - types=private_channel correctly returns only private channels
+   * So we fetch each type separately and merge by ID.
+   * @returns {Promise<Array<{id: string, name: string, is_private: boolean, is_member: boolean}>>}
+   */
+  async listChannels() {
+    const fetchType = async (types) => {
+      const results = [];
+      let cursor = '';
+      do {
+        const params = { types, exclude_archived: true, limit: 200 };
+        if (cursor) params.cursor = cursor;
+        const data = await this.get('conversations.list', params);
+        for (const ch of data.channels || []) {
+          results.push({
+            id: ch.id,
+            name: ch.name,
+            is_private: ch.is_private ?? false,
+            is_member: ch.is_member ?? false,
+          });
+        }
+        cursor = data.response_metadata?.next_cursor || '';
+      } while (cursor);
+      return results;
+    };
+
+    const [publicChannels, privateChannels] = await Promise.all([
+      fetchType('public_channel'),
+      fetchType('private_channel'),
+    ]);
+
+    // Merge by ID — private fetch has correct is_private=true, public has is_private=false
+    const map = new Map(publicChannels.map((ch) => [ch.id, ch]));
+    for (const ch of privateChannels) {
+      map.set(ch.id, ch);
+    }
+
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 }
 

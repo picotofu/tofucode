@@ -196,19 +196,22 @@ The global `~/.claude/CLAUDE.md` is always injected alongside the configured ide
 providing org-specific context (API conventions, service map, infrastructure) without
 baking it into tofucode itself.
 
-## Status
+## Status — Completed
 
 - [x] Direct API call verified (curl → posts as user identity)
 - [x] Architecture decided (baked into tofucode, `server/slack/`)
-- [x] Socket Mode setup
+- [x] Socket Mode setup + lifecycle logs (`connecting`, `connected`, `reconnecting`, etc.)
 - [x] Implementation complete (`server/slack/` — bot, config, api, classifier, executor, sessions, formatter, events)
-- [x] Settings UI — Slack tab in SettingsModal (tokens, watched channels, identity, classifier, actions)
+- [x] Settings UI — Slack tab with tokens, connectivity pill + Restart Bot, fuzzy channel picker, identity, classifier
 - [x] Notion integration moved to dedicated Notion tab (raw API, no MCP)
-- [x] Backend WS events — `slack:get_config`, `slack:save_config`, `slack:test`, `slack:restart`
+- [x] Backend WS events — `slack:get_config`, `slack:save_config`, `slack:test`, `slack:restart`, `slack:list_channels`
 - [x] Two-pass classifier — Haiku first, Sonnet escalated on low confidence or needsContext
+- [x] Classifier uses agent SDK `query()` (OAuth-aware, no `ANTHROPIC_API_KEY` required)
+- [x] Classifier session titles set via `.session-titles.json` after first resolution
 - [x] Slack thread permalink linked in Notion tickets
 - [x] Thread reply → ticket update (`notion-tickets.json` mapping, edit instead of create)
 - [x] Confidence gate — low-confidence work falls back to ticket + wait for clarification
 - [x] Ticket set to In Progress before starting work session
 - [x] PR link → ticket update (scans session output for GitHub PR URLs)
-- [ ] Live testing (pending App Token `xapp-`)
+- [x] Channel picker — GET-based `conversations.list` (POST ignores `types` filter); two separate calls merged by ID map to include private channels
+- [x] Live tested — Socket Mode receiving messages from public and private channels
