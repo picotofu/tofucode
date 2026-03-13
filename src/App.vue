@@ -79,8 +79,8 @@ function closeSettings() {
   showSettings.value = false;
 }
 
-// Android back button closes settings modal instead of navigating away
-useBackButton(showSettings, closeSettings);
+// Android back button closes settings modal instead of navigating away (mobile only)
+useBackButton(showSettings, closeSettings, { mobileOnly: true });
 
 // Help modal state
 const showHelp = ref(false);

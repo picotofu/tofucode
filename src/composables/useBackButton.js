@@ -13,12 +13,13 @@ import { onUnmounted, watch } from 'vue';
  *
  * @param {import('vue').Ref<boolean>} isOpen - Reactive boolean indicating overlay state
  * @param {() => void} close - Function that sets isOpen to false
- * @param {{ mobileOnly?: boolean }} [options]
- *   mobileOnly: if true, only pushes history sentinel on mobile (≤768px).
- *   Useful for sidebars that are visible by default on desktop.
+ * @param {{ mobileOnly?: boolean, mobileBreakpoint?: number }} [options]
+ *   mobileOnly: if true, only pushes history sentinel when on mobile.
+ *   mobileBreakpoint: max-width in px to consider "mobile" (default: 768).
+ *   Useful for overlays that become non-blocking panels on desktop.
  */
 export function useBackButton(isOpen, close, options = {}) {
-  const { mobileOnly = false } = options;
+  const { mobileOnly = false, mobileBreakpoint = 768 } = options;
 
   // Tracks whether the current close was triggered by the popstate event.
   // If so, the sentinel is already consumed — we must NOT call history.back() again.
@@ -30,7 +31,7 @@ export function useBackButton(isOpen, close, options = {}) {
 
   function shouldPushSentinel() {
     if (!mobileOnly) return true;
-    return window.matchMedia('(max-width: 768px)').matches;
+    return window.matchMedia(`(max-width: ${mobileBreakpoint}px)`).matches;
   }
 
   // Note: each useBackButton instance has its own popstate listener. If two overlays

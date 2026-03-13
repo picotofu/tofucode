@@ -1645,8 +1645,8 @@ function closeMemo() {
   memoAttempt = null;
 }
 
-// Android back button closes memo instead of navigating away
-useBackButton(memoOpen, closeMemo);
+// Android back button closes memo instead of navigating away (mobile only — desktop memo is a non-blocking side panel)
+useBackButton(memoOpen, closeMemo, { mobileOnly: true, mobileBreakpoint: 600 });
 
 function toggleMemo() {
   if (memoOpen.value) {
