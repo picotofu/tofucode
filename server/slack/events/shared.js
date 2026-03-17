@@ -28,6 +28,7 @@ const PR_URL_REGEX = /https:\/\/github\.com\/[^\s/]+\/[^\s/]+\/pull\/\d+/g;
 export async function dispatchAction({
   classification,
   event,
+  channelConfig,
   slackApi,
   config,
 }) {
@@ -35,7 +36,14 @@ export async function dispatchAction({
   // DMs use channel ID as the session key (1 session per user/DM).
   // Threads use thread_ts as the anchor. Top-level channel messages fall back to ts.
   const isDm = channelConfig?.name === 'DM';
-  const threadRootTs = isDm ? channel : threadTs || ts;
+  // sessionKey: stable identifier for session reuse. DMs use channel ID (1 session per DM).
+  const sessionKey = isDm ? channel : threadTs || ts;
+  // replyTs: valid Slack message timestamp for threading replies. Always a real ts.
+  const replyTs = threadTs || ts;
+
+  logger.log(
+    `[Slack] [dispatch] action=${classification.action} sessionKey=${sessionKey} replyTs=${replyTs} isDm=${isDm}`,
+  );
 
   switch (classification.action) {
     case 'ignore':
@@ -45,8 +53,11 @@ export async function dispatchAction({
     case 'acknowledge':
     case 'answer': {
       const response = classification.response || 'Got it.';
+      logger.log(
+        `[Slack] [dispatch] posting ${classification.action}: "${response.substring(0, 80)}"`,
+      );
       try {
-        await slackApi.postThreadReply(channel, threadRootTs, response);
+        await slackApi.postThreadReply(channel, replyTs, response);
       } catch (err) {
         logger.error(
           `[Slack] Failed to post ${classification.action} reply:`,
@@ -58,12 +69,15 @@ export async function dispatchAction({
 
     case 'ticket': {
       // Check if this thread already has a ticket — update instead of create
-      const existing = findTicket(channel, threadRootTs);
+      const existing = findTicket(channel, sessionKey);
+      logger.log(
+        `[Slack] [dispatch] ticket — existing=${existing ? existing.pageId : 'none'}`,
+      );
       if (existing) {
         await handleTicketUpdate({
           classification,
           channel,
-          threadRootTs,
+          replyTs,
           existing,
           slackApi,
         });
@@ -72,7 +86,8 @@ export async function dispatchAction({
           classification,
           channel,
           ts,
-          threadRootTs,
+          sessionKey,
+          replyTs,
           slackApi,
         });
       }
@@ -80,11 +95,15 @@ export async function dispatchAction({
     }
 
     case 'work': {
+      logger.log(
+        `[Slack] [dispatch] work — project=${classification.workProject ?? 'unknown'} confidence=${classification.confidence ?? '?'}`,
+      );
       await handleWorkAction({
         classification,
         channel,
         ts,
-        threadRootTs,
+        sessionKey,
+        replyTs,
         slackApi,
         event,
         config,
@@ -133,7 +152,8 @@ async function handleTicketAction({
   classification,
   channel,
   ts,
-  threadRootTs,
+  sessionKey,
+  replyTs,
   slackApi,
 }) {
   const title = classification.ticketTitle || 'Untitled ticket';
@@ -161,7 +181,7 @@ async function handleTicketAction({
       if (result.success) {
         // Store thread → ticket mapping for future reply updates
         if (result.pageId) {
-          storeTicket(channel, threadRootTs, result.pageId, result.url ?? '');
+          storeTicket(channel, sessionKey, result.pageId, result.url ?? '');
         }
 
         const urlText = result.url
@@ -170,7 +190,7 @@ async function handleTicketAction({
         const ticketReply = classification.response
           ? `${classification.response}${urlText}`
           : `:ticket: Ticket created: ${bold(title)}${urlText}`;
-        await slackApi.postThreadReply(channel, threadRootTs, ticketReply);
+        await slackApi.postThreadReply(channel, replyTs, ticketReply);
         return;
       }
 
@@ -190,11 +210,7 @@ async function handleTicketAction({
   }
 
   try {
-    await slackApi.postThreadReply(
-      channel,
-      threadRootTs,
-      fallbackParts.join('\n'),
-    );
+    await slackApi.postThreadReply(channel, replyTs, fallbackParts.join('\n'));
   } catch (err) {
     logger.error('[Slack] Failed to post ticket fallback:', err.message);
   }
@@ -207,7 +223,7 @@ async function handleTicketAction({
 async function handleTicketUpdate({
   classification,
   channel,
-  threadRootTs,
+  replyTs,
   existing,
   slackApi,
 }) {
@@ -229,7 +245,7 @@ async function handleTicketUpdate({
         : '';
       await slackApi.postThreadReply(
         channel,
-        threadRootTs,
+        replyTs,
         `:memo: Ticket updated${urlText}`,
       );
     } else {
@@ -258,7 +274,8 @@ async function handleWorkAction({
   classification,
   channel,
   ts,
-  threadRootTs,
+  sessionKey,
+  replyTs,
   slackApi,
   event,
   config,
@@ -301,7 +318,7 @@ async function handleWorkAction({
           fieldMappings: active.config.fieldMappings || [],
         });
         if (result.success && result.pageId) {
-          storeTicket(channel, threadRootTs, result.pageId, result.url ?? '');
+          storeTicket(channel, sessionKey, result.pageId, result.url ?? '');
         }
       } catch (err) {
         logger.warn(
@@ -313,7 +330,7 @@ async function handleWorkAction({
 
     await slackApi.postThreadReply(
       channel,
-      threadRootTs,
+      replyTs,
       `:thinking_face: Not sure which project to work in. Created a ticket for tracking — please clarify and I'll start the work session.`,
     );
     return;
@@ -328,22 +345,20 @@ async function handleWorkAction({
   if (!projectSlug) {
     await slackApi.postThreadReply(
       channel,
-      threadRootTs,
+      replyTs,
       ':warning: Cannot start work session — no project root configured or project could not be identified.',
     );
     return;
   }
 
   // ── Check for existing session (thread session reuse) ────────────────────
-  const existingSession = getSessionMapping(threadRootTs);
+  const existingSession = getSessionMapping(sessionKey);
   const existingSessionId = existingSession?.sessionId ?? null;
   const isResume = Boolean(existingSessionId);
 
-  if (isResume) {
-    logger.log(
-      `[Slack] Resuming existing session ${existingSessionId} for thread ${threadRootTs}`,
-    );
-  }
+  logger.log(
+    `[Slack] [dispatch] session lookup: key=${sessionKey} → ${isResume ? `resume sessionId=${existingSessionId}` : 'new session'}`,
+  );
 
   // ── Create ticket and set In Progress (new sessions only) ────────────────
   let ticketPageId = null;
@@ -374,7 +389,7 @@ async function handleWorkAction({
         ticketUrl = ticketResult.url ?? null;
 
         // Store mapping and set ticket to In Progress
-        storeTicket(channel, threadRootTs, ticketPageId, ticketUrl ?? '');
+        storeTicket(channel, sessionKey, ticketPageId, ticketUrl ?? '');
 
         // Find the status field from field mappings (look for 'status' type)
         const statusMapping = (active.config.fieldMappings ?? []).find(
@@ -419,7 +434,7 @@ async function handleWorkAction({
     ? `${classification.response}${!isResume && ticketNotice ? `\n${ticketNotice}` : ''}`
     : workStatusDefault;
   try {
-    await slackApi.postThreadReply(channel, threadRootTs, statusMessage);
+    await slackApi.postThreadReply(channel, replyTs, statusMessage);
   } catch (err) {
     logger.error('[Slack] Failed to post work status:', err.message);
   }
@@ -429,7 +444,7 @@ async function handleWorkAction({
     const result = await startWorkSession({
       projectSlug,
       prompt: workPrompt,
-      threadTs: threadRootTs,
+      threadTs: sessionKey,
       channelId: channel,
       userId: event.user,
       existingSessionId,
@@ -443,13 +458,13 @@ async function handleWorkAction({
     if (result.success) {
       await slackApi.postThreadReply(
         channel,
-        threadRootTs,
+        replyTs,
         `:white_check_mark: Work session completed${durationStr}${costStr}`,
       );
     } else {
       await slackApi.postThreadReply(
         channel,
-        threadRootTs,
+        replyTs,
         `:warning: Work session ended: ${result.error || 'unknown error'}`,
       );
     }
@@ -477,7 +492,7 @@ async function handleWorkAction({
     try {
       await slackApi.postThreadReply(
         channel,
-        threadRootTs,
+        replyTs,
         `:x: Work session failed: ${err.message}`,
       );
     } catch {

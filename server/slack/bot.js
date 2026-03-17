@@ -161,8 +161,11 @@ export async function startSlackBot() {
       const mentionTag = isMention ? ' [@mentioned]' : '';
       const isSelf = event?.user === slackConfig.selfUserId;
       const selfTag = isSelf ? ' [self]' : '';
+      const userName = event?.user
+        ? await slackApi.getUserName(event.user)
+        : 'unknown';
       logger.log(
-        `[Slack] #${channelLabel} | user=${event?.user}${selfTag}${mentionTag} | "${text.substring(0, 100)}"`,
+        `[Slack] #${channelLabel} | ${userName}${selfTag}${mentionTag} | "${text.substring(0, 100)}"`,
       );
     }
 

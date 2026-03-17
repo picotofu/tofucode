@@ -28,6 +28,7 @@ const DEFAULT_CONFIG = {
   projectRootPath: '', // Root path for project discovery (e.g. /home/user/projects)
   sessionLogPath: '', // Optional: folder path to persist session logs (e.g. /home/user/slack-sessions)
   respondDm: true, // Whether to respond to direct messages
+  debounceMs: 10000, // Debounce window in ms — groups rapid successive messages before processing
   watchedChannels: [],
   identity: {
     name: '',

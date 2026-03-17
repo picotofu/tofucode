@@ -73,7 +73,7 @@ function buildSystemPrompt(slackConfig) {
   if (classifier.systemPrompt) {
     return `${classifier.systemPrompt}${projectsSection}${mappingsSection}
 
-You will analyze each Slack message and classify it into an action. Respond ONLY with a valid JSON object (no markdown code fences, no extra text).
+You will analyze each Slack message and classify it into an action. Respond ONLY with a valid JSON object wrapped in a \`\`\`json code fence. No extra text outside the fence.
 
 Actions:
 - "ignore" — Message doesn't need a response from you (ambient chatter, someone else's conversation, FYI messages, etc.)
@@ -107,7 +107,7 @@ Set needsContext to true if answering well would require looking up additional i
 
 Your communication style: ${tone}${projectsSection}${mappingsSection}
 
-You will analyze each Slack message and classify it into an action. Respond ONLY with a valid JSON object (no markdown code fences, no extra text).
+You will analyze each Slack message and classify it into an action. Respond ONLY with a valid JSON object wrapped in a \`\`\`json code fence. No extra text outside the fence.
 
 Actions:
 - "ignore" — Message doesn't need a response from you (ambient chatter, someone else's conversation, FYI messages, etc.)
@@ -156,9 +156,16 @@ Set needsContext to true if answering well would require looking up additional i
  * @param {Array} [params.threadHistory] - Thread messages for context
  * @param {Object} [params.channelInfo] - Channel metadata
  * @param {string} [params.senderName] - Display name of sender
- * @returns {string}
+ * @param {((userId: string) => Promise<string>)|null} [params.resolveName] - Optional user ID resolver
+ * @returns {Promise<string>}
  */
-function buildUserPrompt({ message, threadHistory, channelInfo, senderName }) {
+async function buildUserPrompt({
+  message,
+  threadHistory,
+  channelInfo,
+  senderName,
+  resolveName,
+}) {
   const parts = [];
 
   // Context: Channel
@@ -170,7 +177,7 @@ function buildUserPrompt({ message, threadHistory, channelInfo, senderName }) {
   // Context: Thread history
   if (threadHistory?.length > 1) {
     parts.push(
-      `[Thread history]\n${formatThreadContext(threadHistory.slice(0, -1))}`,
+      `[Thread history]\n${await formatThreadContext(threadHistory.slice(0, -1), 10, resolveName)}`,
     );
   }
 
@@ -219,6 +226,7 @@ function shouldEscalateToSonnet(result) {
  * @param {string} systemPrompt
  * @param {string} userPrompt
  * @param {string|null} sessionLogPath
+ * @param {string|null} [resumeSessionId] - Resume an existing session (e.g. haiku → sonnet escalation)
  * @returns {Promise<{ classification: Classification, sessionId: string|null }>}
  */
 async function runClassification(
@@ -226,6 +234,7 @@ async function runClassification(
   systemPrompt,
   userPrompt,
   sessionLogPath,
+  resumeSessionId = null,
 ) {
   const modelSlug = config.models[model] ?? model;
 
@@ -238,6 +247,8 @@ async function runClassification(
       systemPrompt,
       persistSession: !!sessionLogPath,
       ...(sessionLogPath ? { cwd: sessionLogPath } : {}),
+      // Only resume if session is persisted — resume requires an existing JSONL on disk
+      ...(resumeSessionId && sessionLogPath ? { resume: resumeSessionId } : {}),
     },
   });
 
@@ -303,6 +314,7 @@ function assignSessionTitle(sessionId, sessionLogPath, title) {
  * @param {Array} [params.threadHistory] - Thread messages
  * @param {Object} [params.channelInfo] - Channel metadata
  * @param {string} [params.senderName] - Sender display name
+ * @param {((userId: string) => Promise<string>)|null} [params.resolveName] - Optional user ID resolver
  * @param {Object} params.config - Slack bot config
  * @returns {Promise<Classification>}
  */
@@ -311,20 +323,22 @@ export async function classifyMessage({
   threadHistory,
   channelInfo,
   senderName,
+  resolveName,
   config: slackConfig,
 }) {
   const sessionLogPath = slackConfig.sessionLogPath || null;
   const systemPrompt = buildSystemPrompt(slackConfig);
-  const userPrompt = buildUserPrompt({
+  const userPrompt = await buildUserPrompt({
     message,
     threadHistory,
     channelInfo,
     senderName,
+    resolveName,
   });
 
   try {
     // Pass 1: Haiku (fast, cheap)
-    const { classification: initial, sessionId: haikusSessionId } =
+    const { classification: initial, sessionId: haikuSessionId } =
       await runClassification(
         'haiku',
         systemPrompt,
@@ -332,31 +346,38 @@ export async function classifyMessage({
         sessionLogPath,
       );
 
-    // Pass 2: Sonnet (escalate if needed)
+    logger.log(
+      `[Slack Classifier] haiku → action=${initial.action} confidence=${initial.confidence ?? '?'} needsContext=${initial.needsContext ?? false}`,
+    );
+
+    // Pass 2: Sonnet (escalate if needed) — resumes the same session as Haiku.
+    // Sonnet sees the full history (original message + haiku turn) and is asked
+    // to produce a refined classification. Avoids re-sending the same userPrompt
+    // which would add a duplicate user turn to the session.
     if (shouldEscalateToSonnet(initial)) {
-      logger.info(
-        `[Slack Classifier] Escalating to Sonnet — action=${initial.action} confidence=${initial.confidence} needsContext=${initial.needsContext}`,
+      logger.log(
+        `[Slack Classifier] escalating to Sonnet — action=${initial.action} confidence=${initial.confidence} needsContext=${initial.needsContext}`,
       );
+      const escalationPrompt = `Your previous classification had ${initial.confidence === 'low' ? 'low confidence' : 'a needsContext flag'}. Please reconsider and provide your best classification. Respond with the same JSON schema.`;
       try {
         const { classification: escalated, sessionId: sonnetSessionId } =
           await runClassification(
             'sonnet',
             systemPrompt,
-            userPrompt,
+            escalationPrompt,
             sessionLogPath,
+            haikuSessionId, // resume same session — sonnet refines haiku's result
           );
+        logger.log(
+          `[Slack Classifier] sonnet → action=${escalated.action} confidence=${escalated.confidence ?? '?'} needsContext=${escalated.needsContext ?? false}`,
+        );
+        // Single session — title using the final escalated result
         const title = buildSessionTitle(
           escalated,
           channelInfo,
           message.text || '',
         );
         assignSessionTitle(sonnetSessionId, sessionLogPath, title);
-        // Also title the Haiku session so both are identifiable in the UI
-        assignSessionTitle(
-          haikusSessionId,
-          sessionLogPath,
-          `${title} [haiku→sonnet]`,
-        );
         return escalated;
       } catch (err) {
         logger.warn(
@@ -368,13 +389,13 @@ export async function classifyMessage({
           channelInfo,
           message.text || '',
         );
-        assignSessionTitle(haikusSessionId, sessionLogPath, title);
+        assignSessionTitle(haikuSessionId, sessionLogPath, title);
         return initial;
       }
     }
 
     const title = buildSessionTitle(initial, channelInfo, message.text || '');
-    assignSessionTitle(haikusSessionId, sessionLogPath, title);
+    assignSessionTitle(haikuSessionId, sessionLogPath, title);
     return initial;
   } catch (err) {
     logger.error('[Slack Classifier] Error:', err.message);

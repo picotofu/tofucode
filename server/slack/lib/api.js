@@ -40,6 +40,8 @@ class SlackAPI {
    */
   constructor(token) {
     this.token = token;
+    /** @type {Map<string, string>} */
+    this._userNameCache = new Map();
   }
 
   /**
@@ -193,6 +195,30 @@ class SlackAPI {
    */
   async getUserInfo(userId) {
     return this.call('users.info', { user: userId });
+  }
+
+  /**
+   * Resolve a Slack user ID to a display name.
+   * Results are cached in-memory for the lifetime of the API instance.
+   * Falls back to the raw user ID if resolution fails.
+   * @param {string} userId - Slack user ID
+   * @returns {Promise<string>} Display name or user ID as fallback
+   */
+  async getUserName(userId) {
+    if (!userId) return 'unknown';
+    if (this._userNameCache.has(userId)) return this._userNameCache.get(userId);
+    try {
+      const info = await this.getUserInfo(userId);
+      const name =
+        info.user?.profile?.display_name ||
+        info.user?.real_name ||
+        info.user?.name ||
+        userId;
+      this._userNameCache.set(userId, name);
+      return name;
+    } catch {
+      return userId;
+    }
   }
 
   /**

@@ -7,55 +7,52 @@
 
 import { logger } from '../../lib/logger.js';
 import { classifyMessage } from '../lib/classifier.js';
+import { debounceMessage } from '../lib/debounce.js';
 import { dispatchAction } from './shared.js';
 
-/** Thread lock map */
+/** Thread lock map — prevents concurrent processing of the same DM session */
 const threadLocks = new Map();
 
 /**
- * Handle a DM event
+ * Process a (possibly debounce-combined) DM through triage and dispatch.
  * @param {Object} params
- * @param {Object} params.event - Slack message event (channel_type: 'im')
- * @param {import('../lib/api.js').SlackAPI} params.slackApi - Slack API client
- * @param {Object} params.config - Slack bot config
+ * @param {Object} params.event - Slack DM event (text may be combined)
+ * @param {import('../lib/api.js').SlackAPI} params.slackApi
+ * @param {Object} params.config
  */
-export async function handleDM({ event, slackApi, config }) {
-  const { user, channel, ts, thread_ts: threadTs, text } = event;
+async function processDM({ event, slackApi, config }) {
+  const { channel, ts, thread_ts: threadTs } = event;
+  const { text } = event;
 
-  // Skip if DM responses are disabled
-  if (!config.respondDm) return;
-
-  // Skip own messages
-  if (user === config.selfUserId) return;
-
-  // Skip messages without text
-  if (!text?.trim()) return;
-
-  // Thread lock
-  const lockKey = threadTs || ts;
-  if (threadLocks.has(lockKey)) return;
+  // Session lock — prevent concurrent processing of the same DM conversation.
+  // Always use channel ID — aligns with dispatchAction's sessionKey for DMs,
+  // which is always channel regardless of threadTs.
+  const lockKey = channel;
+  if (threadLocks.has(lockKey)) {
+    logger.log('[Slack] [triage] DM | skipped — session locked');
+    return;
+  }
   threadLocks.set(lockKey, true);
 
   try {
+    logger.log(`[Slack] [triage] DM | accepted for triage | ts=${ts}`);
+
     // Fetch thread history if threaded
     let threadHistory = null;
     if (threadTs) {
       try {
         const result = await slackApi.getThreadHistory(channel, threadTs, 15);
         threadHistory = result.messages;
+        logger.log(
+          `[Slack] [triage] DM | thread history fetched: ${threadHistory.length} messages`,
+        );
       } catch (err) {
         logger.warn('[Slack] Failed to fetch DM thread history:', err.message);
       }
     }
 
-    // Fetch sender info
-    let senderName = user;
-    try {
-      const userInfo = await slackApi.getUserInfo(user);
-      senderName = userInfo.user?.real_name || userInfo.user?.name || user;
-    } catch {
-      // Use user ID as fallback
-    }
+    // Fetch sender info (uses cache)
+    const senderName = await slackApi.getUserName(event.user);
 
     // Classify the DM
     const classification = await classifyMessage({
@@ -63,11 +60,12 @@ export async function handleDM({ event, slackApi, config }) {
       threadHistory,
       channelInfo: { id: channel, name: 'DM' },
       senderName,
+      resolveName: (id) => slackApi.getUserName(id),
       config,
     });
 
-    logger.debug(
-      `[Slack] DM | ${senderName}: "${text.substring(0, 80)}" → ${classification.action}`,
+    logger.log(
+      `[Slack] [triage] DM | ${senderName}: "${text.substring(0, 80)}" → action=${classification.action} confidence=${classification.confidence ?? '?'} | ${classification.reasoning || ''}`,
     );
 
     await dispatchAction({
@@ -82,4 +80,47 @@ export async function handleDM({ event, slackApi, config }) {
   } finally {
     threadLocks.delete(lockKey);
   }
+}
+
+/**
+ * Handle a DM event
+ * @param {Object} params
+ * @param {Object} params.event - Slack message event (channel_type: 'im')
+ * @param {import('../lib/api.js').SlackAPI} params.slackApi - Slack API client
+ * @param {Object} params.config - Slack bot config
+ */
+export async function handleDM({ event, slackApi, config }) {
+  const { user, channel, thread_ts: threadTs } = event;
+  let { text } = event;
+
+  // Skip if DM responses are disabled
+  if (!config.respondDm) return;
+
+  // Self-message guard — skip unless it's a debug test message ("test <message>")
+  if (user === config.selfUserId) {
+    if (text?.toLowerCase().startsWith('test ')) {
+      text = text.slice(5); // Strip "test " prefix and process as if sent by someone else
+      event = { ...event, text };
+      logger.log(
+        `[Slack] [debug] Self test message detected — processing as: "${text.substring(0, 80)}"`,
+      );
+    } else {
+      return;
+    }
+  }
+
+  // Skip messages without text
+  if (!text?.trim()) return;
+
+  // Debounce — accumulate rapid successive messages before processing.
+  // DMs use channel ID as the lock key (1 session per DM conversation).
+  // User is included in the key for explicitness, though DMs are already 1-to-1.
+  const lockKey = threadTs || channel;
+  debounceMessage({
+    key: `${channel}:${lockKey}:${user}`,
+    event,
+    slackApi,
+    config,
+    handler: processDM,
+  });
 }

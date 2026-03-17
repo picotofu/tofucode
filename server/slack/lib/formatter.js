@@ -98,17 +98,36 @@ export function bulletList(items) {
  * Build a thread context summary from message history
  * @param {Array} messages - Slack messages array
  * @param {number} [maxMessages=10] - Maximum messages to include
- * @returns {string} Formatted thread summary
+ * @param {((userId: string) => Promise<string>)|null} [resolveName=null] - Optional async resolver for user IDs to display names
+ * @returns {Promise<string>} Formatted thread summary
  */
-export function formatThreadContext(messages, maxMessages = 10) {
+export async function formatThreadContext(
+  messages,
+  maxMessages = 10,
+  resolveName = null,
+) {
   if (!messages?.length) return '(no thread history)';
 
-  return messages
-    .slice(-maxMessages)
+  const slice = messages.slice(-maxMessages);
+
+  // Pre-resolve all unique user IDs in one pass
+  if (resolveName) {
+    const userIds = [...new Set(slice.map((m) => m.user).filter(Boolean))];
+    const nameMap = Object.fromEntries(
+      await Promise.all(userIds.map(async (id) => [id, await resolveName(id)])),
+    );
+    return slice
+      .map((msg) => {
+        const name = msg.user ? (nameMap[msg.user] ?? msg.user) : 'unknown';
+        return `${name}: ${msg.text || '(empty)'}`;
+      })
+      .join('\n');
+  }
+
+  return slice
     .map((msg) => {
       const user = msg.user ? `<@${msg.user}>` : 'unknown';
-      const text = msg.text || '(empty)';
-      return `${user}: ${text}`;
+      return `${user}: ${msg.text || '(empty)'}`;
     })
     .join('\n');
 }

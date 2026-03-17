@@ -144,6 +144,7 @@ const SLACK_DEFAULTS = {
   projectRootPath: '',
   sessionLogPath: '',
   respondDm: true,
+  debounceMs: 10000,
   watchedChannels: [],
   identity: { name: '', role: '', tone: 'concise, professional' },
   classifier: {
@@ -842,6 +843,24 @@ async function handleClearCacheAndUpdate() {
             </label>
             <p class="setting-description">
               Classify and respond to DMs sent directly to you
+            </p>
+          </div>
+
+          <!-- Debounce Window -->
+          <div class="setting-item">
+            <div class="setting-label">
+              <span class="setting-title">Debounce Window (ms)</span>
+            </div>
+            <input
+              type="number"
+              v-model.number="slackLocal.debounceMs"
+              min="1000"
+              max="60000"
+              step="1000"
+              class="setting-input"
+            />
+            <p class="setting-description">
+              How long to wait after the last message before processing. Groups rapid successive messages into one. Default: 10000ms (10s)
             </p>
           </div>
 
