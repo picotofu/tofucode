@@ -37,6 +37,7 @@ const DEFAULT_CONFIG = {
   },
   classifier: {
     systemPrompt: '',
+    maxTriageTurns: 5, // Max tool-use turns for Sonnet agentic triage pass
   },
 };
 
