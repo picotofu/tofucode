@@ -62,6 +62,8 @@ async function processDM({ event, slackApi, config }) {
       senderName,
       resolveName: (id) => slackApi.getUserName(id),
       config,
+      slackApi,
+      event,
     });
 
     logger.log(

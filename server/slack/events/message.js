@@ -66,6 +66,8 @@ async function processMessage({ event, slackApi, config, channelConfig }) {
       senderName,
       resolveName: (id) => slackApi.getUserName(id),
       config,
+      slackApi,
+      event,
     });
 
     logger.log(

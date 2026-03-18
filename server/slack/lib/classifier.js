@@ -1,19 +1,21 @@
 /**
  * Slack Message Classifier
  *
- * Uses Claude (direct Anthropic SDK, NOT agent SDK) to classify incoming
- * Slack messages into actionable categories:
+ * Uses Claude (agent SDK) to classify incoming Slack messages into actionable
+ * categories:
  *   - ignore    → message doesn't need a response
  *   - acknowledge → simple acknowledgement (got it, looking into it)
  *   - answer    → can be answered with available context
  *   - ticket    → needs tracking, create a Notion ticket
  *   - work      → requires code changes or investigation, start tofucode session
  *
- * Two-pass model strategy:
- *   1. Haiku  — always runs first (fast, cheap)
- *   2. Sonnet — escalated when Haiku signals low confidence, or when the
- *               action requires deeper reasoning (answer needing context
- *               gathering, work with uncertain project mapping, etc.)
+ * Three-tier model strategy:
+ *   1. Haiku  — always runs first (fast, cheap, no tools)
+ *   2. Sonnet — escalated when Haiku signals low confidence or needsContext.
+ *               Uses Grep/Glob/Read tools to actively investigate the codebase
+ *               (route → service mapping, field lookups, scope analysis) before
+ *               committing to a classification. cwd = projectRootPath.
+ *               Max turns configurable via config.classifier.maxTriageTurns.
  */
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
@@ -218,15 +220,13 @@ function shouldEscalateToSonnet(result) {
 }
 
 /**
- * Run a single classification pass against a model.
- * Uses the agent SDK query() (handles OAuth auth automatically).
- * No tools. If sessionLogPath is set, persists session JSONL to that path
- * (readable in tofucode web UI). Otherwise runs ephemeral with no disk writes.
+ * Run a single blind classification pass against a model (no tools).
+ * Used for the Haiku first pass.
  * @param {string} model
  * @param {string} systemPrompt
  * @param {string} userPrompt
  * @param {string|null} sessionLogPath
- * @param {string|null} [resumeSessionId] - Resume an existing session (e.g. haiku → sonnet escalation)
+ * @param {string|null} [resumeSessionId] - Resume an existing session
  * @returns {Promise<{ classification: Classification, sessionId: string|null }>}
  */
 async function runClassification(
@@ -247,6 +247,10 @@ async function runClassification(
       systemPrompt,
       persistSession: !!sessionLogPath,
       ...(sessionLogPath ? { cwd: sessionLogPath } : {}),
+      // Load project CLAUDE.md if session log path is configured — user can place
+      // a CLAUDE.md (and a .claude/ folder) in their session log directory to
+      // provide classifier-relevant context (service descriptions, conventions, etc.)
+      ...(sessionLogPath ? { settingSources: ['project'] } : {}),
       // Only resume if session is persisted — resume requires an existing JSONL on disk
       ...(resumeSessionId && sessionLogPath ? { resume: resumeSessionId } : {}),
     },
@@ -264,6 +268,131 @@ async function runClassification(
       }
     }
   }
+
+  return { classification: parseClassification(text), sessionId };
+}
+
+/**
+ * Build the escalation prompt for the agentic Sonnet pass.
+ * Written in first-person as TS — matches the persona tone in the system prompt.
+ * @param {Classification} initial - Haiku's initial (low-confidence) result
+ * @param {string|null} projectRootPath - Root path of the codebase (from slackConfig)
+ * @param {string|null} sessionLogPath - Session log path (cwd when resuming a session)
+ * @returns {string}
+ */
+function buildAgenticEscalationPrompt(
+  initial,
+  projectRootPath,
+  sessionLogPath,
+) {
+  const reason =
+    initial.confidence === 'low'
+      ? `wasn't sure how to classify this (initial guess: ${initial.action})`
+      : `needs more context to respond well (action=${initial.action})`;
+
+  // Tell the model exactly which base path to use for tool calls.
+  // cwd may be sessionLogPath (when resuming) — not the codebase — so absolute paths are required.
+  const pathNote = projectRootPath
+    ? `my projects are at ${projectRootPath} — always use that as the absolute base for tool calls${sessionLogPath ? `, even though cwd is currently ${sessionLogPath}` : ''}`
+    : 'use absolute paths when calling tools';
+
+  return `ok so my initial read ${reason}. let me check before responding.
+
+${pathNote}.
+
+when digging in:
+- if there's a route or endpoint mentioned (like /crests or /watchlist/status): grep for it under ${projectRootPath ?? 'the projects folder'} to find which service owns it. my services follow /api/{context}/v1/{route} where context = repo prefix (user-service → user, anime-service → anime, etc.)
+- if the project is unclear: grep for the most specific term — a function name, field name, or table name
+- if i need to judge scope (work vs ticket): read the relevant controller or route file to get a feel for the change
+- if it's a question i should answer: read the actual code or config so i'm not guessing
+
+2-3 targeted lookups is usually enough. don't spiral.
+
+once i have enough to be confident, respond with ONLY the \`\`\`json code fence — same schema as before. don't output JSON mid-investigation, only in the final message.
+
+for workPrompt: be specific — include the actual file paths, function names, or route handlers found so the work session has direct starting context rather than re-discovering everything.`;
+}
+
+/**
+ * Run an agentic classification pass (Sonnet + Grep/Glob/Read tools).
+ * Used for Tier 2 escalation — investigates the codebase before classifying.
+ * @param {string} systemPrompt
+ * @param {Classification} initial - Haiku's initial result (for escalation prompt context)
+ * @param {string|null} sessionLogPath
+ * @param {string|null} resumeSessionId - Haiku session to resume
+ * @param {string|null} projectRootPath - Codebase root (cwd for tools)
+ * @param {number} maxTurns
+ * @returns {Promise<{ classification: Classification, sessionId: string|null }>}
+ */
+async function runAgenticClassification(
+  systemPrompt,
+  initial,
+  sessionLogPath,
+  resumeSessionId,
+  projectRootPath,
+  maxTurns,
+) {
+  const modelSlug = config.models.sonnet;
+  const escalationPrompt = buildAgenticEscalationPrompt(
+    initial,
+    projectRootPath,
+    sessionLogPath,
+  );
+
+  // cwd resolution:
+  // - When resuming a persisted session, use sessionLogPath so the SDK locates
+  //   the existing JSONL (session slug is derived from cwd at creation time).
+  //   The escalation prompt tells Sonnet the projectRootPath explicitly so it
+  //   can use absolute paths with tools regardless of cwd.
+  // - When not resuming (ephemeral), use projectRootPath so tools default to
+  //   the codebase root. Fall back to undefined (SDK default) if neither is set.
+  const cwd =
+    resumeSessionId && sessionLogPath
+      ? sessionLogPath
+      : projectRootPath || undefined;
+
+  const stream = query({
+    prompt: escalationPrompt,
+    options: {
+      model: modelSlug,
+      allowedTools: ['Grep', 'Glob', 'Read'],
+      permissionMode: 'default',
+      systemPrompt,
+      maxTurns,
+      persistSession: !!sessionLogPath,
+      ...(cwd ? { cwd } : {}),
+      // Load project CLAUDE.md from session log path if available (same guard as haiku pass)
+      ...(sessionLogPath ? { settingSources: ['project'] } : {}),
+      // Only resume if session is persisted — resume requires an existing JSONL on disk
+      ...(resumeSessionId && sessionLogPath ? { resume: resumeSessionId } : {}),
+    },
+  });
+
+  let text = '';
+  let sessionId = null;
+  let toolUseCount = 0;
+
+  for await (const message of stream) {
+    if (message.type === 'system' && message.subtype === 'init') {
+      sessionId = message.session_id ?? null;
+    }
+    if (message.type === 'assistant') {
+      for (const block of message.message?.content || []) {
+        if ('text' in block) {
+          text += block.text;
+        } else if ('name' in block) {
+          toolUseCount++;
+          logger.log(
+            `[Slack Classifier] [agentic] tool_use #${toolUseCount}: ${block.name}(${JSON.stringify(block.input).substring(0, 120)})`,
+          );
+        }
+      }
+    }
+  }
+
+  logger.log(
+    `[Slack Classifier] [agentic] completed — ${toolUseCount} tool calls`,
+  );
 
   return { classification: parseClassification(text), sessionId };
 }
@@ -308,7 +437,11 @@ function assignSessionTitle(sessionId, sessionLogPath, title) {
 
 /**
  * Classify a Slack message.
- * Uses Haiku first; escalates to Sonnet if confidence is low or context is needed.
+ *
+ * Tier 1 — Haiku (no tools, 1 turn): classifies the obvious majority cheaply.
+ * Tier 2 — Sonnet (Grep/Glob/Read, up to maxTriageTurns): escalated when Haiku
+ *           is uncertain. Actively investigates the codebase before classifying.
+ *
  * @param {Object} params
  * @param {Object} params.message - Slack event message
  * @param {Array} [params.threadHistory] - Thread messages
@@ -316,6 +449,8 @@ function assignSessionTitle(sessionId, sessionLogPath, title) {
  * @param {string} [params.senderName] - Sender display name
  * @param {((userId: string) => Promise<string>)|null} [params.resolveName] - Optional user ID resolver
  * @param {Object} params.config - Slack bot config
+ * @param {import('./api.js').SlackAPI|null} [params.slackApi] - For posting reactions on escalation
+ * @param {Object|null} [params.event] - Original Slack event (for reaction target)
  * @returns {Promise<Classification>}
  */
 export async function classifyMessage({
@@ -325,8 +460,12 @@ export async function classifyMessage({
   senderName,
   resolveName,
   config: slackConfig,
+  slackApi = null,
+  event = null,
 }) {
   const sessionLogPath = slackConfig.sessionLogPath || null;
+  const projectRootPath = slackConfig.projectRootPath || null;
+  const maxTriageTurns = slackConfig.classifier?.maxTriageTurns ?? 5;
   const systemPrompt = buildSystemPrompt(slackConfig);
   const userPrompt = await buildUserPrompt({
     message,
@@ -337,7 +476,7 @@ export async function classifyMessage({
   });
 
   try {
-    // Pass 1: Haiku (fast, cheap)
+    // Tier 1: Haiku — fast, cheap, no tools
     const { classification: initial, sessionId: haikuSessionId } =
       await runClassification(
         'haiku',
@@ -350,23 +489,32 @@ export async function classifyMessage({
       `[Slack Classifier] haiku → action=${initial.action} confidence=${initial.confidence ?? '?'} needsContext=${initial.needsContext ?? false}`,
     );
 
-    // Pass 2: Sonnet (escalate if needed) — resumes the same session as Haiku.
-    // Sonnet sees the full history (original message + haiku turn) and is asked
-    // to produce a refined classification. Avoids re-sending the same userPrompt
-    // which would add a duplicate user turn to the session.
+    // Tier 2: Sonnet + tools — escalate when haiku is uncertain.
+    // Resumes the same session so haiku's turn is visible in context.
+    // Posts :mag: reaction immediately so the user sees investigation is underway.
     if (shouldEscalateToSonnet(initial)) {
       logger.log(
-        `[Slack Classifier] escalating to Sonnet — action=${initial.action} confidence=${initial.confidence} needsContext=${initial.needsContext}`,
+        `[Slack Classifier] escalating to Sonnet (agentic) — action=${initial.action} confidence=${initial.confidence} needsContext=${initial.needsContext}`,
       );
-      const escalationPrompt = `Your previous classification had ${initial.confidence === 'low' ? 'low confidence' : 'a needsContext flag'}. Please reconsider and provide your best classification. Respond with the same JSON schema.`;
+
+      // Post :mag: reaction as immediate visual feedback
+      if (slackApi && event) {
+        try {
+          await slackApi.addReaction(event.channel, event.ts, 'mag');
+        } catch {
+          // Ignore — already reacted, or missing permission
+        }
+      }
+
       try {
         const { classification: escalated, sessionId: sonnetSessionId } =
-          await runClassification(
-            'sonnet',
+          await runAgenticClassification(
             systemPrompt,
-            escalationPrompt,
+            initial,
             sessionLogPath,
-            haikuSessionId, // resume same session — sonnet refines haiku's result
+            haikuSessionId,
+            projectRootPath,
+            maxTriageTurns,
           );
         logger.log(
           `[Slack Classifier] sonnet → action=${escalated.action} confidence=${escalated.confidence ?? '?'} needsContext=${escalated.needsContext ?? false}`,
@@ -413,9 +561,33 @@ export async function classifyMessage({
  */
 function parseClassification(text) {
   try {
-    // Extract JSON: find first '{' and attempt to parse from there.
-    // Using substring from first '{' handles code fences and preamble text
-    // without a greedy regex that can grab unintended trailing content.
+    // Primary: extract from ```json code fence — the model is instructed to use this.
+    // This is robust against intermediate reasoning text that may contain stray braces
+    // (e.g. code samples echoed during agentic tool investigation turns).
+    const fenceMatch = text.match(/```json\s*\n([\s\S]*?)\n```/);
+    if (fenceMatch) {
+      const parsed = JSON.parse(fenceMatch[1].trim());
+      const validActions = [
+        'ignore',
+        'acknowledge',
+        'answer',
+        'ticket',
+        'work',
+      ];
+      if (!validActions.includes(parsed.action)) {
+        logger.warn(
+          `[Slack Classifier] Invalid action "${parsed.action}", defaulting to ignore`,
+        );
+        return {
+          action: 'ignore',
+          reasoning: `Invalid action: ${parsed.action}`,
+        };
+      }
+      return parsed;
+    }
+
+    // Fallback: brace-matching extraction for responses without a code fence.
+    // Finds the first '{' and its matching '}' by depth counting.
     const start = text.indexOf('{');
     if (start === -1) {
       logger.warn('[Slack Classifier] No JSON found in response:', text);
