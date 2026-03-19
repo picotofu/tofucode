@@ -176,14 +176,24 @@ async function buildUserPrompt({
     parts.push(`[Channel: #${channelName}]`);
   }
 
-  // Context: Thread history
-  if (threadHistory?.length > 1) {
-    parts.push(
-      `[Thread history]\n${await formatThreadContext(threadHistory.slice(0, -1), 10, resolveName)}`,
+  // Context: Thread/conversation history (all prior messages, excluding the triggering message)
+  // For threaded replies: conversations.replies returns parent + all replies chronologically.
+  // For top-level messages: conversations.history is reversed to chronological order.
+  // We exclude the last message only if it matches the triggering event ts — it will be
+  // shown separately as [New message] below. Debounced events may have combined text that
+  // differs from any single history entry, so we match by ts rather than position.
+  if (threadHistory?.length) {
+    const historyWithoutCurrent = threadHistory.filter(
+      (m) => m.ts !== message.ts,
     );
+    if (historyWithoutCurrent.length > 0) {
+      parts.push(
+        `[Thread history]\n${await formatThreadContext(historyWithoutCurrent, 30, resolveName)}`,
+      );
+    }
   }
 
-  // The actual message
+  // The new message(s) — may be debounce-combined text from multiple rapid sends
   const sender = senderName || message.user || 'someone';
   parts.push(`[New message from ${sender}]\n${message.text || '(empty)'}`);
 

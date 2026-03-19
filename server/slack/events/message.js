@@ -41,18 +41,24 @@ async function processMessage({ event, slackApi, config, channelConfig }) {
       `[Slack] [triage] #${channelConfig.name} | accepted for triage | thread=${threadTs || 'none'} ts=${ts}`,
     );
 
-    // Fetch thread history if this is a threaded message
+    // Always fetch thread history for full context:
+    // - Threaded replies: fetch all replies under the parent (includes parent as first message)
+    // - Parent messages: fetch recent channel history so classifier has prior conversation context
     let threadHistory = null;
-    if (threadTs) {
-      try {
-        const result = await slackApi.getThreadHistory(channel, threadTs, 15);
+    try {
+      if (threadTs) {
+        const result = await slackApi.getThreadHistory(channel, threadTs, 30);
         threadHistory = result.messages;
-        logger.log(
-          `[Slack] [triage] #${channelConfig.name} | thread history fetched: ${threadHistory.length} messages`,
-        );
-      } catch (err) {
-        logger.warn('[Slack] Failed to fetch thread history:', err.message);
+      } else {
+        const result = await slackApi.getChannelHistory(channel, 30);
+        // Channel history is newest-first — reverse for chronological order
+        threadHistory = (result.messages || []).reverse();
       }
+      logger.log(
+        `[Slack] [triage] #${channelConfig.name} | context fetched: ${threadHistory?.length ?? 0} messages (${threadTs ? 'thread' : 'channel'})`,
+      );
+    } catch (err) {
+      logger.warn('[Slack] Failed to fetch message context:', err.message);
     }
 
     // Fetch sender info (uses cache)

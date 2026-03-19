@@ -160,7 +160,7 @@ class SlackAPI {
    * @returns {Promise<Object>} Response with messages array
    */
   async getThreadHistory(channel, threadTs, limit = 20) {
-    return this.call('conversations.replies', {
+    return this.get('conversations.replies', {
       channel,
       ts: threadTs,
       limit,
@@ -174,7 +174,7 @@ class SlackAPI {
    * @returns {Promise<Object>} Response with messages array
    */
   async getChannelHistory(channel, limit = 10) {
-    return this.call('conversations.history', { channel, limit });
+    return this.get('conversations.history', { channel, limit });
   }
 
   /**

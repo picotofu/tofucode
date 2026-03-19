@@ -37,18 +37,24 @@ async function processDM({ event, slackApi, config }) {
   try {
     logger.log(`[Slack] [triage] DM | accepted for triage | ts=${ts}`);
 
-    // Fetch thread history if threaded
+    // Always fetch conversation context:
+    // - Threaded replies: fetch all replies under the parent (includes parent as first message)
+    // - Top-level DMs: fetch recent DM history for prior conversation context
     let threadHistory = null;
-    if (threadTs) {
-      try {
-        const result = await slackApi.getThreadHistory(channel, threadTs, 15);
+    try {
+      if (threadTs) {
+        const result = await slackApi.getThreadHistory(channel, threadTs, 30);
         threadHistory = result.messages;
-        logger.log(
-          `[Slack] [triage] DM | thread history fetched: ${threadHistory.length} messages`,
-        );
-      } catch (err) {
-        logger.warn('[Slack] Failed to fetch DM thread history:', err.message);
+      } else {
+        const result = await slackApi.getChannelHistory(channel, 30);
+        // Channel/DM history is newest-first — reverse for chronological order
+        threadHistory = (result.messages || []).reverse();
       }
+      logger.log(
+        `[Slack] [triage] DM | context fetched: ${threadHistory?.length ?? 0} messages (${threadTs ? 'thread' : 'dm history'})`,
+      );
+    } catch (err) {
+      logger.warn('[Slack] Failed to fetch DM context:', err.message);
     }
 
     // Fetch sender info (uses cache)
