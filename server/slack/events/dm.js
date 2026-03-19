@@ -98,7 +98,7 @@ async function processDM({ event, slackApi, config }) {
  * @param {Object} params.config - Slack bot config
  */
 export async function handleDM({ event, slackApi, config }) {
-  const { user, channel, thread_ts: threadTs } = event;
+  const { user, channel } = event;
   let { text } = event;
 
   // Skip if DM responses are disabled
@@ -121,11 +121,10 @@ export async function handleDM({ event, slackApi, config }) {
   if (!text?.trim()) return;
 
   // Debounce — accumulate rapid successive messages before processing.
-  // DMs use channel ID as the lock key (1 session per DM conversation).
-  // User is included in the key for explicitness, though DMs are already 1-to-1.
-  const lockKey = threadTs || channel;
+  // DMs always use channel ID as lock key — aligns with processDM's session lock
+  // and dispatchAction's sessionKey, both of which key on channel for DMs.
   debounceMessage({
-    key: `${channel}:${lockKey}:${user}`,
+    key: `${channel}:${channel}:${user}`,
     event,
     slackApi,
     config,

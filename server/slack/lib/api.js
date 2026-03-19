@@ -228,7 +228,7 @@ class SlackAPI {
    * @returns {Promise<Object>} Response with channel object
    */
   async getChannelInfo(channel) {
-    return this.call('conversations.info', { channel });
+    return this.get('conversations.info', { channel });
   }
 
   /**
