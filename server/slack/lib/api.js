@@ -194,7 +194,7 @@ class SlackAPI {
    * @returns {Promise<Object>} Response with user object
    */
   async getUserInfo(userId) {
-    return this.call('users.info', { user: userId });
+    return this.get('users.info', { user: userId });
   }
 
   /**
@@ -209,10 +209,11 @@ class SlackAPI {
     if (this._userNameCache.has(userId)) return this._userNameCache.get(userId);
     try {
       const info = await this.getUserInfo(userId);
+      // display_name can be an empty string — skip it if blank
       const name =
-        info.user?.profile?.display_name ||
-        info.user?.real_name ||
-        info.user?.name ||
+        info.user?.profile?.display_name?.trim() ||
+        info.user?.real_name?.trim() ||
+        info.user?.name?.trim() ||
         userId;
       this._userNameCache.set(userId, name);
       return name;
