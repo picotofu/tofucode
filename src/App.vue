@@ -17,7 +17,7 @@ const {
   disconnect,
   connected,
   recentSessions,
-  getRecentSessionsImmediate,
+  getRecentSessionsForPalette,
   getProjects,
   send,
   onMessage,
@@ -282,8 +282,8 @@ function handleGlobalKeydown(e) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault();
     showPalette.value = true;
-    // Refresh sessions when opening palette (immediate for user action)
-    getRecentSessionsImmediate();
+    // Fetch with higher limit so palette search covers full history
+    getRecentSessionsForPalette();
   }
   // Ctrl+P or Cmd+P: Open file picker (only in project/session context)
   if ((e.ctrlKey || e.metaKey) && e.key === 'p') {

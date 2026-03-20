@@ -151,13 +151,13 @@ const groupedSessions = computed(() => {
     groups[projectSlug].sessions.push(session);
   }
 
-  // Convert to array and limit sessions per project
+  // Convert to array; when searching show all matches, otherwise cap for brevity
   return Object.values(groups)
     .map((group) => ({
       ...group,
-      sessions: group.sessions.slice(0, 5), // Show max 5 sessions per project
+      sessions: query ? group.sessions : group.sessions.slice(0, 5),
     }))
-    .slice(0, 10); // Show max 10 projects
+    .slice(0, query ? undefined : 10);
 });
 
 // Flatten for keyboard navigation

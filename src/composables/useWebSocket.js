@@ -404,6 +404,15 @@ function getRecentSessionsImmediate() {
   sendGlobal({ type: 'get_recent_sessions' });
 }
 
+// Higher-limit version for the command palette (needs full history for search)
+function getRecentSessionsForPalette() {
+  if (recentSessionsDebounceTimer) {
+    clearTimeout(recentSessionsDebounceTimer);
+    recentSessionsDebounceTimer = null;
+  }
+  sendGlobal({ type: 'get_recent_sessions', limit: 200 });
+}
+
 function browseFolder(path) {
   sendGlobal({ type: 'browse_folder', path });
 }
@@ -474,6 +483,7 @@ export function useWebSocket() {
     getSessions,
     getRecentSessions,
     getRecentSessionsImmediate,
+    getRecentSessionsForPalette,
     browseFolder,
     createFolder,
     setSessionTitle,
