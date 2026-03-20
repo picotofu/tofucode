@@ -21,6 +21,7 @@ const {
   connected,
   projects,
   recentSessions,
+  sessionsReady,
   folderContents,
   currentFolder,
   rootPath,
@@ -217,8 +218,30 @@ function cancelCreateFolder() {
       </div>
 
       <template v-else>
+        <!-- Recent Sessions skeleton while data loads -->
+        <section v-if="!sessionsReady" class="quick-access">
+          <h2 class="section-title">Recent Sessions</h2>
+          <div class="quick-cards">
+            <div v-for="i in 4" :key="i" class="quick-card quick-card-skeleton">
+              <div class="skeleton-card-icon"></div>
+              <div class="skeleton-card-title"></div>
+              <div class="skeleton-card-meta"></div>
+            </div>
+          </div>
+          <!-- Mobile list view skeleton -->
+          <ul class="quick-list">
+            <li v-for="i in 4" :key="i" class="quick-list-skeleton">
+              <div class="skeleton-list-icon"></div>
+              <div class="skeleton-list-text">
+                <div class="skeleton-list-title"></div>
+                <div class="skeleton-list-meta"></div>
+              </div>
+            </li>
+          </ul>
+        </section>
+
         <!-- Recent Sessions -->
-        <section v-if="quickSessions.length > 0" class="quick-access">
+        <section v-else-if="quickSessions.length > 0" class="quick-access">
           <h2 class="section-title">Recent Sessions</h2>
           <div class="quick-cards">
             <router-link
@@ -301,7 +324,7 @@ function cancelCreateFolder() {
           </ul>
         </section>
 
-        <div v-if="quickSessions.length === 0 && quickProjects.length === 0" class="empty-sessions">
+        <div v-if="sessionsReady && quickSessions.length === 0 && quickProjects.length === 0" class="empty-sessions">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
@@ -688,6 +711,85 @@ function cancelCreateFolder() {
   color: var(--text-muted);
   font-size: 14px;
   text-align: center;
+}
+
+/* ─── Skeleton loading ────────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.4; }
+}
+
+.quick-card-skeleton {
+  pointer-events: none;
+}
+
+.skeleton-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  margin-bottom: 10px;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-card-title {
+  height: 12px;
+  width: 80%;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  margin-bottom: 6px;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-card-meta {
+  height: 10px;
+  width: 55%;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  animation: shimmer 1.4s ease-in-out infinite;
+  animation-delay: 0.2s;
+}
+
+.quick-list-skeleton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.skeleton-list-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-list-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.skeleton-list-title {
+  height: 13px;
+  width: 70%;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-list-meta {
+  height: 11px;
+  width: 45%;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  animation: shimmer 1.4s ease-in-out infinite;
+  animation-delay: 0.2s;
 }
 
 /* ─── Tab loading ────────────────────────────────────────────────────────────── */

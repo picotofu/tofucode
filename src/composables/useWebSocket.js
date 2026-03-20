@@ -28,6 +28,9 @@ const rootPath = ref(null);
 // Home path — topmost browsable directory (rootPath if set, otherwise server home)
 const homePath = ref(null);
 
+// True once the first recent_sessions response is received
+const sessionsReady = ref(false);
+
 // Clone dialog state (global so sidebar + homepage can both trigger it)
 const showCloneDialog = ref(false);
 const cloneInitialDir = ref(null);
@@ -189,6 +192,7 @@ function handleGlobalMessage(msg) {
 
     case 'recent_sessions':
       recentSessions.value = msg.sessions;
+      sessionsReady.value = true;
       break;
 
     case 'folder_contents':
@@ -444,6 +448,7 @@ export function useWebSocket() {
     projects: readonly(projects),
     sessions: readonly(sessions),
     recentSessions: readonly(recentSessions),
+    sessionsReady: readonly(sessionsReady),
     folderContents: readonly(folderContents),
     currentFolder: readonly(currentFolder),
     sessionStatuses: readonly(sessionStatuses),

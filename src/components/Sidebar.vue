@@ -25,6 +25,7 @@ const {
   connected,
   projects,
   recentSessions,
+  sessionsReady,
   sessionStatuses,
   terminalCounts,
   currentVersion,
@@ -161,7 +162,20 @@ function handleOverlayClick() {
   <aside class="sidebar" :class="{ open }">
     <div class="sidebar-content">
       <!-- Recent Sessions Tab -->
-      <ul v-if="activeTab === 'sessions'" class="sidebar-list">
+      <!-- Skeleton while sessions are loading -->
+      <ul v-if="activeTab === 'sessions' && !sessionsReady" class="sidebar-list">
+        <li v-for="i in 4" :key="i" class="sidebar-item sidebar-skeleton-item">
+          <div class="sidebar-link">
+            <div class="skeleton-icon"></div>
+            <div class="skeleton-text">
+              <div class="skeleton-line skeleton-title"></div>
+              <div class="skeleton-line skeleton-meta"></div>
+            </div>
+          </div>
+        </li>
+      </ul>
+      <!-- Actual sessions list -->
+      <ul v-else-if="activeTab === 'sessions'" class="sidebar-list">
         <li
           v-for="session in recentSessions"
           :key="session.sessionId"
@@ -820,6 +834,51 @@ function handleOverlayClick() {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Skeleton loading for sessions */
+@keyframes shimmer {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.4; }
+}
+
+.sidebar-skeleton-item .sidebar-link {
+  pointer-events: none;
+}
+
+.skeleton-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeleton-line {
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-title {
+  height: 13px;
+  width: 75%;
+}
+
+.skeleton-meta {
+  height: 11px;
+  width: 50%;
+  animation-delay: 0.2s;
 }
 
 /* Overlay (mobile only, controlled by media query) */

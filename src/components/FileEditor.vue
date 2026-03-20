@@ -48,6 +48,8 @@ const mdEditorRef = ref(null);
 let tinyMdeInstance = null;
 let tabKeyHandler = null;
 let tabKeyElement = null;
+let mobileBackspaceHandler = null;
+let mobileBackspaceElement = null;
 
 // Get settings
 const settingsContext = inject('settings');
@@ -336,6 +338,51 @@ function cleanupTabKeyHandler() {
   }
 }
 
+// Fix mobile backspace: on soft keyboards, deleteContentBackward at col=0
+// doesn't merge lines via the DOM — intercept it and merge manually.
+function setupMobileBackspaceFix() {
+  cleanupMobileBackspaceFix();
+
+  if (!mdEditorRef.value) return;
+
+  const editorElement = mdEditorRef.value.querySelector('.TinyMDE');
+  if (!editorElement) return;
+
+  mobileBackspaceHandler = (e) => {
+    if (e.inputType !== 'deleteContentBackward') return;
+    if (!tinyMdeInstance) return;
+    const sel = tinyMdeInstance.getSelection();
+    if (!sel || sel.col !== 0 || sel.row === 0) return;
+    // Cursor is at start of a non-first line — merge with previous line
+    e.preventDefault();
+    const content = tinyMdeInstance.getContent();
+    const lines = content.split('\n');
+    const prevLine = lines[sel.row - 1];
+    const curLine = lines[sel.row];
+    const mergedCol = prevLine.length;
+    lines.splice(sel.row - 1, 2, prevLine + curLine);
+    tinyMdeInstance.setContent(lines.join('\n'));
+    tinyMdeInstance.setSelection({ row: sel.row - 1, col: mergedCol });
+    editorContent.value = tinyMdeInstance.getContent();
+    isDirty.value = true;
+  };
+
+  mobileBackspaceElement = editorElement;
+  editorElement.addEventListener('beforeinput', mobileBackspaceHandler);
+}
+
+// Clean up mobile backspace event listener
+function cleanupMobileBackspaceFix() {
+  if (mobileBackspaceHandler && mobileBackspaceElement) {
+    mobileBackspaceElement.removeEventListener(
+      'beforeinput',
+      mobileBackspaceHandler,
+    );
+    mobileBackspaceHandler = null;
+    mobileBackspaceElement = null;
+  }
+}
+
 // Watch for content changes from parent (new file loaded)
 watch(
   () => props.content,
@@ -357,6 +404,7 @@ watch(
     // Clean up old instance first
     if (tinyMdeInstance) {
       cleanupTabKeyHandler();
+      cleanupMobileBackspaceFix();
       tinyMdeInstance = null;
     }
 
@@ -379,6 +427,8 @@ watch(
 
         // Add tab key handling for markdown editor
         setupMarkdownTabHandling();
+        // Fix mobile backspace merging lines at col 0
+        setupMobileBackspaceFix();
       }
     }
   },
@@ -534,6 +584,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
   cleanupTabKeyHandler();
+  cleanupMobileBackspaceFix();
   tinyMdeInstance = null;
   if (autoSaveTimeout) {
     clearTimeout(autoSaveTimeout);

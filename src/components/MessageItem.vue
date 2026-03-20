@@ -909,14 +909,13 @@ function togglePlanExpand() {
 }
 
 .result-label {
+  flex: 1;
   font-weight: 500;
   color: var(--success-color);
   text-transform: capitalize;
 }
 
 .result-meta {
-  flex: 1;
-  text-align: right;
   font-family: var(--font-mono);
   font-size: 11px;
   color: rgba(34, 197, 94, 0.8);
