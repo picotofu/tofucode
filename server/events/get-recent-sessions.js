@@ -44,12 +44,14 @@ import { send } from '../lib/ws.js';
 import { loadSlackConfigRaw } from '../slack/config.js';
 
 export function handler(ws, message) {
-  const limit = message.limit || 50;
   const slackConfig = loadSlackConfigRaw();
   const slackSessionSlug =
     slackConfig.hideSlackSessions && slackConfig.sessionLogPath
       ? pathToSlug(slackConfig.sessionLogPath)
       : null;
+  // When slack sessions are hidden, bump the default limit so the visible list
+  // stays full after slack sessions are filtered out client-side
+  const limit = message.limit || (slackSessionSlug ? 200 : 50);
 
   try {
     if (!existsSync(config.projectsDir)) {

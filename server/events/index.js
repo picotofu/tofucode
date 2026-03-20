@@ -58,6 +58,7 @@ import { handler as setSessionTitle } from './set-session-title.js';
 import {
   handleGetConfig as slackGetConfig,
   handleListChannels as slackListChannels,
+  handleMarkViewed as slackMarkViewed,
   handleRestart as slackRestart,
   handleSaveConfig as slackSaveConfig,
   handleTestConnection as slackTest,
@@ -129,6 +130,7 @@ export const handlers = {
   'draft:get': draftGet,
   'slack:get_config': slackGetConfig,
   'slack:save_config': slackSaveConfig,
+  'slack:mark_viewed': slackMarkViewed,
   'slack:test': slackTest,
   'slack:restart': slackRestart,
   'slack:list_channels': slackListChannels,

@@ -15,16 +15,31 @@ import {
   loadSlackConfig,
   loadSlackConfigRaw,
   saveSlackConfig,
+  updateLastViewedAt,
 } from '../slack/config.js';
+
+/**
+ * Send masked config to a client, always including lastViewedAt at the top level
+ * so the sidebar unread badge stays in sync regardless of which handler triggered it.
+ * @param {WebSocket} ws
+ * @param {Object} [config] - Pre-loaded masked config (optional, loads fresh if not provided)
+ */
+function sendConfig(ws, config) {
+  const cfg = config ?? getMaskedConfig();
+  send(ws, {
+    type: 'slack:config',
+    config: cfg,
+    lastViewedAt: cfg.lastViewedAt ?? null,
+  });
+}
 
 /**
  * Get Slack config (tokens masked for display) + current bot socket status
  */
 export async function handleGetConfig(ws) {
   try {
-    const config = getMaskedConfig();
     const { getSlackBotConnected } = await import('../slack/bot.js');
-    send(ws, { type: 'slack:config', config });
+    sendConfig(ws);
     send(ws, { type: 'slack:status', connected: getSlackBotConnected() });
   } catch (err) {
     logger.error('[Slack WS] Error getting config:', err);
@@ -73,10 +88,7 @@ export async function handleSaveConfig(ws, message) {
 
     saveSlackConfig(updated);
     send(ws, { type: 'slack:save_result', success: true });
-
-    // Return updated masked config
-    const masked = getMaskedConfig();
-    send(ws, { type: 'slack:config', config: masked });
+    sendConfig(ws);
   } catch (err) {
     logger.error('[Slack WS] Error saving config:', err);
     send(ws, { type: 'slack:save_result', success: false, error: err.message });
@@ -143,6 +155,19 @@ export async function handleListChannels(ws) {
   } catch (err) {
     logger.error('[Slack WS] Error listing channels:', err);
     send(ws, { type: 'slack:channels', channels: [], error: err.message });
+  }
+}
+
+/**
+ * Mark the Slack sessions tab as viewed — updates lastViewedAt to now and
+ * responds with updated slack:config so all connected clients sync the timestamp
+ */
+export async function handleMarkViewed(ws) {
+  try {
+    updateLastViewedAt();
+    sendConfig(ws);
+  } catch (err) {
+    logger.error('[Slack WS] Error marking viewed:', err);
   }
 }
 
