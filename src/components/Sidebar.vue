@@ -123,10 +123,11 @@ const currentProject = computed(() => route.params.project);
 const currentSession = computed(() => route.params.session);
 
 // Fetch data when connected (use immediate for explicit user actions)
+// When slack sessions are filtered out, request more to keep the visible list full
 function fetchData() {
   if (connected.value) {
     getProjects();
-    getRecentSessionsImmediate();
+    getRecentSessionsImmediate(slackSessionSlug.value ? 200 : undefined);
   }
 }
 
@@ -139,6 +140,14 @@ onMounted(() => {
 watch(connected, (isConnected) => {
   if (isConnected) {
     fetchData();
+  }
+});
+
+// Re-fetch sessions with higher limit once slackSessionSlug is first known
+// (first fetchData() runs before server responds with the slug)
+watch(slackSessionSlug, (slug, prev) => {
+  if (slug && !prev && connected.value) {
+    getRecentSessionsImmediate(200);
   }
 });
 
@@ -389,33 +398,37 @@ function handleOverlayClick() {
     </div>
 
     <nav class="sidebar-tabs">
+      <!-- Sessions tab -->
       <button
         class="sidebar-tab"
         :class="{ active: activeTab === 'sessions' }"
         @click="activeTab = 'sessions'"
+        title="Sessions"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
-        Sessions
       </button>
+      <!-- Projects tab -->
       <button
         class="sidebar-tab"
         :class="{ active: activeTab === 'projects' }"
         @click="activeTab = 'projects'"
+        title="Projects"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
         </svg>
-        Projects
       </button>
+      <!-- Slack tab (only when hideSlackSessions is enabled) -->
       <button
         v-if="slackSessionSlug"
         class="sidebar-tab"
         :class="{ active: activeTab === 'slack' }"
         @click="activeTab = 'slack'"
+        title="Slack Sessions"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5z"/>
           <path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
           <path d="M9.5 14c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5S8 21.33 8 20.5v-5c0-.83.67-1.5 1.5-1.5z"/>
@@ -425,7 +438,6 @@ function handleOverlayClick() {
           <path d="M10 9.5C10 8.67 9.33 8 8.5 8h-5C2.67 8 2 8.67 2 9.5S2.67 11 3.5 11h5c.83 0 1.5-.67 1.5-1.5z"/>
           <path d="M8.5 5H10V3.5C10 2.67 9.33 2 8.5 2S7 2.67 7 3.5 7.67 5 8.5 5z"/>
         </svg>
-        Slack
       </button>
     </nav>
 
