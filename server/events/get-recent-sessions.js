@@ -32,13 +32,24 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { config, getProjectDisplayName, slugToPath } from '../config.js';
+import {
+  config,
+  getProjectDisplayName,
+  pathToSlug,
+  slugToPath,
+} from '../config.js';
 import { logger } from '../lib/logger.js';
 import { loadTitles } from '../lib/session-titles.js';
 import { send } from '../lib/ws.js';
+import { loadSlackConfigRaw } from '../slack/config.js';
 
 export function handler(ws, message) {
   const limit = message.limit || 50;
+  const slackConfig = loadSlackConfigRaw();
+  const slackSessionSlug =
+    slackConfig.hideSlackSessions && slackConfig.sessionLogPath
+      ? pathToSlug(slackConfig.sessionLogPath)
+      : null;
 
   try {
     if (!existsSync(config.projectsDir)) {
@@ -221,9 +232,10 @@ export function handler(ws, message) {
     send(ws, {
       type: 'recent_sessions',
       sessions: limitedSessions,
+      slackSessionSlug,
     });
   } catch (err) {
     logger.error('Failed to load recent sessions:', err.message);
-    send(ws, { type: 'recent_sessions', sessions: [] });
+    send(ws, { type: 'recent_sessions', sessions: [], slackSessionSlug });
   }
 }

@@ -26,6 +26,7 @@ const {
   currentFolder,
   rootPath,
   homePath,
+  slackSessionSlug,
   connect,
   send,
   onMessage,
@@ -87,8 +88,21 @@ watch(fm.filesCurrentPath, (path) => {
 
 // ─── Quick access ─────────────────────────────────────────────────────────────
 
-const quickSessions = computed(() => recentSessions.value.slice(0, 5));
-const quickProjects = computed(() => projects.value.slice(0, 5));
+const quickSessions = computed(() => {
+  const sessions = slackSessionSlug.value
+    ? recentSessions.value.filter(
+        (s) => s.projectSlug !== slackSessionSlug.value,
+      )
+    : recentSessions.value;
+  return sessions.slice(0, 5);
+});
+
+const quickProjects = computed(() => {
+  const projs = slackSessionSlug.value
+    ? projects.value.filter((p) => p.slug !== slackSessionSlug.value)
+    : projects.value;
+  return projs.slice(0, 5);
+});
 
 // ─── Loading state ────────────────────────────────────────────────────────────
 

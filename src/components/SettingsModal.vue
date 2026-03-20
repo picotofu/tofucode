@@ -143,6 +143,7 @@ const SLACK_DEFAULTS = {
   appToken: '',
   projectRootPath: '',
   sessionLogPath: '',
+  hideSlackSessions: false,
   respondDm: true,
   debounceMs: 10000,
   watchedChannels: [],
@@ -824,6 +825,22 @@ async function handleClearCacheAndUpdate() {
               class="setting-input"
               placeholder="/home/user/slack-sessions"
             />
+          </div>
+
+          <!-- Hide Slack Sessions -->
+          <div class="setting-item">
+            <label class="setting-label">
+              <input
+                type="checkbox"
+                v-model="slackLocal.hideSlackSessions"
+                class="setting-checkbox"
+                :disabled="!slackLocal.sessionLogPath"
+              />
+              <span class="setting-title" :class="{ 'text-muted': !slackLocal.sessionLogPath }">Hide Slack Sessions from Sidebar</span>
+            </label>
+            <p class="setting-description">
+              Hide Slack classifier sessions from the main Sessions tab and homepage. When enabled, they appear in a dedicated <strong>Slack</strong> tab in the sidebar. Requires Session Log Path to be set.
+            </p>
           </div>
 
           <hr class="divider" />
