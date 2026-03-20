@@ -21,12 +21,21 @@
  * }
  */
 
+import { pathToSlug } from '../config.js';
 import { getProjectsList } from '../lib/projects.js';
 import { send } from '../lib/ws.js';
+import { loadSlackConfigRaw } from '../slack/config.js';
 
 export function handler(ws, _message, _context) {
+  const slackConfig = loadSlackConfigRaw();
+  const slackSessionSlug =
+    slackConfig.hideSlackSessions && slackConfig.sessionLogPath
+      ? pathToSlug(slackConfig.sessionLogPath)
+      : null;
+
   send(ws, {
     type: 'projects_list',
     projects: getProjectsList(),
+    slackSessionSlug,
   });
 }

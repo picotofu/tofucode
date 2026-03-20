@@ -27,6 +27,7 @@ const DEFAULT_CONFIG = {
   selfUserId: '', // Cached from auth.test — for self-reply prevention
   projectRootPath: '', // Root path for project discovery (e.g. /home/user/projects)
   sessionLogPath: '', // Optional: folder path to persist session logs (e.g. /home/user/slack-sessions)
+  hideSlackSessions: false, // Hide slack sessions from main sidebar/homepage; show in dedicated Slack Sessions tab
   respondDm: true, // Whether to respond to direct messages
   debounceMs: 10000, // Debounce window in ms — groups rapid successive messages before processing
   watchedChannels: [],

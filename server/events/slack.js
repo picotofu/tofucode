@@ -48,6 +48,8 @@ export async function handleSaveConfig(ws, message) {
       enabled: incoming.enabled ?? existing.enabled,
       projectRootPath: incoming.projectRootPath ?? existing.projectRootPath,
       sessionLogPath: incoming.sessionLogPath ?? existing.sessionLogPath,
+      hideSlackSessions:
+        incoming.hideSlackSessions ?? existing.hideSlackSessions,
       respondDm: incoming.respondDm ?? existing.respondDm,
       debounceMs: incoming.debounceMs ?? existing.debounceMs,
       watchedChannels: incoming.watchedChannels ?? existing.watchedChannels,
