@@ -28,6 +28,7 @@ const DEFAULT_CONFIG = {
   projectRootPath: '', // Root path for project discovery (e.g. /home/user/projects)
   sessionLogPath: '', // Optional: folder path to persist session logs (e.g. /home/user/slack-sessions)
   hideSlackSessions: false, // Hide slack sessions from main sidebar/homepage; show in dedicated Slack Sessions tab
+  lastViewedAt: null, // ISO8601 timestamp — when user last opened the Slack sessions tab (server-synced)
   respondDm: true, // Whether to respond to direct messages
   debounceMs: 10000, // Debounce window in ms — groups rapid successive messages before processing
   watchedChannels: [],
@@ -166,6 +167,18 @@ export function getMaskedConfig() {
 function maskToken(token) {
   if (!token || token.length < 8) return '';
   return `${'*'.repeat(token.length - 4)}${token.slice(-4)}`;
+}
+
+/**
+ * Update lastViewedAt to now and persist to disk
+ * @returns {string} The new ISO8601 timestamp
+ */
+export function updateLastViewedAt() {
+  const now = new Date().toISOString();
+  const config = loadSlackConfigRaw();
+  config.lastViewedAt = now;
+  saveSlackConfig(config);
+  return now;
 }
 
 // --- Session Mappings ---

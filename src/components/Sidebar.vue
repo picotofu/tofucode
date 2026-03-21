@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { useWebSocket } from '../composables/useWebSocket';
 import { formatRelativeTime } from '../utils/format.js';
 
@@ -19,7 +19,6 @@ const emit = defineEmits([
   'new-project',
 ]);
 
-const router = useRouter();
 const route = useRoute();
 const {
   connected,
@@ -118,16 +117,39 @@ function handleDismissUpdate(e) {
 
 const activeTab = ref('sessions');
 
+// Slack unread badge — server-synced lastViewedAt timestamp
+// Populated from slack:config response; null = never viewed (all sessions are unread)
+const slackLastViewed = ref(null);
+
+onMessage((msg) => {
+  if (msg.type === 'slack:config' && msg.lastViewedAt !== undefined) {
+    slackLastViewed.value = msg.lastViewedAt;
+  }
+});
+
+const slackUnreadCount = computed(() => {
+  if (!slackSessionSlug.value) return 0;
+  // If never viewed, all sessions count as unread
+  const lastViewed = slackLastViewed.value || '1970-01-01T00:00:00.000Z';
+  return slackSessions.value.filter((s) => s.modified > lastViewed).length;
+});
+
+// Notify server when user opens the Slack tab — syncs lastViewedAt across all devices/tabs
+watch(activeTab, (tab) => {
+  if (tab === 'slack') {
+    send({ type: 'slack:mark_viewed' });
+  }
+});
+
 // Current route info for highlighting
 const currentProject = computed(() => route.params.project);
 const currentSession = computed(() => route.params.session);
 
 // Fetch data when connected (use immediate for explicit user actions)
-// When slack sessions are filtered out, request more to keep the visible list full
 function fetchData() {
   if (connected.value) {
     getProjects();
-    getRecentSessionsImmediate(slackSessionSlug.value ? 200 : undefined);
+    getRecentSessionsImmediate();
   }
 }
 
@@ -143,11 +165,10 @@ watch(connected, (isConnected) => {
   }
 });
 
-// Re-fetch sessions with higher limit once slackSessionSlug is first known
-// (first fetchData() runs before server responds with the slug)
+// Fetch slack config once the slug is first known to populate lastViewedAt for the unread badge
 watch(slackSessionSlug, (slug, prev) => {
   if (slug && !prev && connected.value) {
-    getRecentSessionsImmediate(200);
+    send({ type: 'slack:get_config' });
   }
 });
 
@@ -166,19 +187,6 @@ function closeOnMobile() {
   if (window.innerWidth <= 768) {
     emit('close');
   }
-}
-
-function selectSession(session) {
-  // Full page reload to ensure clean WebSocket state - prevents cross-session issues
-  window.location.href = `/project/${session.projectSlug}/session/${session.sessionId}`;
-}
-
-function selectProject(project) {
-  router.push({
-    name: 'sessions',
-    params: { project: project.slug },
-  });
-  closeOnMobile();
 }
 
 function startNewSession(projectSlug) {
@@ -438,6 +446,9 @@ function handleOverlayClick() {
           <path d="M10 9.5C10 8.67 9.33 8 8.5 8h-5C2.67 8 2 8.67 2 9.5S2.67 11 3.5 11h5c.83 0 1.5-.67 1.5-1.5z"/>
           <path d="M8.5 5H10V3.5C10 2.67 9.33 2 8.5 2S7 2.67 7 3.5 7.67 5 8.5 5z"/>
         </svg>
+        <span v-if="slackUnreadCount > 0" class="slack-badge">
+          {{ slackUnreadCount > 99 ? '99+' : slackUnreadCount }}
+        </span>
       </button>
     </nav>
 
@@ -678,6 +689,7 @@ function handleOverlayClick() {
   transition: color 0.15s, background 0.15s;
   flex: 1;
   justify-content: center;
+  position: relative;
 }
 
 .sidebar-tab:hover {
@@ -687,6 +699,24 @@ function handleOverlayClick() {
 .sidebar-tab.active {
   color: var(--text-primary);
   background: var(--bg-tertiary);
+}
+
+.slack-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 8px;
+  line-height: 16px;
+  text-align: center;
+  box-sizing: border-box;
+  pointer-events: none;
 }
 
 .sidebar-content {

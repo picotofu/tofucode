@@ -405,12 +405,12 @@ function getRecentSessions() {
 }
 
 // Immediate version for explicit user actions (e.g., opening sidebar)
-function getRecentSessionsImmediate(limit) {
+function getRecentSessionsImmediate() {
   if (recentSessionsDebounceTimer) {
     clearTimeout(recentSessionsDebounceTimer);
     recentSessionsDebounceTimer = null;
   }
-  sendGlobal({ type: 'get_recent_sessions', ...(limit ? { limit } : {}) });
+  sendGlobal({ type: 'get_recent_sessions' });
 }
 
 // Higher-limit version for the command palette (needs full history for search)
