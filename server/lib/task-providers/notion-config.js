@@ -6,6 +6,12 @@
  *
  * Schema:
  *   { enabled, token, ticketDatabaseUrl, fieldMappings: [{ field, type, purpose }] }
+ *
+ * TODO (adapter): When adding support for additional task management providers
+ * (e.g. Jira, Linear), this file should evolve into a generic active-provider
+ * config — e.g. ~/.tofucode/tasks-config.json with a top-level `provider` field.
+ * Each provider would then have its own config block keyed by provider name.
+ * The TaskProvider registry in index.js is already structured for this.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

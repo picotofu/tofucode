@@ -11,13 +11,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits([
-  'close',
-  'open-settings',
-  'open-help',
-  'open-mcp',
-  'new-project',
-]);
+const emit = defineEmits(['close', 'open-settings', 'new-project']);
 
 const route = useRoute();
 const {
@@ -301,33 +295,45 @@ function handleOverlayClick() {
 
       <!-- Slack Sessions Tab -->
       <ul v-else-if="activeTab === 'slack'" class="sidebar-list">
-        <li
-          v-for="session in slackSessions"
-          :key="session.sessionId"
-          class="sidebar-item"
-          :class="{ active: currentSession === session.sessionId }"
-        >
-          <a
-            :href="`/project/${session.projectSlug}/session/${session.sessionId}`"
-            class="sidebar-link"
+        <template v-if="slackSessionSlug">
+          <li
+            v-for="session in slackSessions"
+            :key="session.sessionId"
+            class="sidebar-item"
+            :class="{ active: currentSession === session.sessionId }"
           >
-            <div class="item-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-              </svg>
-            </div>
-            <div class="item-content">
-              <p class="item-title truncate">{{ session.title || session.firstPrompt }}</p>
-              <p class="item-meta">
-                <span>{{ formatRelativeTime(session.modified) }}</span>
-              </p>
-            </div>
-          </a>
-        </li>
-        <li v-if="slackSessions.length === 0" class="sidebar-empty">
-          No Slack sessions yet
+            <a
+              :href="`/project/${session.projectSlug}/session/${session.sessionId}`"
+              class="sidebar-link"
+            >
+              <div class="item-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </div>
+              <div class="item-content">
+                <p class="item-title truncate">{{ session.title || session.firstPrompt }}</p>
+                <p class="item-meta">
+                  <span>{{ formatRelativeTime(session.modified) }}</span>
+                </p>
+              </div>
+            </a>
+          </li>
+          <li v-if="slackSessions.length === 0" class="sidebar-empty">
+            No Slack sessions yet
+          </li>
+        </template>
+        <li v-else class="sidebar-empty">
+          Slack integration not configured
         </li>
       </ul>
+
+      <!-- Tasks Tab -->
+      <div v-else-if="activeTab === 'tasks'" class="sidebar-list">
+        <div class="sidebar-empty">
+          Tasks panel coming soon
+        </div>
+      </div>
 
       <!-- Projects Tab -->
       <ul v-else-if="activeTab === 'projects'" class="sidebar-list">
@@ -428,9 +434,8 @@ function handleOverlayClick() {
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
         </svg>
       </button>
-      <!-- Slack tab (only when hideSlackSessions is enabled) -->
+      <!-- Slack tab -->
       <button
-        v-if="slackSessionSlug"
         class="sidebar-tab"
         :class="{ active: activeTab === 'slack' }"
         @click="activeTab = 'slack'"
@@ -449,6 +454,18 @@ function handleOverlayClick() {
         <span v-if="slackUnreadCount > 0" class="slack-badge">
           {{ slackUnreadCount > 99 ? '99+' : slackUnreadCount }}
         </span>
+      </button>
+      <!-- Tasks tab -->
+      <button
+        class="sidebar-tab"
+        :class="{ active: activeTab === 'tasks' }"
+        @click="activeTab = 'tasks'"
+        title="Tasks"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 11l3 3L22 4"/>
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+        </svg>
       </button>
     </nav>
 
@@ -480,31 +497,6 @@ function handleOverlayClick() {
         </button>
         <button class="dismiss-btn" @click="handleDismissUpdate" title="Dismiss">×</button>
       </div>
-
-      <!-- MCP button -->
-      <button
-        class="sidebar-icon-btn"
-        @click="$emit('open-mcp')"
-        title="MCP Servers"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/>
-          <path d="M7 7h.01"/>
-        </svg>
-      </button>
-
-      <!-- Help button -->
-      <button
-        class="sidebar-icon-btn"
-        @click="$emit('open-help')"
-        title="Keyboard Shortcuts (Ctrl+?)"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-          <line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
-      </button>
 
       <!-- Settings button -->
       <button

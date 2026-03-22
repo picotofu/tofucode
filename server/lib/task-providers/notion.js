@@ -140,6 +140,37 @@ class NotionAPI {
   async appendBlockChildren(pageId, children) {
     return this.call('PATCH', `/blocks/${pageId}/children`, { children });
   }
+
+  /**
+   * Get a page by ID — GET /v1/pages/{id}
+   * @param {string} pageId - Page ID
+   * @returns {Promise<Object>}
+   */
+  async getPage(pageId) {
+    return this.call('GET', `/pages/${pageId}`);
+  }
+
+  /**
+   * Get block children for a page — GET /v1/blocks/{id}/children
+   * @param {string} pageId - Page ID (also a block)
+   * @param {string} [cursor] - Pagination cursor
+   * @returns {Promise<Object>}
+   */
+  async getBlockChildren(pageId, cursor) {
+    const params = new URLSearchParams({ page_size: '100' });
+    if (cursor) params.set('start_cursor', cursor);
+    return this.call('GET', `/blocks/${pageId}/children?${params}`);
+  }
+
+  /**
+   * Query a database — POST /v1/databases/{id}/query
+   * @param {string} dbId - Database ID
+   * @param {Object} [body] - Query body (filter, sorts, page_size, start_cursor)
+   * @returns {Promise<Object>}
+   */
+  async queryDatabase(dbId, body = {}) {
+    return this.call('POST', `/databases/${dbId}/query`, body);
+  }
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -376,6 +407,112 @@ function buildBodyChildren(body) {
   return children;
 }
 
+/**
+ * Extract plain text from a Notion rich_text array.
+ * @param {Array} richText
+ * @returns {string}
+ */
+function extractPlainText(richText) {
+  if (!Array.isArray(richText)) return '';
+  return richText.map((t) => t.plain_text ?? t.text?.content ?? '').join('');
+}
+
+/**
+ * Extract the title string from a Notion page properties object.
+ * Finds the first property with type === 'title'.
+ * @param {Object} properties
+ * @returns {string}
+ */
+function extractPageTitle(properties) {
+  for (const prop of Object.values(properties)) {
+    if (prop.type === 'title') {
+      return extractPlainText(prop.title);
+    }
+  }
+  return '';
+}
+
+/**
+ * Extract the status string from a Notion page properties object.
+ * Finds the first property with type === 'status', falling back to 'select'.
+ * If multiple status/select fields exist, the first encountered wins — relies on
+ * the database having a single primary status field, which is the common case.
+ * @param {Object} properties
+ * @returns {string|undefined}
+ */
+function extractPageStatus(properties) {
+  for (const prop of Object.values(properties)) {
+    if (prop.type === 'status') return prop.status?.name;
+    if (prop.type === 'select') return prop.select?.name;
+  }
+  return undefined;
+}
+
+/**
+ * Fetch all block children for a page, following pagination.
+ * Returns a flat array of all top-level block objects.
+ * Capped at 10 pages (1000 blocks) to prevent runaway requests on very large pages.
+ * @param {NotionAPI} api
+ * @param {string} pageId
+ * @returns {Promise<Array>}
+ */
+async function fetchAllBlocks(api, pageId) {
+  const blocks = [];
+  let cursor;
+  let pages = 0;
+  const MAX_PAGES = 10;
+
+  do {
+    const res = await api.getBlockChildren(pageId, cursor);
+    blocks.push(...(res.results ?? []));
+    cursor = res.next_cursor ?? undefined;
+    pages++;
+  } while (cursor && pages < MAX_PAGES);
+
+  return blocks;
+}
+
+/**
+ * Convert a flat array of Notion blocks to a plain text string.
+ * Handles paragraph, heading_1/2/3, bulleted_list_item, numbered_list_item,
+ * to_do, callout, quote, and code blocks.
+ * @param {Array} blocks
+ * @returns {string}
+ */
+function blocksToPlainText(blocks) {
+  return blocks
+    .map((block) => {
+      const type = block.type;
+      const content = block[type];
+      if (!content) return '';
+
+      switch (type) {
+        case 'paragraph':
+          return extractPlainText(content.rich_text);
+        case 'heading_1':
+          return `# ${extractPlainText(content.rich_text)}`;
+        case 'heading_2':
+          return `## ${extractPlainText(content.rich_text)}`;
+        case 'heading_3':
+          return `### ${extractPlainText(content.rich_text)}`;
+        case 'bulleted_list_item':
+          return `- ${extractPlainText(content.rich_text)}`;
+        case 'numbered_list_item':
+          return `1. ${extractPlainText(content.rich_text)}`;
+        case 'to_do':
+          return `[${content.checked ? 'x' : ' '}] ${extractPlainText(content.rich_text)}`;
+        case 'callout':
+        case 'quote':
+        case 'code':
+          return extractPlainText(content.rich_text);
+        default:
+          return '';
+      }
+    })
+    .filter(Boolean)
+    .join('\n\n');
+}
+
 // ─── Provider factory ────────────────────────────────────────────────────────
 
 /**
@@ -488,6 +625,76 @@ export function createNotionProvider(token) {
       } catch (err) {
         logger.error('[Notion] updateTicket error:', err.message);
         return { success: false, reason: err.message };
+      }
+    },
+
+    /**
+     * Fetch a ticket's properties and page body content
+     * @param {string} pageId
+     * @returns {Promise<import('./types.js').FetchTicketResult>}
+     */
+    async fetchTicket(pageId) {
+      try {
+        const page = await api.getPage(pageId);
+        const title = extractPageTitle(page.properties ?? {});
+        const status = extractPageStatus(page.properties ?? {});
+        const url = page.url || `https://notion.so/${pageId.replace(/-/g, '')}`;
+        const lastEditedAt = page.last_edited_time;
+
+        const blocks = await fetchAllBlocks(api, pageId);
+        const body = blocksToPlainText(blocks);
+
+        return {
+          success: true,
+          pageId,
+          title,
+          url,
+          status,
+          body,
+          lastEditedAt,
+        };
+      } catch (err) {
+        logger.error('[Notion] fetchTicket error:', err.message);
+        return { success: false, error: err.message };
+      }
+    },
+
+    /**
+     * List tickets from a Notion database
+     * @param {import('./types.js').ListTicketsParams} params
+     * @returns {Promise<import('./types.js').ListTicketsResult>}
+     */
+    async listTickets({ databaseUrl, limit = 20, cursor }) {
+      const dbId = extractDatabaseId(databaseUrl);
+      if (!dbId) {
+        return {
+          success: false,
+          error: 'Could not extract database ID from URL.',
+        };
+      }
+
+      try {
+        const queryBody = { page_size: limit };
+        if (cursor) queryBody.start_cursor = cursor;
+
+        const res = await api.queryDatabase(dbId, queryBody);
+
+        const tickets = (res.results ?? []).map((page) => ({
+          pageId: page.id,
+          title: extractPageTitle(page.properties ?? {}),
+          url: page.url || `https://notion.so/${page.id.replace(/-/g, '')}`,
+          status: extractPageStatus(page.properties ?? {}),
+          lastEditedAt: page.last_edited_time,
+        }));
+
+        return {
+          success: true,
+          tickets,
+          nextCursor: res.next_cursor ?? undefined,
+        };
+      } catch (err) {
+        logger.error('[Notion] listTickets error:', err.message);
+        return { success: false, error: err.message };
       }
     },
 

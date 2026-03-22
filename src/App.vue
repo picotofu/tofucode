@@ -4,8 +4,6 @@ import { useRoute, useRouter } from 'vue-router';
 import CommandPalette from './components/CommandPalette.vue';
 import FilePicker from './components/FilePicker.vue';
 import GitCloneModal from './components/GitCloneModal.vue';
-import KeyboardShortcutsModal from './components/KeyboardShortcutsModal.vue';
-import McpModal from './components/McpModal.vue';
 import PwaPrompt from './components/PwaPrompt.vue';
 import SettingsModal from './components/SettingsModal.vue';
 import Sidebar from './components/Sidebar.vue';
@@ -46,6 +44,8 @@ function fetchUsageStats() {
 
 // Settings state
 const showSettings = ref(false);
+const settingsInitialTab = ref('settings');
+const settingsModalRef = ref(null);
 const settings = ref({
   debugMode: false,
   autoSaveFiles: true,
@@ -71,7 +71,12 @@ const notionConfig = ref(null);
 const notionTestResult = ref(null);
 const notionAnalyseResult = ref(null);
 
-function openSettings() {
+// MCP state
+const mcpServers = ref([]);
+const mcpLoading = ref(false);
+
+function openSettings(tab) {
+  settingsInitialTab.value = tab || 'settings';
   showSettings.value = true;
 }
 
@@ -81,31 +86,6 @@ function closeSettings() {
 
 // Android back button closes settings modal instead of navigating away (mobile only)
 useBackButton(showSettings, closeSettings, { mobileOnly: true });
-
-// Help modal state
-const showHelp = ref(false);
-
-function openHelp() {
-  showHelp.value = true;
-}
-
-function closeHelp() {
-  showHelp.value = false;
-}
-
-// MCP modal state
-const showMcp = ref(false);
-const mcpServers = ref([]);
-const mcpLoading = ref(false);
-const mcpModalRef = ref(null);
-
-function openMcp() {
-  showMcp.value = true;
-}
-
-function closeMcp() {
-  showMcp.value = false;
-}
 
 function fetchMcpServers() {
   mcpLoading.value = true;
@@ -235,12 +215,14 @@ onMessage((msg) => {
   ) {
     if (msg.success) {
       mcpServers.value = msg.servers;
-      mcpModalRef.value?.handleMutationSuccess();
+      settingsModalRef.value?.handleMcpMutationSuccess();
     } else {
-      mcpModalRef.value?.handleMutationError(msg.error ?? 'Operation failed');
+      settingsModalRef.value?.handleMcpMutationError(
+        msg.error ?? 'Operation failed',
+      );
     }
   } else if (msg.type === 'mcp:test_result') {
-    mcpModalRef.value?.handleTestResult(msg);
+    settingsModalRef.value?.handleMcpTestResult(msg);
   } else if (
     msg.type === 'files:read:result' &&
     pendingDownloads.has(msg.path)
@@ -301,12 +283,16 @@ function handleGlobalKeydown(e) {
   // Ctrl+, or Cmd+,: Open settings
   if ((e.ctrlKey || e.metaKey) && e.key === ',') {
     e.preventDefault();
-    openSettings();
+    openSettings('settings');
   }
   // Ctrl+? or Cmd+? or Ctrl+/ or Cmd+/: Show keyboard shortcuts
   if ((e.ctrlKey || e.metaKey) && (e.key === '?' || e.key === '/')) {
     e.preventDefault();
-    showHelp.value = !showHelp.value;
+    if (showSettings.value) {
+      closeSettings();
+    } else {
+      openSettings('shortcuts');
+    }
   }
 }
 
@@ -457,7 +443,7 @@ onUnmounted(() => {
 
 <template>
   <div class="app" :class="{ 'sidebar-open': sidebarOpen }">
-    <Sidebar :open="sidebarOpen" @close="closeSidebar" @open-settings="openSettings" @open-help="openHelp" @open-mcp="openMcp" @new-project="openPaletteNewProject" />
+    <Sidebar :open="sidebarOpen" @close="closeSidebar" @open-settings="openSettings" @new-project="openPaletteNewProject" />
     <div class="app-main">
       <router-view />
     </div>
@@ -475,6 +461,7 @@ onUnmounted(() => {
       @download="handleFilePickerDownload"
     />
     <SettingsModal
+      ref="settingsModalRef"
       :show="showSettings"
       :settings="settings"
       :connected="connected"
@@ -488,6 +475,9 @@ onUnmounted(() => {
       :notion-config="notionConfig"
       :notion-test-result="notionTestResult"
       :notion-analyse-result="notionAnalyseResult"
+      :mcp-servers="mcpServers"
+      :mcp-loading="mcpLoading"
+      :initial-tab="settingsInitialTab"
       @close="closeSettings"
       @update="updateSettings"
       @restart="handleRestart"
@@ -501,28 +491,17 @@ onUnmounted(() => {
       @notion-save-config="saveNotionConfig"
       @notion-test="testNotionConnection"
       @notion-analyse="analyseNotionDatabase"
+      @mcp-fetch="fetchMcpServers"
+      @mcp-add="handleMcpAdd"
+      @mcp-update="handleMcpUpdate"
+      @mcp-remove="handleMcpRemove"
+      @mcp-test="handleMcpTest"
     />
     <GitCloneModal
       :show="showCloneDialog"
       :initial-target-dir="cloneInitialDir"
       @close="closeCloneDialog"
       @cloned="handleCloned"
-    />
-    <McpModal
-      ref="mcpModalRef"
-      :show="showMcp"
-      :servers="mcpServers"
-      :loading="mcpLoading"
-      @close="closeMcp"
-      @fetch="fetchMcpServers"
-      @add="handleMcpAdd"
-      @update="handleMcpUpdate"
-      @remove="handleMcpRemove"
-      @test="handleMcpTest"
-    />
-    <KeyboardShortcutsModal
-      v-if="showHelp"
-      @close="closeHelp"
     />
     <PwaPrompt />
   </div>

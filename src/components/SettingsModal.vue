@@ -1,5 +1,7 @@
 <script setup>
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
+import McpServerForm from './McpServerForm.vue';
+import McpServerList from './McpServerList.vue';
 import UsageStats from './UsageStats.vue';
 
 const props = defineProps({
@@ -55,6 +57,18 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  mcpServers: {
+    type: Array,
+    default: () => [],
+  },
+  mcpLoading: {
+    type: Boolean,
+    default: false,
+  },
+  initialTab: {
+    type: String,
+    default: 'settings',
+  },
 });
 
 const activeTab = ref('settings');
@@ -73,6 +87,11 @@ const emit = defineEmits([
   'notion-save-config',
   'notion-test',
   'notion-analyse',
+  'mcp-fetch',
+  'mcp-add',
+  'mcp-update',
+  'mcp-remove',
+  'mcp-test',
 ]);
 
 // Local copy of settings
@@ -113,6 +132,11 @@ function closeModal() {
 function handleKeydown(e) {
   if (e.key === 'Escape') {
     e.preventDefault();
+    // If MCP tab is in add/edit sub-view, return to list instead of closing modal
+    if (activeTab.value === 'mcp' && mcpView.value !== 'list') {
+      mcpOnFormCancel();
+      return;
+    }
     closeModal();
   }
 }
@@ -123,7 +147,7 @@ watch(
   (isVisible) => {
     if (isVisible) {
       document.addEventListener('keydown', handleKeydown);
-      activeTab.value = 'settings';
+      activeTab.value = props.initialTab;
       emit('fetch-usage');
     } else {
       document.removeEventListener('keydown', handleKeydown);
@@ -134,6 +158,9 @@ watch(
 // Cleanup on unmount
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
+  clearTimeout(mcpListTestTimer);
+  clearTimeout(mcpFormTestTimer);
+  clearTimeout(mcpMutationErrorTimer);
 });
 
 // --- Slack Settings ---
@@ -278,10 +305,6 @@ function selectChannel(channel) {
   closeChannelPicker();
 }
 
-function addWatchedChannel() {
-  openChannelPicker();
-}
-
 function removeWatchedChannel(index) {
   if (!slackLocal.value?.watchedChannels) return;
   slackLocal.value.watchedChannels.splice(index, 1);
@@ -395,6 +418,176 @@ function removeNotionFieldMapping(index) {
   if (!notionLocal.value?.fieldMappings) return;
   notionLocal.value.fieldMappings.splice(index, 1);
 }
+
+// --- MCP Settings ---
+const mcpView = ref('list'); // 'list' | 'add' | 'edit'
+const mcpEditingServer = ref(null);
+const mcpTestingServer = ref(null);
+const mcpListTestResult = ref(null);
+let mcpListTestTimer = null;
+const mcpFormTesting = ref(false);
+const mcpFormTestResult = ref(null);
+let mcpFormTestTimer = null;
+const mcpFormSaving = ref(false);
+const mcpMutationError = ref(null);
+let mcpMutationErrorTimer = null;
+
+// Fetch MCP servers when switching to MCP tab
+watch(activeTab, (tab) => {
+  if (tab === 'mcp') {
+    mcpView.value = 'list';
+    mcpEditingServer.value = null;
+    mcpListTestResult.value = null;
+    mcpFormTestResult.value = null;
+    clearTimeout(mcpListTestTimer);
+    clearTimeout(mcpFormTestTimer);
+    emit('mcp-fetch');
+  }
+});
+
+function mcpOnAdd() {
+  mcpEditingServer.value = null;
+  mcpFormTestResult.value = null;
+  mcpView.value = 'add';
+}
+
+function mcpOnEdit(server) {
+  mcpEditingServer.value = server;
+  mcpFormTestResult.value = null;
+  mcpView.value = 'edit';
+}
+
+function mcpOnRemove(server) {
+  const confirmed = confirm(
+    `Remove "${server.name}" from ${server.scope} scope?`,
+  );
+  if (!confirmed) return;
+  emit('mcp-remove', { name: server.name, scope: server.scope });
+}
+
+function mcpOnTestFromList(server) {
+  mcpTestingServer.value = server.name;
+  mcpListTestResult.value = null;
+  emit('mcp-test', {
+    serverName: server.name,
+    url: server.url,
+    headers: server.headers ?? {},
+  });
+}
+
+function mcpOnFormSave(payload) {
+  mcpFormSaving.value = true;
+  if (mcpView.value === 'edit') {
+    emit('mcp-update', payload);
+  } else {
+    emit('mcp-add', payload);
+  }
+}
+
+function mcpOnFormTest(payload) {
+  mcpFormTesting.value = true;
+  mcpFormTestResult.value = null;
+  emit('mcp-test', { ...payload, _formLevel: true });
+}
+
+function mcpOnFormCancel() {
+  mcpView.value = 'list';
+  mcpEditingServer.value = null;
+  mcpFormTestResult.value = null;
+}
+
+function handleMcpTestResult(result) {
+  if (result._formLevel) {
+    mcpFormTesting.value = false;
+    mcpFormTestResult.value = result;
+    clearTimeout(mcpFormTestTimer);
+    mcpFormTestTimer = setTimeout(() => {
+      mcpFormTestResult.value = null;
+    }, 8000);
+  } else {
+    mcpTestingServer.value = null;
+    mcpListTestResult.value = result;
+    clearTimeout(mcpListTestTimer);
+    mcpListTestTimer = setTimeout(() => {
+      mcpListTestResult.value = null;
+    }, 8000);
+  }
+}
+
+function handleMcpMutationSuccess() {
+  mcpFormSaving.value = false;
+  mcpView.value = 'list';
+  mcpEditingServer.value = null;
+  mcpFormTestResult.value = null;
+  mcpMutationError.value = null;
+}
+
+function handleMcpMutationError(error) {
+  mcpFormSaving.value = false;
+  mcpMutationError.value = error;
+  clearTimeout(mcpMutationErrorTimer);
+  mcpMutationErrorTimer = setTimeout(() => {
+    mcpMutationError.value = null;
+  }, 6000);
+}
+
+// Expose so App.vue can call MCP result handlers
+defineExpose({
+  handleMcpTestResult,
+  handleMcpMutationSuccess,
+  handleMcpMutationError,
+});
+
+// --- Keyboard Shortcuts data ---
+const shortcuts = [
+  {
+    category: 'Global',
+    items: [
+      { keys: ['⌘/^', 'K'], description: 'Open command palette' },
+      { keys: ['⌘/^', 'P'], description: 'Open file picker' },
+      { keys: ['⌘/^', 'B'], description: 'Toggle sidebar' },
+      { keys: ['⌘/^', ','], description: 'Open settings' },
+      { keys: ['⌘/^', '/'], description: 'Show keyboard shortcuts' },
+    ],
+  },
+  {
+    category: 'Chat View',
+    items: [
+      { keys: ['⌘/^', '1'], description: 'Switch to Chat tab' },
+      { keys: ['⌘/^', '2'], description: 'Switch to Terminal tab' },
+      { keys: ['⌘/^', '3'], description: 'Switch to Files tab' },
+      { keys: ['⌘/^', 'M'], description: 'Toggle memo' },
+      { keys: ['⌘/^', 'N'], description: 'New session from current project' },
+      { keys: ['⌘/^', 'J'], description: 'Jump to next session' },
+      { keys: ['⌘/^', 'L'], description: 'Scroll to bottom (clear view)' },
+      { keys: ['⌘/^', '↑'], description: 'Navigate to previous turn' },
+      { keys: ['⌘/^', '↓'], description: 'Navigate to next turn' },
+      { keys: ['Escape'], description: 'Close modals / blur input' },
+    ],
+  },
+  {
+    category: 'Chat Input',
+    items: [
+      { keys: ['Enter'], description: 'Send message' },
+      { keys: ['Shift', 'Enter'], description: 'New line in message' },
+      { keys: ['⌘/^', 'Enter'], description: 'Send message (alternate)' },
+    ],
+  },
+  {
+    category: 'Terminal',
+    items: [
+      { keys: ['Enter'], description: 'Execute command' },
+      { keys: ['\\'], description: 'Start multiline mode' },
+    ],
+  },
+  {
+    category: 'File Editor',
+    items: [
+      { keys: ['⌘/^', 'S'], description: 'Save file' },
+      { keys: ['Escape'], description: 'Close editor' },
+    ],
+  },
+];
 
 // Restart functionality
 const isRestarting = ref(false);
@@ -511,6 +704,16 @@ async function handleClearCacheAndUpdate() {
           :class="{ active: activeTab === 'slack' }"
           @click="activeTab = 'slack'"
         >Slack<span v-if="slackBotConnected" class="tab-status-dot" /></button>
+        <button
+          class="tab-btn"
+          :class="{ active: activeTab === 'mcp' }"
+          @click="activeTab = 'mcp'"
+        >MCP</button>
+        <button
+          class="tab-btn"
+          :class="{ active: activeTab === 'shortcuts' }"
+          @click="activeTab = 'shortcuts'"
+        >Shortcuts</button>
       </div>
 
       <div class="modal-body">
@@ -1221,6 +1424,63 @@ async function handleClearCacheAndUpdate() {
 
           </template><!-- end v-else-if="notionLocal" -->
         </template><!-- end Notion Tab -->
+
+        <!-- MCP Tab -->
+        <template v-if="activeTab === 'mcp'">
+          <p class="mcp-desc">HTTP/SSE servers are fully managed here. stdio servers require manual installation — only config is managed.</p>
+
+          <!-- Mutation error banner -->
+          <div v-if="mcpMutationError" class="mcp-mutation-error">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            {{ mcpMutationError }}
+          </div>
+
+          <!-- List view -->
+          <McpServerList
+            v-if="mcpView === 'list'"
+            :servers="mcpServers"
+            :loading="mcpLoading"
+            :testing-server="mcpTestingServer"
+            :test-result="mcpListTestResult"
+            @add="mcpOnAdd"
+            @edit="mcpOnEdit"
+            @remove="mcpOnRemove"
+            @test="mcpOnTestFromList"
+          />
+
+          <!-- Add / Edit form -->
+          <McpServerForm
+            v-else
+            :server="mcpView === 'edit' ? mcpEditingServer : null"
+            :testing="mcpFormTesting"
+            :test-result="mcpFormTestResult"
+            :saving="mcpFormSaving"
+            @save="mcpOnFormSave"
+            @cancel="mcpOnFormCancel"
+            @test="mcpOnFormTest"
+          />
+        </template><!-- end MCP Tab -->
+
+        <!-- Keyboard Shortcuts Tab -->
+        <template v-if="activeTab === 'shortcuts'">
+          <table class="shortcuts-table">
+            <tbody v-for="section in shortcuts" :key="section.category">
+              <tr class="shortcuts-section-header">
+                <td colspan="2">{{ section.category }}</td>
+              </tr>
+              <tr v-for="(shortcut, index) in section.items" :key="index" class="shortcut-row">
+                <td class="shortcut-keys">
+                  <kbd v-for="(key, i) in shortcut.keys" :key="i" class="shortcut-key">
+                    {{ key }}
+                  </kbd>
+                </td>
+                <td class="shortcut-description">{{ shortcut.description }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </template><!-- end Shortcuts Tab -->
       </div>
     </div>
   </div>
@@ -1246,7 +1506,7 @@ async function handleClearCacheAndUpdate() {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   width: 90%;
-  max-width: 500px;
+  max-width: 600px;
   max-height: 80vh;
   overflow: hidden;
   display: flex;
@@ -1906,6 +2166,85 @@ async function handleClearCacheAndUpdate() {
   letter-spacing: 0.04em;
 }
 
+/* --- MCP Tab --- */
+.mcp-desc {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.mcp-mutation-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--error-color);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-sm);
+}
+
+/* --- Shortcuts Tab --- */
+.shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.shortcuts-section-header td {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 16px 4px 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.shortcuts-table tbody:first-child .shortcuts-section-header td {
+  padding-top: 4px;
+}
+
+.shortcut-row td {
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.shortcut-row:hover {
+  background: var(--bg-hover);
+}
+
+.shortcut-keys {
+  width: 140px;
+  white-space: nowrap;
+}
+
+.shortcut-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
+  margin-right: 4px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+}
+
+.shortcut-description {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
 @media (max-width: 768px) {
   .modal-overlay {
     padding: 0;
@@ -1918,6 +2257,16 @@ async function handleClearCacheAndUpdate() {
     height: 100%;
     max-height: 100%;
     border-radius: 0;
+  }
+
+  .shortcut-keys {
+    width: auto;
+    display: block;
+    padding-bottom: 4px;
+  }
+
+  .shortcut-description {
+    font-size: 12px;
   }
 }
 </style>
