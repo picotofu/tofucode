@@ -16,19 +16,21 @@ import { findTicket, storeTicket } from '../lib/notion-tickets.js';
  * @param {import('../lib/classifier.js').Classification} params.classification
  * @param {Object} params.event - Slack event
  * @param {import('../lib/api.js').SlackAPI} params.slackApi
+ * @param {string} [params.replyTs] - Override reply timestamp (DM thread anchor)
  */
 export async function dispatchAction({
   classification,
   event,
   channelConfig,
   slackApi,
+  replyTs: replyTsOverride = null,
 }) {
   const { channel, ts, thread_ts: threadTs } = event;
   const isDm = channelConfig?.name === 'DM';
   // sessionKey: stable identifier for ticket dedup. DMs use channel ID; threads use thread_ts or ts.
   const sessionKey = isDm ? channel : threadTs || ts;
-  // replyTs: valid Slack message timestamp for threading replies. Always a real ts.
-  const replyTs = threadTs || ts;
+  // replyTs: DMs use the thread anchor (passed from dm.js); channels derive from event.
+  const replyTs = replyTsOverride ?? threadTs ?? ts;
 
   logger.log(
     `[Slack] [dispatch] action=${classification.action} sessionKey=${sessionKey} replyTs=${replyTs} isDm=${isDm}`,
