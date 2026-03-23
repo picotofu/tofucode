@@ -33,8 +33,8 @@ const displayLabel = computed(() => {
   const head = props.headOptions.find((o) => o.value === props.modelValue);
   if (head) return head.label;
   return (
-    props.assignees.find((u) => u.id === props.modelValue)?.name ??
-    props.modelValue ??
+    props.assignees.find((u) => u.id === props.modelValue)?.name ||
+    props.modelValue ||
     '—'
   );
 });
@@ -116,6 +116,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 <style scoped>
 .ad-wrap {
   position: relative;
+  width: 100%;
+  min-width: 0;
 }
 
 .ad-trigger {
