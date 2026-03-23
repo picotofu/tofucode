@@ -268,7 +268,7 @@ onUnmounted(() => {
 
 <template>
   <aside class="sidebar" :class="{ open }">
-    <div class="sidebar-content">
+    <div class="sidebar-content" :class="{ 'sidebar-content-tasks': activeTab === 'tasks' && notionEnabled }">
       <!-- Recent Sessions Tab -->
       <!-- Skeleton while sessions are loading -->
       <ul v-if="activeTab === 'sessions' && !sessionsReady" class="sidebar-list">
@@ -823,6 +823,17 @@ onUnmounted(() => {
   overflow-y: auto;
   padding: 8px;
   padding-bottom: 0;
+  min-height: 0;
+}
+
+/* When the tasks tab is active and TasksPanel is rendering, let the panel
+   manage its own scroll/flex layout. We make sidebar-content a pass-through
+   flex container so TasksPanel gets the full flex: 1 height. */
+.sidebar-content-tasks {
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar-list {

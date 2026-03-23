@@ -314,10 +314,16 @@ export async function handleGetAssignees(ws) {
     if (!ctx) return;
 
     const { provider, config, databaseUrl, assigneeField } = ctx;
-    const users = await provider.listAssigneesFromDb(
-      databaseUrl,
-      assigneeField,
-    );
+    const [dbUsers, workspaceUsers] = await Promise.all([
+      provider.listAssigneesFromDb(databaseUrl, assigneeField),
+      provider.listWorkspaceUsers(),
+    ]);
+    // DB assignees first (already in use), then remaining workspace users
+    const seen = new Set(dbUsers.map((u) => u.id));
+    const users = [
+      ...dbUsers,
+      ...workspaceUsers.filter((u) => !seen.has(u.id)),
+    ];
     send(ws, {
       type: 'tasks:assignees_result',
       success: true,

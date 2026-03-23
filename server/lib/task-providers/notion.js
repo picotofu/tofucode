@@ -1073,6 +1073,22 @@ export function createNotionProvider(token) {
     },
 
     /**
+     * List all workspace users (people type only).
+     * @returns {Promise<Array<{id: string, name: string}>>}
+     */
+    async listWorkspaceUsers() {
+      try {
+        const res = await api.listUsers();
+        return (res.results ?? [])
+          .filter((u) => u.type === 'person' && u.id)
+          .map((u) => ({ id: u.id, name: u.name || u.id }));
+      } catch (err) {
+        logger.warn('[Notion] listWorkspaceUsers error:', err.message);
+        return [];
+      }
+    },
+
+    /**
      * Fetch comments on a Notion page.
      * @param {string} pageId
      * @returns {Promise<Array<{id, createdTime, createdBy, content}>>}
