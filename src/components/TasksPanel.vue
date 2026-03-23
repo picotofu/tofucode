@@ -18,6 +18,7 @@ const props = defineProps({
   },
   taskStatusOptions: { type: Array, default: () => [] },
   taskAssignees: { type: Array, default: () => [] },
+  taskSelfEmail: { type: String, default: null },
 });
 
 const emit = defineEmits([
@@ -145,26 +146,56 @@ function groupByAssigneeOnly(tasks) {
       map.get(name).push(task);
     }
   }
-  return Array.from(map.entries()).map(([label, items]) => ({
+  const groups = Array.from(map.entries()).map(([label, items]) => ({
     key: label,
     label,
     items,
   }));
+
+  // Resolve "me" name from taskAssignees using selfEmail
+  const myName = props.taskSelfEmail
+    ? (props.taskAssignees.find((u) => u.email === props.taskSelfEmail)?.name ??
+      null)
+    : null;
+
+  return groups.sort((a, b) => {
+    // "Unassigned" always last
+    if (a.key === 'Unassigned') return 1;
+    if (b.key === 'Unassigned') return -1;
+    // "Me" always first
+    if (myName && a.key === myName) return -1;
+    if (myName && b.key === myName) return 1;
+    // Rest alphabetical
+    return a.label.localeCompare(b.label);
+  });
 }
 
 function groupByStatusOnly(tasks) {
   const map = new Map(); // status → tasks[]
   for (const task of tasks) {
     const key = task.status || '';
-    const label = task.status || 'No status';
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(task);
   }
-  return Array.from(map.entries()).map(([key, items]) => ({
+  const groups = Array.from(map.entries()).map(([key, items]) => ({
     key,
     label: key || 'No status',
     items,
   }));
+
+  // Sort by Notion schema order (taskStatusOptions preserves it); "No status" last
+  const schemaOrder = props.taskStatusOptions;
+  return groups.sort((a, b) => {
+    if (a.key === '') return 1;
+    if (b.key === '') return -1;
+    const ai = schemaOrder.indexOf(a.key);
+    const bi = schemaOrder.indexOf(b.key);
+    // Known statuses sorted by schema order; unknowns go after
+    if (ai === -1 && bi === -1) return a.label.localeCompare(b.label);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

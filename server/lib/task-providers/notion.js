@@ -1081,7 +1081,11 @@ export function createNotionProvider(token) {
         const res = await api.listUsers();
         return (res.results ?? [])
           .filter((u) => u.type === 'person' && u.id)
-          .map((u) => ({ id: u.id, name: u.name || u.id }));
+          .map((u) => ({
+            id: u.id,
+            name: u.name || u.id,
+            email: u.person?.email ?? null,
+          }));
       } catch (err) {
         logger.warn('[Notion] listWorkspaceUsers error:', err.message);
         return [];
