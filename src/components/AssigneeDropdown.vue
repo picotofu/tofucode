@@ -100,39 +100,39 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 </script>
 
 <template>
-  <div class="ad-wrap">
+  <div class="asgn-wrap">
     <button
       ref="triggerRef"
-      class="ad-trigger"
-      :class="[size === 'sm' ? 'ad-trigger-sm' : '', bare ? 'ad-trigger-bare' : '']"
+      class="asgn-trigger"
+      :class="[size === 'sm' ? 'asgn-trigger-sm' : '', bare ? 'asgn-trigger-bare' : '']"
       type="button"
       @click="open ? (open = false) : openDropdown()"
     >
-      <span class="ad-label">{{ displayLabel }}</span>
+      <span class="asgn-label">{{ displayLabel }}</span>
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <polyline points="6 9 12 15 18 9" />
       </svg>
     </button>
 
     <Teleport to="body">
-      <div v-if="open" ref="popoverRef" class="ad-popover" :style="popoverStyle">
+      <div v-if="open" ref="popoverRef" class="asgn-popover" :style="popoverStyle">
         <input
           ref="inputRef"
           v-model="search"
-          class="ad-search"
+          class="asgn-search"
           placeholder="Search…"
           @keydown="onKeydown"
         />
-        <div class="ad-list">
+        <div class="asgn-list">
           <button
             v-for="opt in filteredOptions"
             :key="opt.value"
-            class="ad-option"
+            class="asgn-option"
             :class="{ active: modelValue === opt.value }"
             type="button"
             @mousedown.prevent="select(opt.value)"
           >{{ opt.label }}</button>
-          <div v-if="filteredOptions.length === 0" class="ad-empty">No match</div>
+          <div v-if="filteredOptions.length === 0" class="asgn-empty">No match</div>
         </div>
       </div>
     </Teleport>
@@ -140,11 +140,11 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 </template>
 
 <style scoped>
-.ad-wrap {
+.asgn-wrap {
   position: relative;
 }
 
-.ad-trigger {
+.asgn-trigger {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -162,29 +162,29 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
   transition: border-color 0.15s;
 }
 
-.ad-trigger:hover,
-.ad-trigger:focus {
+.asgn-trigger:hover,
+.asgn-trigger:focus {
   outline: none;
   border-color: var(--text-muted);
 }
 
-.ad-trigger-sm {
+.asgn-trigger-sm {
   padding: 3px 6px;
   font-size: 12px;
 }
 
-.ad-trigger-bare {
+.asgn-trigger-bare {
   background: transparent;
   border-color: transparent;
 }
 
-.ad-trigger-bare:hover,
-.ad-trigger-bare:focus {
+.asgn-trigger-bare:hover,
+.asgn-trigger-bare:focus {
   background: var(--bg-tertiary);
   border-color: transparent;
 }
 
-.ad-label {
+.asgn-label {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -195,7 +195,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 
 <!-- Teleported popover — must be unscoped since it renders outside the component root -->
 <style>
-.ad-popover {
+.asgn-popover {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
@@ -206,7 +206,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
   min-width: 120px;
 }
 
-.ad-search {
+.asgn-search {
   padding: 6px 8px;
   font-size: 12px;
   font-family: inherit;
@@ -217,16 +217,16 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
   outline: none;
 }
 
-.ad-search::placeholder {
+.asgn-search::placeholder {
   color: var(--text-muted);
 }
 
-.ad-list {
+.asgn-list {
   max-height: 160px;
   overflow-y: auto;
 }
 
-.ad-option {
+.asgn-option {
   display: block;
   width: 100%;
   padding: 6px 10px;
@@ -240,17 +240,17 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
   transition: background 0.1s;
 }
 
-.ad-option:hover {
+.asgn-option:hover {
   background: var(--bg-secondary);
   color: var(--text-primary);
 }
 
-.ad-option.active {
+.asgn-option.active {
   color: var(--text-primary);
   font-weight: 500;
 }
 
-.ad-empty {
+.asgn-empty {
   padding: 8px 10px;
   font-size: 12px;
   color: var(--text-muted);
