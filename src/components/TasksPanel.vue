@@ -358,10 +358,6 @@ function statusClass(status) {
                     <p class="tasks-item-title">{{ task.title }}</p>
                     <p class="tasks-item-meta">
                       <span v-if="task.ticketId" class="tasks-item-ticket-id">{{ task.ticketId }}</span>
-                      <!-- Show assignee pills when grouped by status (not grouped by assignee) -->
-                      <template v-if="groupByStatus && !groupByAssignee && task.assignees?.length">
-                        <span v-for="name in task.assignees" :key="name" class="tasks-item-assignee-pill">{{ name }}</span>
-                      </template>
                       <!-- Show status badge when grouped by assignee (not grouped by status) -->
                       <span v-if="groupByAssignee && !groupByStatus && task.status" class="status-badge" :class="statusClass(task.status)">{{ task.status }}</span>
                       <span v-if="task.lastEditedAt">{{ formatRelativeTime(task.lastEditedAt) }}</span>
@@ -390,9 +386,6 @@ function statusClass(status) {
                 <p class="tasks-item-title">{{ task.title }}</p>
                 <p class="tasks-item-meta">
                   <span v-if="task.ticketId" class="tasks-item-ticket-id">{{ task.ticketId }}</span>
-                  <template v-if="localAssignee !== '__self__' && task.assignees?.length">
-                    <span v-for="name in task.assignees" :key="name" class="tasks-item-assignee-pill">{{ name }}</span>
-                  </template>
                   <span v-if="!localStatus && task.status" class="status-badge" :class="statusClass(task.status)">{{ task.status }}</span>
                   <span v-if="task.lastEditedAt">{{ formatRelativeTime(task.lastEditedAt) }}</span>
                 </p>
@@ -670,22 +663,6 @@ function statusClass(status) {
   gap: 4px 6px;
   font-size: 11px;
   color: var(--text-muted);
-}
-
-.tasks-item-assignee-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 6px;
-  font-size: 10px;
-  font-weight: 500;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .tasks-item-ticket-id {
