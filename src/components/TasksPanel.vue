@@ -1,6 +1,7 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { formatRelativeTime } from '../utils/format.js';
+import AssigneeDropdown from './AssigneeDropdown.vue';
 
 const props = defineProps({
   tasks: { type: Array, default: () => [] },
@@ -53,113 +54,19 @@ function onTitleInput() {
   titleSearchTimer = setTimeout(() => emitFilter(), 300);
 }
 
-// ── Assignee dropdown (shared for filter + create) ─────────────────────────
-// value: '__self__' | '' | userId
-// displayOptions: [{ value, label }]
-// The dropdown shows a fuzzy-searchable list; prioritises users from taskAssignees
-// (already assigned in DB) then falls back to a static "Me" / "Anyone" set.
+function onFilterAssigneeChange(value) {
+  localAssignee.value = value;
+  emitFilter();
+}
 
-// Static head options always shown first
-const HEAD_OPTIONS = [
+// ── Assignee head options (Me / Anyone) ────────────────────────────────────
+
+const FILTER_HEAD_OPTIONS = [
   { value: '__self__', label: 'Me' },
   { value: '', label: 'Anyone' },
 ];
 
-// Filter assignee dropdown
-const filterAssigneeOpen = ref(false);
-const filterAssigneeSearch = ref('');
-const filterAssigneeInputRef = ref(null);
-const filterAssigneeDropRef = ref(null);
-
-// Create assignee dropdown
-const createAssigneeOpen = ref(false);
-const createAssigneeSearch = ref('');
-const createAssigneeInputRef = ref(null);
-const createAssigneeDropRef = ref(null);
-
-function assigneeOptions(search) {
-  const q = search.trim().toLowerCase();
-  const all = [
-    ...HEAD_OPTIONS,
-    ...props.taskAssignees.map((u) => ({ value: u.id, label: u.name })),
-  ];
-  if (!q) return all;
-  return all.filter((o) => o.label.toLowerCase().includes(q));
-}
-
-const filterAssigneeOptions = computed(() =>
-  assigneeOptions(filterAssigneeSearch.value),
-);
-const createAssigneeOptions = computed(() =>
-  assigneeOptions(createAssigneeSearch.value),
-);
-
-function assigneeLabel(value) {
-  if (value === '__self__') return 'Me';
-  if (value === '') return 'Anyone';
-  return props.taskAssignees.find((u) => u.id === value)?.name ?? value;
-}
-
-// Filter dropdown handlers
-function openFilterAssignee() {
-  filterAssigneeSearch.value = '';
-  filterAssigneeOpen.value = true;
-  nextTick(() => filterAssigneeInputRef.value?.focus());
-}
-
-function selectFilterAssignee(value) {
-  localAssignee.value = value;
-  filterAssigneeOpen.value = false;
-  filterAssigneeSearch.value = '';
-  emitFilter();
-}
-
-function onFilterAssigneeKeydown(e) {
-  if (e.key === 'Escape') {
-    filterAssigneeOpen.value = false;
-    filterAssigneeSearch.value = '';
-  }
-}
-
-// Create dropdown handlers
-function openCreateAssignee() {
-  createAssigneeSearch.value = '';
-  createAssigneeOpen.value = true;
-  nextTick(() => createAssigneeInputRef.value?.focus());
-}
-
-function selectCreateAssignee(value) {
-  createAssignee.value = value;
-  createAssigneeOpen.value = false;
-  createAssigneeSearch.value = '';
-}
-
-function onCreateAssigneeKeydown(e) {
-  if (e.key === 'Escape') {
-    createAssigneeOpen.value = false;
-    createAssigneeSearch.value = '';
-  }
-}
-
-// Close dropdowns on outside click
-function onDocClick(e) {
-  if (
-    filterAssigneeOpen.value &&
-    filterAssigneeDropRef.value &&
-    !filterAssigneeDropRef.value.contains(e.target)
-  ) {
-    filterAssigneeOpen.value = false;
-    filterAssigneeSearch.value = '';
-  }
-  if (
-    createAssigneeOpen.value &&
-    createAssigneeDropRef.value &&
-    !createAssigneeDropRef.value.contains(e.target)
-  ) {
-    createAssigneeOpen.value = false;
-    createAssigneeSearch.value = '';
-  }
-}
+const CREATE_HEAD_OPTIONS = [{ value: '__self__', label: 'Me' }];
 
 // ── Create form ────────────────────────────────────────────────────────────
 
@@ -169,7 +76,6 @@ const createAssignee = ref('__self__');
 function confirmCreate() {
   const title = createTitle.value.trim();
   if (!title) return;
-  // Pass assignee info alongside title; parent handles it
   emit('create-task', title, createAssignee.value);
   createTitle.value = '';
   createAssignee.value = '__self__';
@@ -194,13 +100,11 @@ onMounted(() => {
     { threshold: 0.1 },
   );
   if (scrollSentinelRef.value) scrollObserver.observe(scrollSentinelRef.value);
-  document.addEventListener('mousedown', onDocClick);
 });
 
 onBeforeUnmount(() => {
   scrollObserver?.disconnect();
   clearTimeout(titleSearchTimer);
-  document.removeEventListener('mousedown', onDocClick);
 });
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -244,39 +148,15 @@ function statusClass(status) {
       <div class="tasks-filters">
         <!-- Row 1: Assignee + status + refresh -->
         <div class="tasks-filter-row">
-          <!-- Assignee filter (custom fuzzy dropdown) -->
-          <div ref="filterAssigneeDropRef" class="tasks-assignee-dropdown">
-            <button
-              class="tasks-assignee-trigger"
-              type="button"
-              @click="filterAssigneeOpen ? (filterAssigneeOpen = false) : openFilterAssignee()"
-            >
-              <span class="tasks-assignee-trigger-label">{{ assigneeLabel(localAssignee) }}</span>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            <div v-if="filterAssigneeOpen" class="tasks-assignee-popover">
-              <input
-                ref="filterAssigneeInputRef"
-                v-model="filterAssigneeSearch"
-                class="tasks-assignee-search"
-                placeholder="Search…"
-                @keydown="onFilterAssigneeKeydown"
-              />
-              <div class="tasks-assignee-list">
-                <button
-                  v-for="opt in filterAssigneeOptions"
-                  :key="opt.value"
-                  class="tasks-assignee-option"
-                  :class="{ active: localAssignee === opt.value }"
-                  type="button"
-                  @mousedown.prevent="selectFilterAssignee(opt.value)"
-                >{{ opt.label }}</button>
-                <div v-if="filterAssigneeOptions.length === 0" class="tasks-assignee-empty">No match</div>
-              </div>
-            </div>
-          </div>
+          <!-- Assignee filter -->
+          <AssigneeDropdown
+            class="tasks-filter-assignee"
+            :model-value="localAssignee"
+            :assignees="taskAssignees"
+            :head-options="FILTER_HEAD_OPTIONS"
+            size="md"
+            @update:model-value="onFilterAssigneeChange"
+          />
 
           <!-- Status filter -->
           <select
@@ -383,38 +263,14 @@ function statusClass(status) {
         <!-- Row 2: assignee dropdown + confirm button -->
         <div class="tasks-create-bottom">
           <!-- Assignee picker -->
-          <div ref="createAssigneeDropRef" class="tasks-assignee-dropdown tasks-create-assignee">
-            <button
-              class="tasks-assignee-trigger tasks-assignee-trigger-sm tasks-assignee-trigger-bare"
-              type="button"
-              @click="createAssigneeOpen ? (createAssigneeOpen = false) : openCreateAssignee()"
-            >
-              <span class="tasks-assignee-trigger-label">{{ assigneeLabel(createAssignee) }}</span>
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            <div v-if="createAssigneeOpen" class="tasks-assignee-popover tasks-assignee-popover-up">
-              <input
-                ref="createAssigneeInputRef"
-                v-model="createAssigneeSearch"
-                class="tasks-assignee-search"
-                placeholder="Search…"
-                @keydown="onCreateAssigneeKeydown"
-              />
-              <div class="tasks-assignee-list">
-                <button
-                  v-for="opt in createAssigneeOptions"
-                  :key="opt.value"
-                  class="tasks-assignee-option"
-                  :class="{ active: createAssignee === opt.value }"
-                  type="button"
-                  @mousedown.prevent="selectCreateAssignee(opt.value)"
-                >{{ opt.label }}</button>
-                <div v-if="createAssigneeOptions.length === 0" class="tasks-assignee-empty">No match</div>
-              </div>
-            </div>
-          </div>
+          <AssigneeDropdown
+            v-model="createAssignee"
+            class="tasks-create-assignee ad-bare"
+            :assignees="taskAssignees"
+            :head-options="CREATE_HEAD_OPTIONS"
+            :popover-up="true"
+            size="sm"
+          />
 
           <!-- Confirm button (borderless) -->
           <button
@@ -525,119 +381,15 @@ function statusClass(status) {
   color: var(--text-muted);
 }
 
-/* ── Assignee dropdown (shared) ───────────────── */
-.tasks-assignee-dropdown {
-  position: relative;
+/* ── Assignee dropdown layout helpers ────────── */
+.tasks-filter-assignee {
   flex: 1;
   min-width: 0;
 }
 
-.tasks-assignee-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  width: 100%;
-  padding: 4px 6px;
-  font-size: 13px;
-  font-family: inherit;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 0.15s;
-}
-
-.tasks-assignee-trigger:focus,
-.tasks-assignee-trigger:hover {
-  outline: none;
-  border-color: var(--text-muted);
-}
-
-.tasks-assignee-trigger-label {
+.tasks-create-assignee {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tasks-assignee-trigger-sm {
-  padding: 3px 6px;
-  font-size: 12px;
-}
-
-.tasks-assignee-popover {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 100;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* Create assignee pops upward */
-.tasks-assignee-popover-up {
-  top: auto;
-  bottom: calc(100% + 4px);
-}
-
-.tasks-assignee-search {
-  padding: 6px 8px;
-  font-size: 12px;
-  font-family: inherit;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--border-color);
-  color: var(--text-primary);
-  outline: none;
-}
-
-.tasks-assignee-search::placeholder {
-  color: var(--text-muted);
-}
-
-.tasks-assignee-list {
-  max-height: 160px;
-  overflow-y: auto;
-}
-
-.tasks-assignee-option {
-  display: block;
-  width: 100%;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-family: inherit;
-  text-align: left;
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 0.1s;
-}
-
-.tasks-assignee-option:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.tasks-assignee-option.active {
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.tasks-assignee-empty {
-  padding: 8px 10px;
-  font-size: 12px;
-  color: var(--text-muted);
 }
 
 /* ── List ─────────────────────────────────────── */
@@ -838,22 +590,6 @@ function statusClass(status) {
   display: flex;
   align-items: center;
   padding: 0 2px 0 0;
-}
-
-.tasks-create-assignee {
-  flex: 1;
-  min-width: 0;
-}
-
-.tasks-assignee-trigger-bare {
-  background: transparent;
-  border-color: transparent;
-}
-
-.tasks-assignee-trigger-bare:focus,
-.tasks-assignee-trigger-bare:hover {
-  background: var(--bg-tertiary);
-  border-color: transparent;
 }
 
 .tasks-create-confirm {
