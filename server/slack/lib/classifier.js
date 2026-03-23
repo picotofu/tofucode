@@ -3,50 +3,24 @@
  *
  * Uses Claude (agent SDK) to classify incoming Slack messages into actionable
  * categories:
- *   - ignore    → message doesn't need a response
- *   - acknowledge → simple acknowledgement (got it, looking into it)
- *   - answer    → can be answered with available context
- *   - ticket    → needs tracking, create a Notion ticket
- *   - work      → requires code changes or investigation, start tofucode session
+ *   - ignore      → message doesn't need a response
+ *   - acknowledge → FYI directly to you, no action needed
+ *   - answer      → question that needs investigation, then responds with the answer
+ *   - ticket      → anything requiring action/tracking — creates a [BOT]-prefixed Notion ticket
  *
- * Three-tier model strategy:
- *   1. Haiku  — always runs first (fast, cheap, no tools)
- *   2. Sonnet — escalated when Haiku signals low confidence or needsContext.
- *               Uses Grep/Glob/Read tools to actively investigate the codebase
- *               (route → service mapping, field lookups, scope analysis) before
- *               committing to a classification. cwd = projectRootPath.
+ * Two-tier model strategy:
+ *   1. Haiku  — always runs first (fast, cheap, no tools): classifies the obvious majority
+ *   2. Sonnet — escalated for: low confidence, answer+needsContext, and all tickets.
+ *               Uses Grep/Glob/Read to investigate the codebase before classifying or answering.
+ *               For tickets: always runs to produce a rich, actionable ticketBody.
  *               Max turns configurable via config.classifier.maxTriageTurns.
  */
 
-import { existsSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { config, pathToSlug } from '../../config.js';
 import { logger } from '../../lib/logger.js';
 import { setTitle } from '../../lib/session-titles.js';
 import { loadNotionConfig } from '../../lib/task-providers/notion-config.js';
-import { formatThreadContext } from './formatter.js';
-
-/**
- * List available project directories under a root path
- * @param {string} rootPath
- * @returns {string[]} Array of project folder names
- */
-function listProjects(rootPath) {
-  if (!rootPath || !existsSync(rootPath)) return [];
-  try {
-    return readdirSync(rootPath).filter((name) => {
-      if (name.startsWith('.')) return false;
-      try {
-        return statSync(join(rootPath, name)).isDirectory();
-      } catch {
-        return false;
-      }
-    });
-  } catch {
-    return [];
-  }
-}
 
 /**
  * Build the system prompt for classification
@@ -54,14 +28,7 @@ function listProjects(rootPath) {
  * @returns {string}
  */
 function buildSystemPrompt(slackConfig) {
-  const { identity, classifier = {}, projectRootPath } = slackConfig;
-
-  // Enumerate available projects
-  const projects = listProjects(projectRootPath);
-  const projectsSection =
-    projects.length > 0
-      ? `\n\nAvailable projects (under ${projectRootPath}):\n${projects.map((p) => `- ${p}`).join('\n')}\nWhen returning "workProject", use the exact folder name from this list that best matches the work described.`
-      : '';
+  const { identity, classifier = {} } = slackConfig;
 
   // Notion field mappings section — sourced from Notion config (independent of Slack config)
   const notionConfig = loadNotionConfig();
@@ -73,31 +40,28 @@ function buildSystemPrompt(slackConfig) {
 
   // Allow full system prompt override — append dynamic sections
   if (classifier.systemPrompt) {
-    return `${classifier.systemPrompt}${projectsSection}${mappingsSection}
+    return `${classifier.systemPrompt}${mappingsSection}
 
 You will analyze each Slack message and classify it into an action. Respond ONLY with a valid JSON object wrapped in a \`\`\`json code fence. No extra text outside the fence.
 
 Actions:
 - "ignore" — Message doesn't need a response from you (ambient chatter, someone else's conversation, FYI messages, etc.)
-- "acknowledge" — Simple acknowledgement needed (e.g., "Got it", "On it", "Thanks, noted")
-- "answer" — You can answer the question or provide useful information
-- "ticket" — The message describes work/feature/bug that should be tracked as a ticket
-- "work" — The message explicitly asks you to implement, fix, or investigate something in code
+- "acknowledge" — FYI directly to you, no action needed — just a brief natural reply
+- "answer" — A question or request that you can respond to with information or investigation
+- "ticket" — Anything requiring tracking or action (bug, feature, work request, investigation, etc.)
 
 Response JSON schema:
 {
-  "action": "ignore" | "acknowledge" | "answer" | "ticket" | "work",
+  "action": "ignore" | "acknowledge" | "answer" | "ticket",
   "confidence": "high" | "low",
   "needsContext": true | false,
-  "response": "Your reply in Slack mrkdwn — required for all actions except ignore. One short line for acknowledge. Lead with the answer for answer. Never robotic or templated.",
-  "ticketTitle": "Short title for Notion ticket (only for ticket)",
-  "ticketBody": "Detailed description for Notion ticket (only for ticket) — do NOT include a Slack thread link, it is appended automatically",
-  "workProject": "Exact project folder name from the available projects list (only for work)",
-  "workPrompt": "Detailed instructions for the work session (only for work)",
+  "response": "Your reply in Slack mrkdwn — required for acknowledge/answer/ticket. One short line for acknowledge. Lead with the answer for answer. For ticket, omit — reply is handled automatically.",
+  "ticketTitle": "Short title for Notion ticket (only for ticket, without [BOT] prefix)",
+  "ticketBody": "Self-contained brief for the ticket — what needs to be done, where in the codebase, suggested approach if clear. Do NOT include a Slack thread link, it is appended automatically.",
   "reasoning": "1-line reasoning for your classification"
 }
 
-Set confidence to "low" if you are unsure about the action, the project to work on, or the scope of the request.
+Set confidence to "low" if you are unsure about the action or scope.
 Set needsContext to true if answering well would require looking up additional information (e.g. checking code, querying a database, reading docs).`;
   }
 
@@ -107,68 +71,56 @@ Set needsContext to true if answering well would require looking up additional i
 
   return `You are ${name}, a ${role}. You are responding to Slack messages on your own behalf.
 
-Your communication style: ${tone}${projectsSection}${mappingsSection}
+Your communication style: ${tone}${mappingsSection}
 
 You will analyze each Slack message and classify it into an action. Respond ONLY with a valid JSON object wrapped in a \`\`\`json code fence. No extra text outside the fence.
 
 Actions:
-- "ignore" — Message doesn't need a response from you (ambient chatter, someone else's conversation, FYI messages, etc.)
-- "acknowledge" — Simple acknowledgement needed (e.g., "Got it", "On it", "Thanks, noted")
-- "answer" — You can answer the question or provide useful information
-- "ticket" — The message describes work/feature/bug that should be tracked as a ticket
-- "work" — The message explicitly asks you to implement, fix, or investigate something in code
+- "ignore" — Message doesn't need a response from you (ambient chatter, someone else's conversation, FYI messages not directed at you, etc.)
+- "acknowledge" — FYI directly to you, no action needed — just a brief natural reply
+- "answer" — A question or request that you can respond to with information (may need investigation first)
+- "ticket" — Anything requiring tracking or action: bugs, feature requests, work requests, investigations, anything that needs to be logged and followed up
 
 Classification guidelines:
-- Default to "ignore" for messages that don't involve you or need your input
-- Use "acknowledge" for messages directed at you that just need a brief response
-- Use "answer" only when you have the knowledge to give a substantive reply
-- Use "ticket" when someone reports a bug, requests a feature, or describes work that needs tracking
-- Use "work" only when explicitly asked to do technical work (code, deploy, investigate a bug, etc.)
+- Default to "ignore" for messages that don't involve you or don't need your input
+- Use "acknowledge" only for FYIs sent directly to you where no further action is needed
+- Use "answer" when someone asks you a question you can actually answer (with or without looking things up)
+- Use "ticket" for anything that requires action, tracking, or follow-up — including work requests, bugs, feature requests
 - When in doubt between "ignore" and "acknowledge", prefer "ignore"
+- When in doubt between "acknowledge" and "ticket", prefer "ticket"
 
 Response guidelines:
-- "response" is required for all actions except "ignore"
 - Write exactly as you would in a real Slack message — lowercase, casual, no punctuation if not needed
 - Never sound like an assistant or a bot. No "Sure!", "Got it!", "Noted!", "Certainly" — ever.
-- For "acknowledge": one short line only. e.g. "noted", "yep on it", "sounds good", "k will check" — vary it, never the same opener twice
+- For "acknowledge": one short line only — vary it every time. e.g. "noted", "yep", "👍", "sounds good", "k", "sure", "ok", "will do" — match the tone of the message
 - For "answer": answer directly, no preamble. Lead with the answer, not "Great question" or "Sure, here's..."
-- For "ticket": one line saying you've logged it, maybe a 1-line summary of what you captured — nothing more
-- For "work": one line confirming what you're picking up — no need to repeat the full brief back
+- For "ticket": omit "response" — the reply is handled automatically
+- For "ignore": omit "response"
 
 Response JSON schema:
 {
-  "action": "ignore" | "acknowledge" | "answer" | "ticket" | "work",
+  "action": "ignore" | "acknowledge" | "answer" | "ticket",
   "confidence": "high" | "low",
   "needsContext": true | false,
-  "response": "Your reply in Slack mrkdwn — required for all actions except ignore",
-  "ticketTitle": "Short title for Notion ticket (only for ticket)",
-  "ticketBody": "Detailed description for Notion ticket (only for ticket) — do NOT include a Slack thread link, it is appended automatically",
-  "workProject": "Exact project folder name from the available projects list (only for work)",
-  "workPrompt": "Detailed instructions for the work session (only for work)",
+  "response": "Your reply — required for acknowledge/answer only",
+  "ticketTitle": "Short title for Notion ticket (only for ticket, without [BOT] prefix)",
+  "ticketBody": "Self-contained brief for the ticket — what needs to be done, where in the codebase, suggested approach if clear. Do NOT include a Slack thread link, it is appended automatically.",
   "reasoning": "1-line reasoning for your classification"
 }
 
-Set confidence to "low" if you are unsure about the action, the project to work on, or the scope of the request.
-Set needsContext to true if answering well would require looking up additional information (e.g. checking code, querying a database, reading docs).`;
+Set confidence to "low" if you are unsure about the action or scope.
+Set needsContext to true if answering well would require looking up additional information (e.g. checking code, reading a config, querying a database).`;
 }
 
 /**
  * Build the user prompt with message context
  * @param {Object} params
- * @param {Object} params.message - Slack event message
- * @param {Array} [params.threadHistory] - Thread messages for context
+ * @param {Object} params.message - Slack event (text may be debounce-combined)
  * @param {Object} [params.channelInfo] - Channel metadata
  * @param {string} [params.senderName] - Display name of sender
- * @param {((userId: string) => Promise<string>)|null} [params.resolveName] - Optional user ID resolver
- * @returns {Promise<string>}
+ * @returns {string}
  */
-async function buildUserPrompt({
-  message,
-  threadHistory,
-  channelInfo,
-  senderName,
-  resolveName,
-}) {
+function buildUserPrompt({ message, channelInfo, senderName }) {
   const parts = [];
 
   // Context: Channel
@@ -177,40 +129,21 @@ async function buildUserPrompt({
     parts.push(`[Channel: #${channelName}]`);
   }
 
-  // Context: Thread/conversation history (all prior messages, excluding the triggering message)
-  // For threaded replies: conversations.replies returns parent + all replies chronologically.
-  // For top-level messages: conversations.history is reversed to chronological order.
-  // We exclude the last message only if it matches the triggering event ts — it will be
-  // shown separately as [New message] below. Debounced events may have combined text that
-  // differs from any single history entry, so we match by ts rather than position.
-  if (threadHistory?.length) {
-    const historyWithoutCurrent = threadHistory.filter(
-      (m) => m.ts !== message.ts,
-    );
-    if (historyWithoutCurrent.length > 0) {
-      parts.push(
-        `[Thread history]\n${await formatThreadContext(historyWithoutCurrent, 30, resolveName)}`,
-      );
-    }
-  }
-
-  // The new message(s) — may be debounce-combined text from multiple rapid sends
+  // The message — may be debounce-combined text from multiple rapid sends
   const sender = senderName || message.user || 'someone';
-  parts.push(`[New message from ${sender}]\n${message.text || '(empty)'}`);
+  parts.push(`[Message from ${sender}]\n${message.text || '(empty)'}`);
 
   return parts.join('\n\n');
 }
 
 /**
  * @typedef {Object} Classification
- * @property {'ignore'|'acknowledge'|'answer'|'ticket'|'work'} action
+ * @property {'ignore'|'acknowledge'|'answer'|'ticket'} action
  * @property {'high'|'low'} [confidence] - Classifier confidence in the action
  * @property {boolean} [needsContext] - Whether deeper context lookup is needed
  * @property {string} [response] - Draft response (for acknowledge/answer)
- * @property {string} [ticketTitle] - Notion ticket title (for ticket)
+ * @property {string} [ticketTitle] - Notion ticket title, without [BOT] prefix (for ticket)
  * @property {string} [ticketBody] - Notion ticket body (for ticket)
- * @property {string} [workProject] - Project slug (for work)
- * @property {string} [workPrompt] - Work session prompt (for work)
  * @property {string} [reasoning] - Classification reasoning
  */
 
@@ -225,8 +158,9 @@ function shouldEscalateToSonnet(result) {
   if (confidence === 'low') return true;
   // Escalate answers that need context gathering
   if (result.action === 'answer' && result.needsContext) return true;
-  // Escalate work actions that need context (uncertain project mapping, etc.)
-  if (result.action === 'work' && result.needsContext) return true;
+  // Always escalate tickets — Sonnet investigates the codebase to produce a rich,
+  // actionable ticketBody with files, routes, scope, and suggested approach.
+  if (result.action === 'ticket') return true;
   return false;
 }
 
@@ -296,10 +230,13 @@ function buildAgenticEscalationPrompt(
   projectRootPath,
   sessionLogPath,
 ) {
+  const isTicket = initial.action === 'ticket';
   const reason =
     initial.confidence === 'low'
       ? `wasn't sure how to classify this (initial guess: ${initial.action})`
-      : `needs more context to respond well (action=${initial.action})`;
+      : isTicket
+        ? 'this is a ticket — need to investigate before writing the body'
+        : `needs more context to respond well (action=${initial.action})`;
 
   // Tell the model exactly which base path to use for tool calls.
   // cwd may be sessionLogPath (when resuming) — not the codebase — so absolute paths are required.
@@ -307,21 +244,37 @@ function buildAgenticEscalationPrompt(
     ? `my projects are at ${projectRootPath} — always use that as the absolute base for tool calls${sessionLogPath ? `, even though cwd is currently ${sessionLogPath}` : ''}`
     : 'use absolute paths when calling tools';
 
+  const ticketInstructions = isTicket
+    ? `
+since this is a ticket, investigate thoroughly so the body has everything needed to act on it:
+- identify the exact service/project (grep for the route, function name, or domain term under ${projectRootPath ?? 'the projects folder'})
+- find the relevant files — controller, service layer, model, migration, config — whatever applies
+- understand the current behaviour vs what's being asked
+- note any related code that would need to change (e.g. if a field is added, what reads/writes it)
+- if it's a bug: identify where the fault likely is
+- if it's a feature/change: sketch the approach — what needs to be added/modified and where
+
+the ticketBody should be a self-contained brief that a dev can pick up without needing to ask follow-up questions. include:
+- what: 1-2 lines on what needs to be done
+- where: exact file paths and function/route names found during investigation
+- how (if clear): suggested approach or any constraints to be aware of
+- context: anything else relevant (related tickets, edge cases, dependencies)
+
+keep it tight — no fluff, no repetition of the slack message. use plain text, not markdown headers.`
+    : `
+when digging in:
+- if there's a route or endpoint mentioned: grep for it under ${projectRootPath ?? 'the projects folder'} to find which service owns it. my services follow /api/{context}/v1/{route} where context = repo prefix (user-service → user, anime-service → anime, etc.)
+- if the project or scope is unclear: grep for the most specific term — a function name, field name, or table name
+- if it's a question i should answer: read the actual code or config so i'm not guessing`;
+
   return `ok so my initial read ${reason}. let me check before responding.
 
 ${pathNote}.
-
-when digging in:
-- if there's a route or endpoint mentioned (like /crests or /watchlist/status): grep for it under ${projectRootPath ?? 'the projects folder'} to find which service owns it. my services follow /api/{context}/v1/{route} where context = repo prefix (user-service → user, anime-service → anime, etc.)
-- if the project is unclear: grep for the most specific term — a function name, field name, or table name
-- if i need to judge scope (work vs ticket): read the relevant controller or route file to get a feel for the change
-- if it's a question i should answer: read the actual code or config so i'm not guessing
+${ticketInstructions}
 
 2-3 targeted lookups is usually enough. don't spiral.
 
-once i have enough to be confident, respond with ONLY the \`\`\`json code fence — same schema as before. don't output JSON mid-investigation, only in the final message.
-
-for workPrompt: be specific — include the actual file paths, function names, or route handlers found so the work session has direct starting context rather than re-discovering everything.`;
+once i have enough to be confident, respond with ONLY the \`\`\`json code fence — same schema as before. don't output JSON mid-investigation, only in the final message.`;
 }
 
 /**
@@ -454,11 +407,9 @@ function assignSessionTitle(sessionId, sessionLogPath, title) {
  *           is uncertain. Actively investigates the codebase before classifying.
  *
  * @param {Object} params
- * @param {Object} params.message - Slack event message
- * @param {Array} [params.threadHistory] - Thread messages
+ * @param {Object} params.message - Slack event (text may be debounce-combined)
  * @param {Object} [params.channelInfo] - Channel metadata
  * @param {string} [params.senderName] - Sender display name
- * @param {((userId: string) => Promise<string>)|null} [params.resolveName] - Optional user ID resolver
  * @param {Object} params.config - Slack bot config
  * @param {import('./api.js').SlackAPI|null} [params.slackApi] - For posting reactions on escalation
  * @param {Object|null} [params.event] - Original Slack event (for reaction target)
@@ -466,10 +417,8 @@ function assignSessionTitle(sessionId, sessionLogPath, title) {
  */
 export async function classifyMessage({
   message,
-  threadHistory,
   channelInfo,
   senderName,
-  resolveName,
   config: slackConfig,
   slackApi = null,
   event = null,
@@ -478,12 +427,10 @@ export async function classifyMessage({
   const projectRootPath = slackConfig.projectRootPath || null;
   const maxTriageTurns = slackConfig.classifier?.maxTriageTurns ?? 5;
   const systemPrompt = buildSystemPrompt(slackConfig);
-  const userPrompt = await buildUserPrompt({
+  const userPrompt = buildUserPrompt({
     message,
-    threadHistory,
     channelInfo,
     senderName,
-    resolveName,
   });
 
   try {
@@ -578,13 +525,7 @@ function parseClassification(text) {
     const fenceMatch = text.match(/```json\s*\n([\s\S]*?)\n```/);
     if (fenceMatch) {
       const parsed = JSON.parse(fenceMatch[1].trim());
-      const validActions = [
-        'ignore',
-        'acknowledge',
-        'answer',
-        'ticket',
-        'work',
-      ];
+      const validActions = ['ignore', 'acknowledge', 'answer', 'ticket'];
       if (!validActions.includes(parsed.action)) {
         logger.warn(
           `[Slack Classifier] Invalid action "${parsed.action}", defaulting to ignore`,
@@ -629,7 +570,7 @@ function parseClassification(text) {
     const parsed = JSON.parse(text.substring(start, end + 1));
 
     // Validate action
-    const validActions = ['ignore', 'acknowledge', 'answer', 'ticket', 'work'];
+    const validActions = ['ignore', 'acknowledge', 'answer', 'ticket'];
     if (!validActions.includes(parsed.action)) {
       logger.warn(
         `[Slack Classifier] Invalid action "${parsed.action}", defaulting to ignore`,
