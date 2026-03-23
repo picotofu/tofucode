@@ -116,7 +116,6 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 <style scoped>
 .ad-wrap {
   position: relative;
-  width: 100%;
   min-width: 0;
 }
 
