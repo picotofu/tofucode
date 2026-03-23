@@ -369,22 +369,23 @@ function statusClass(status) {
 
     <!-- Pinned footer: create ticket -->
     <div v-if="!tasksError" class="tasks-footer">
-      <div class="tasks-create-row">
-        <!-- Left: title + assignee stacked -->
-        <div class="tasks-create-fields">
-          <input
-            v-model="createTitle"
-            type="text"
-            class="tasks-create-input"
-            placeholder="New ticket title…"
-            maxlength="200"
-            @keydown="onCreateTitleKeydown"
-          />
+      <div class="tasks-create-box">
+        <!-- Row 1: title input -->
+        <input
+          v-model="createTitle"
+          type="text"
+          class="tasks-create-input"
+          placeholder="New ticket title…"
+          maxlength="200"
+          @keydown="onCreateTitleKeydown"
+        />
 
-          <!-- Assignee picker for create -->
+        <!-- Row 2: assignee dropdown + confirm button -->
+        <div class="tasks-create-bottom">
+          <!-- Assignee picker -->
           <div ref="createAssigneeDropRef" class="tasks-assignee-dropdown tasks-create-assignee">
             <button
-              class="tasks-assignee-trigger tasks-assignee-trigger-sm"
+              class="tasks-assignee-trigger tasks-assignee-trigger-sm tasks-assignee-trigger-bare"
               type="button"
               @click="createAssigneeOpen ? (createAssigneeOpen = false) : openCreateAssignee()"
             >
@@ -414,19 +415,19 @@ function statusClass(status) {
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Right: add button spanning both rows -->
-        <button
-          class="tasks-create-confirm"
-          :disabled="!createTitle.trim()"
-          title="Add ticket"
-          @click="confirmCreate"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </button>
+          <!-- Confirm button (borderless) -->
+          <button
+            class="tasks-create-confirm"
+            :disabled="!createTitle.trim()"
+            title="Add ticket"
+            @click="confirmCreate"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -805,22 +806,10 @@ function statusClass(status) {
   padding: 8px 10px;
 }
 
-.tasks-create-row {
-  display: flex;
-  align-items: stretch;
-  gap: 6px;
-}
-
-.tasks-create-fields {
-  flex: 1;
-  min-width: 0;
+.tasks-create-box {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.tasks-create-assignee {
-  flex: unset;
+  gap: 2px;
 }
 
 .tasks-create-input {
@@ -834,6 +823,7 @@ function statusClass(status) {
   outline: none;
   box-sizing: border-box;
   font-family: inherit;
+  transition: border-color 0.15s;
 }
 
 .tasks-create-input:focus {
@@ -844,29 +834,52 @@ function statusClass(status) {
   color: var(--text-muted);
 }
 
+.tasks-create-bottom {
+  display: flex;
+  align-items: center;
+  padding: 0 2px 0 0;
+}
+
+.tasks-create-assignee {
+  flex: 1;
+  min-width: 0;
+}
+
+.tasks-assignee-trigger-bare {
+  background: transparent;
+  border-color: transparent;
+}
+
+.tasks-assignee-trigger-bare:focus,
+.tasks-assignee-trigger-bare:hover {
+  background: var(--bg-tertiary);
+  border-color: transparent;
+}
+
 .tasks-create-confirm {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 36px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--text-muted);
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .tasks-create-confirm:disabled {
-  opacity: 0.35;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
 .tasks-create-confirm:not(:disabled):hover {
-  background: var(--bg-hover);
-  border-color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 /* ── Skeleton loading ─────────────────────────── */
