@@ -428,8 +428,9 @@ provide('settings', {
 
 onMounted(() => {
   connect(() => {
-    // Load settings once WebSocket is connected
+    // Load settings and Notion config once WebSocket is connected
     send({ type: 'get_settings' });
+    send({ type: 'notion:get_config' });
   });
   document.addEventListener('keydown', handleGlobalKeydown);
 });
@@ -443,7 +444,7 @@ onUnmounted(() => {
 
 <template>
   <div class="app" :class="{ 'sidebar-open': sidebarOpen }">
-    <Sidebar :open="sidebarOpen" @close="closeSidebar" @open-settings="openSettings" @new-project="openPaletteNewProject" />
+    <Sidebar :open="sidebarOpen" :slack-enabled="slackEnabled" :notion-enabled="notionConfig?.enabled ?? false" @close="closeSidebar" @open-settings="openSettings" @new-project="openPaletteNewProject" />
     <div class="app-main">
       <router-view />
     </div>

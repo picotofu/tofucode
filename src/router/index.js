@@ -4,6 +4,7 @@ import AuthView from '../views/AuthView.vue';
 import ChatView from '../views/ChatView.vue';
 import ProjectsView from '../views/ProjectsView.vue';
 import SessionsView from '../views/SessionsView.vue';
+import TaskView from '../views/TaskView.vue';
 
 const routes = [
   {
@@ -26,6 +27,11 @@ const routes = [
     path: '/project/:project/session/:session',
     name: 'chat',
     component: ChatView,
+  },
+  {
+    path: '/tasks/:pageId',
+    name: 'task',
+    component: TaskView,
   },
 ];
 

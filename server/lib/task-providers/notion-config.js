@@ -5,7 +5,7 @@
  * Config file: ~/.tofucode/notion-config.json
  *
  * Schema:
- *   { enabled, token, ticketDatabaseUrl, fieldMappings: [{ field, type, purpose }] }
+ *   { enabled, token, ticketDatabaseUrl, userEmail, fieldMappings: [{ field, type, purpose }] }
  *
  * TODO (adapter): When adding support for additional task management providers
  * (e.g. Jira, Linear), this file should evolve into a generic active-provider
@@ -27,6 +27,7 @@ const DEFAULT_CONFIG = {
   enabled: false,
   token: '', // Notion Integration Token (secret_xxx)
   ticketDatabaseUrl: '',
+  userEmail: '', // Workspace email to identify self for filtering
   fieldMappings: [], // [{ field: string, type: string, purpose: string }]
 };
 
@@ -66,9 +67,12 @@ export function loadNotionConfigRaw() {
  */
 export function loadNotionConfig() {
   const raw = loadNotionConfigRaw();
-  // Allow env var override for token
+  // Allow env var overrides
   if (!raw.token && process.env.NOTION_TOKEN) {
     raw.token = process.env.NOTION_TOKEN;
+  }
+  if (!raw.userEmail && process.env.NOTION_USER_EMAIL) {
+    raw.userEmail = process.env.NOTION_USER_EMAIL;
   }
   return raw;
 }

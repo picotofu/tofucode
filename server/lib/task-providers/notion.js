@@ -151,6 +151,14 @@ class NotionAPI {
   }
 
   /**
+   * List all workspace users — GET /v1/users
+   * @returns {Promise<Object>}
+   */
+  async listUsers() {
+    return this.call('GET', '/users');
+  }
+
+  /**
    * Get block children for a page — GET /v1/blocks/{id}/children
    * @param {string} pageId - Page ID (also a block)
    * @param {string} [cursor] - Pagination cursor
@@ -170,6 +178,15 @@ class NotionAPI {
    */
   async queryDatabase(dbId, body = {}) {
     return this.call('POST', `/databases/${dbId}/query`, body);
+  }
+
+  /**
+   * Delete a block — DELETE /v1/blocks/{id}
+   * @param {string} blockId - Block ID to delete
+   * @returns {Promise<Object>}
+   */
+  async deleteBlock(blockId) {
+    return this.call('DELETE', `/blocks/${blockId}`);
   }
 }
 
@@ -418,6 +435,21 @@ function extractPlainText(richText) {
 }
 
 /**
+ * Extract the unique_id string (e.g. "AOB-123") from a Notion page properties object.
+ * @param {Object} properties
+ * @returns {string|undefined}
+ */
+function extractPageUniqueId(properties) {
+  for (const prop of Object.values(properties)) {
+    if (prop.type === 'unique_id' && prop.unique_id?.number != null) {
+      const { prefix, number } = prop.unique_id;
+      return prefix ? `${prefix}-${number}` : String(number);
+    }
+  }
+  return undefined;
+}
+
+/**
  * Extract the title string from a Notion page properties object.
  * Finds the first property with type === 'title'.
  * @param {Object} properties
@@ -434,18 +466,53 @@ function extractPageTitle(properties) {
 
 /**
  * Extract the status string from a Notion page properties object.
- * Finds the first property with type === 'status', falling back to 'select'.
- * If multiple status/select fields exist, the first encountered wins — relies on
- * the database having a single primary status field, which is the common case.
+ * When a statusField name is provided (from fieldMappings), uses it directly.
+ * Otherwise falls back to scanning for the first non-null status/select property.
  * @param {Object} properties
+ * @param {string|null} [statusField] - Known status field name from fieldMappings
  * @returns {string|undefined}
  */
-function extractPageStatus(properties) {
-  for (const prop of Object.values(properties)) {
+function extractPageStatus(properties, statusField) {
+  // Prefer direct lookup when field name is known
+  if (statusField && properties[statusField]) {
+    const prop = properties[statusField];
     if (prop.type === 'status') return prop.status?.name;
     if (prop.type === 'select') return prop.select?.name;
   }
+
+  // Fallback: scan for first status/select with a non-null value
+  for (const prop of Object.values(properties)) {
+    if (prop.type === 'status' && prop.status?.name) return prop.status.name;
+    if (prop.type === 'select' && prop.select?.name) return prop.select.name;
+  }
   return undefined;
+}
+
+/**
+ * Extract assignee names from a Notion page properties object.
+ * Uses the known assigneeField name when provided, otherwise scans for the first people property.
+ * @param {Object} properties
+ * @param {string|null} [assigneeField] - Known assignee field name from fieldMappings
+ * @returns {string[]} Array of assignee display names
+ */
+function extractPageAssignees(properties, assigneeField) {
+  const pick = (prop) => {
+    if (prop.type === 'people' && Array.isArray(prop.people)) {
+      return prop.people.map((p) => p.name || p.id).filter(Boolean);
+    }
+    return null;
+  };
+
+  if (assigneeField && properties[assigneeField]) {
+    const result = pick(properties[assigneeField]);
+    if (result) return result;
+  }
+
+  for (const prop of Object.values(properties)) {
+    const result = pick(prop);
+    if (result?.length) return result;
+  }
+  return [];
 }
 
 /**
@@ -513,6 +580,114 @@ function blocksToPlainText(blocks) {
     .join('\n\n');
 }
 
+/**
+ * Find the Notion person user ID for a given email address.
+ * Calls GET /v1/users and matches by person.email.
+ * Returns null if not found or on error.
+ * @param {NotionAPI} api
+ * @param {string} email
+ * @returns {Promise<string|null>}
+ */
+async function resolveUserIdByEmail(api, email) {
+  if (!email) return null;
+  try {
+    const res = await api.listUsers();
+    const users = res.results ?? [];
+    const match = users.find(
+      (u) => u.type === 'person' && u.person?.email === email,
+    );
+    return match?.id ?? null;
+  } catch (err) {
+    logger.warn('[Notion] resolveUserIdByEmail error:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Extract all configured field values from a page's properties.
+ * Returns a map of fieldName → { type, value } for all field mappings.
+ * @param {Object} properties - Raw Notion page properties
+ * @param {Array<{field: string, type: string}>} fieldMappings
+ * @returns {Object}
+ */
+function extractAllProperties(properties, fieldMappings) {
+  const result = {};
+  for (const mapping of fieldMappings) {
+    const prop = properties[mapping.field];
+    if (!prop) continue;
+    const entry = { type: prop.type, value: null };
+    switch (prop.type) {
+      case 'title':
+        entry.value = extractPlainText(prop.title);
+        break;
+      case 'rich_text':
+        entry.value = extractPlainText(prop.rich_text);
+        break;
+      case 'select':
+        entry.value = prop.select?.name ?? null;
+        break;
+      case 'status':
+        entry.value = prop.status?.name ?? null;
+        break;
+      case 'multi_select':
+        entry.value = (prop.multi_select ?? []).map((o) => o.name);
+        break;
+      case 'people':
+        entry.value = (prop.people ?? []).map((p) => ({
+          id: p.id,
+          name: p.name || p.id,
+        }));
+        break;
+      case 'checkbox':
+        entry.value = prop.checkbox ?? false;
+        break;
+      case 'number':
+        entry.value = prop.number ?? null;
+        break;
+      case 'date':
+        entry.value = prop.date?.start ?? null;
+        break;
+      case 'url':
+        entry.value = prop.url ?? null;
+        break;
+      case 'email':
+        entry.value = prop.email ?? null;
+        break;
+      case 'phone_number':
+        entry.value = prop.phone_number ?? null;
+        break;
+      default:
+        entry.value = null;
+    }
+    result[mapping.field] = entry;
+  }
+  return result;
+}
+
+/**
+ * Extract dropdown options for select/status/multi_select fields from a DB schema.
+ * @param {Object} schema - Notion database properties schema
+ * @param {Array<{field: string, type: string}>} fieldMappings
+ * @returns {Object} Map of fieldName → string[]
+ */
+function extractFieldOptions(schema, fieldMappings) {
+  const result = {};
+  for (const mapping of fieldMappings) {
+    const prop = schema[mapping.field];
+    if (!prop) continue;
+    if (prop.type === 'select') {
+      result[mapping.field] = (prop.select?.options ?? []).map((o) => o.name);
+    } else if (prop.type === 'status') {
+      result[mapping.field] = (prop.status?.options ?? []).map((o) => o.name);
+    } else if (prop.type === 'multi_select') {
+      result[mapping.field] = (prop.multi_select?.options ?? []).map(
+        (o) => o.name,
+      );
+    }
+  }
+  return result;
+}
+
 // ─── Provider factory ────────────────────────────────────────────────────────
 
 /**
@@ -575,6 +750,8 @@ export function createNotionProvider(token) {
       body,
       databaseUrl,
       fieldMappings: _fieldMappings,
+      assigneeId,
+      assigneeField,
     }) {
       const dbId = extractDatabaseId(databaseUrl);
       if (!dbId) {
@@ -590,6 +767,18 @@ export function createNotionProvider(token) {
         const schema = db.properties || {};
 
         const properties = buildProperties(title, schema);
+
+        // Set assignee if provided and the field exists in the schema
+        if (
+          assigneeId &&
+          assigneeField &&
+          schema[assigneeField]?.type === 'people'
+        ) {
+          properties[assigneeField] = {
+            people: [{ object: 'user', id: assigneeId }],
+          };
+        }
+
         const children = buildBodyChildren(body);
 
         const page = await api.createPage(dbId, properties, children);
@@ -624,22 +813,53 @@ export function createNotionProvider(token) {
         return { success: true };
       } catch (err) {
         logger.error('[Notion] updateTicket error:', err.message);
-        return { success: false, reason: err.message };
+        return { success: false, error: err.message };
       }
     },
 
     /**
      * Fetch a ticket's properties and page body content
      * @param {string} pageId
+     * @param {string} [statusField] - Known status field name from fieldMappings
+     * @param {string} [assigneeField] - Known assignee field name from fieldMappings
+     * @param {Array} [fieldMappings] - Full field mappings for extracting all properties
+     * @param {string} [databaseUrl] - Database URL for fetching field options
      * @returns {Promise<import('./types.js').FetchTicketResult>}
      */
-    async fetchTicket(pageId) {
+    async fetchTicket(
+      pageId,
+      statusField,
+      assigneeField,
+      fieldMappings,
+      databaseUrl,
+    ) {
       try {
         const page = await api.getPage(pageId);
-        const title = extractPageTitle(page.properties ?? {});
-        const status = extractPageStatus(page.properties ?? {});
+        const props = page.properties ?? {};
+        const title = extractPageTitle(props);
+        const status = extractPageStatus(props, statusField);
+        const assignees = extractPageAssignees(props, assigneeField);
+        const ticketId = extractPageUniqueId(props);
         const url = page.url || `https://notion.so/${pageId.replace(/-/g, '')}`;
         const lastEditedAt = page.last_edited_time;
+
+        // Extract all configured field values
+        const properties = fieldMappings?.length
+          ? extractAllProperties(props, fieldMappings)
+          : {};
+
+        // Fetch field options (select/status/multi_select) from DB schema
+        let fieldOptions = {};
+        if (fieldMappings?.length && databaseUrl) {
+          const dbId = extractDatabaseId(databaseUrl);
+          if (dbId) {
+            const db = await api.getDatabase(dbId);
+            fieldOptions = extractFieldOptions(
+              db.properties ?? {},
+              fieldMappings,
+            );
+          }
+        }
 
         const blocks = await fetchAllBlocks(api, pageId);
         const body = blocksToPlainText(blocks);
@@ -647,11 +867,16 @@ export function createNotionProvider(token) {
         return {
           success: true,
           pageId,
+          ticketId,
           title,
           url,
           status,
+          assignees,
           body,
           lastEditedAt,
+          properties,
+          fieldOptions,
+          fieldMappings: fieldMappings ?? [],
         };
       } catch (err) {
         logger.error('[Notion] fetchTicket error:', err.message);
@@ -664,7 +889,16 @@ export function createNotionProvider(token) {
      * @param {import('./types.js').ListTicketsParams} params
      * @returns {Promise<import('./types.js').ListTicketsResult>}
      */
-    async listTickets({ databaseUrl, limit = 20, cursor }) {
+    async listTickets({
+      databaseUrl,
+      limit = 20,
+      cursor,
+      filterByUserId,
+      assigneeField,
+      statusField,
+      filterByStatus,
+      titleSearch,
+    }) {
       const dbId = extractDatabaseId(databaseUrl);
       if (!dbId) {
         return {
@@ -677,13 +911,60 @@ export function createNotionProvider(token) {
         const queryBody = { page_size: limit };
         if (cursor) queryBody.start_cursor = cursor;
 
+        const conditions = [];
+
+        // Assignee filter (self only)
+        if (filterByUserId && assigneeField) {
+          conditions.push({
+            property: assigneeField,
+            people: { contains: filterByUserId },
+          });
+        }
+
+        // Status filter
+        if (filterByStatus && statusField) {
+          if (filterByStatus === '__none__') {
+            // Filter to tickets with no status set
+            conditions.push({
+              property: statusField,
+              status: { is_empty: true },
+            });
+          } else {
+            conditions.push({
+              property: statusField,
+              status: { equals: filterByStatus },
+            });
+          }
+        }
+
+        // Title fuzzy search (Notion "contains" on title)
+        if (titleSearch?.trim()) {
+          conditions.push({
+            property: 'title',
+            title: { contains: titleSearch.trim() },
+          });
+        }
+
+        if (conditions.length === 1) {
+          queryBody.filter = conditions[0];
+        } else if (conditions.length > 1) {
+          queryBody.filter = { and: conditions };
+        }
+
+        // Sort: last_edited_time descending — most recently touched first
+        queryBody.sorts = [
+          { timestamp: 'last_edited_time', direction: 'descending' },
+        ];
+
         const res = await api.queryDatabase(dbId, queryBody);
 
         const tickets = (res.results ?? []).map((page) => ({
           pageId: page.id,
+          ticketId: extractPageUniqueId(page.properties ?? {}),
           title: extractPageTitle(page.properties ?? {}),
           url: page.url || `https://notion.so/${page.id.replace(/-/g, '')}`,
-          status: extractPageStatus(page.properties ?? {}),
+          status: extractPageStatus(page.properties ?? {}, statusField),
+          assignees: extractPageAssignees(page.properties ?? {}, assigneeField),
           lastEditedAt: page.last_edited_time,
         }));
 
@@ -699,6 +980,15 @@ export function createNotionProvider(token) {
     },
 
     /**
+     * Resolve a Notion person user ID from an email address.
+     * @param {string} email
+     * @returns {Promise<string|null>}
+     */
+    async resolveUserId(email) {
+      return resolveUserIdByEmail(api, email);
+    },
+
+    /**
      * Build Notion status property value for a given status name.
      * Used to set In Progress / Done etc. on a ticket.
      * @param {string} statusFieldName - Field name in the database
@@ -709,6 +999,215 @@ export function createNotionProvider(token) {
       return {
         [statusFieldName]: { status: { name: statusValue } },
       };
+    },
+
+    /**
+     * Get available status options from the database schema.
+     * Returns the named options plus a sentinel for no-status.
+     * @param {string} databaseUrl
+     * @param {string} statusField - Status field name from fieldMappings
+     * @returns {Promise<{ success: boolean, options?: string[], error?: string }>}
+     */
+    async getStatusOptions(databaseUrl, statusField) {
+      const dbId = extractDatabaseId(databaseUrl);
+      if (!dbId) {
+        return {
+          success: false,
+          error: 'Could not extract database ID from URL.',
+        };
+      }
+      try {
+        const db = await api.getDatabase(dbId);
+        const prop = db.properties?.[statusField];
+        const options = (
+          prop?.status?.options ??
+          prop?.select?.options ??
+          []
+        ).map((o) => o.name);
+        return { success: true, options };
+      } catch (err) {
+        logger.error('[Notion] getStatusOptions error:', err.message);
+        return { success: false, error: err.message };
+      }
+    },
+
+    /**
+     * List unique assignees from actual tickets in the database.
+     * Queries up to 100 pages without filters and collects unique people.
+     * @param {string} databaseUrl
+     * @param {string|null} assigneeField - Known assignee field name
+     * @returns {Promise<Array<{id: string, name: string}>>}
+     */
+    async listAssigneesFromDb(databaseUrl, assigneeField) {
+      const dbId = extractDatabaseId(databaseUrl);
+      if (!dbId) return [];
+      try {
+        const res = await api.queryDatabase(dbId, {
+          page_size: 100,
+          sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }],
+        });
+
+        const seen = new Map(); // id → name
+        for (const page of res.results ?? []) {
+          const props = page.properties ?? {};
+          // Prefer known assignee field; fall back to scanning for people type
+          const candidates = assigneeField
+            ? [props[assigneeField]].filter(Boolean)
+            : Object.values(props).filter((p) => p.type === 'people');
+          for (const prop of candidates) {
+            if (prop.type === 'people' && Array.isArray(prop.people)) {
+              for (const person of prop.people) {
+                if (person.id && !seen.has(person.id)) {
+                  seen.set(person.id, person.name || person.id);
+                }
+              }
+            }
+          }
+        }
+
+        return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+      } catch (err) {
+        logger.warn('[Notion] listAssigneesFromDb error:', err.message);
+        return [];
+      }
+    },
+
+    /**
+     * Fetch comments on a Notion page.
+     * @param {string} pageId
+     * @returns {Promise<Array<{id, createdTime, createdBy, content}>>}
+     */
+    async getComments(pageId) {
+      try {
+        const res = await api.call('GET', `/comments?block_id=${pageId}`);
+        return (res.results ?? []).map((c) => ({
+          id: c.id,
+          createdTime: c.created_time,
+          createdBy: c.created_by?.name || c.created_by?.id || 'Unknown',
+          content: extractPlainText(c.rich_text ?? []),
+        }));
+      } catch (err) {
+        logger.warn('[Notion] getComments error:', err.message);
+        return [];
+      }
+    },
+
+    /**
+     * Add a comment to a Notion page.
+     * @param {string} pageId
+     * @param {string} content
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async addComment(pageId, content) {
+      try {
+        await api.call('POST', '/comments', {
+          parent: { page_id: pageId },
+          rich_text: [{ type: 'text', text: { content } }],
+        });
+        return { success: true };
+      } catch (err) {
+        logger.error('[Notion] addComment error:', err.message);
+        return { success: false, error: err.message };
+      }
+    },
+
+    /**
+     * Build a Notion property value object from a field name, type, and value.
+     * Used for arbitrary field updates from the frontend.
+     * @param {string} fieldName
+     * @param {string} fieldType - Notion property type
+     * @param {*} value
+     * @returns {Object|null}
+     */
+    buildPropertyValue(fieldName, fieldType, value) {
+      switch (fieldType) {
+        case 'title':
+          return {
+            [fieldName]: {
+              title: [
+                {
+                  type: 'text',
+                  text: { content: String(value ?? '').substring(0, 2000) },
+                },
+              ],
+            },
+          };
+        case 'rich_text':
+          return {
+            [fieldName]: {
+              rich_text: [
+                {
+                  type: 'text',
+                  text: { content: String(value ?? '').substring(0, 2000) },
+                },
+              ],
+            },
+          };
+        case 'select':
+          return { [fieldName]: { select: value ? { name: value } : null } };
+        case 'status':
+          return { [fieldName]: { status: value ? { name: value } : null } };
+        case 'multi_select':
+          return {
+            [fieldName]: {
+              multi_select: (value ?? []).map((name) => ({ name })),
+            },
+          };
+        case 'checkbox':
+          return { [fieldName]: { checkbox: !!value } };
+        case 'number':
+          return {
+            [fieldName]: { number: value != null ? Number(value) : null },
+          };
+        case 'date':
+          return { [fieldName]: { date: value ? { start: value } : null } };
+        case 'url':
+          return { [fieldName]: { url: value || null } };
+        case 'email':
+          return { [fieldName]: { email: value || null } };
+        case 'phone_number':
+          return { [fieldName]: { phone_number: value || null } };
+        default:
+          return null;
+      }
+    },
+
+    /**
+     * Replace the full body content of a page.
+     * Deletes all existing children blocks, then creates new ones from text.
+     * @param {string} pageId
+     * @param {string} text - New plain text body
+     * @returns {Promise<import('./types.js').TicketResult>}
+     */
+    async replaceTicketBody(pageId, text) {
+      try {
+        // 1. Fetch all existing block IDs
+        const existingBlockIds = [];
+        let cursor;
+        do {
+          const res = await api.getBlockChildren(pageId, cursor);
+          for (const block of res.results ?? []) {
+            existingBlockIds.push(block.id);
+          }
+          cursor = res.has_more ? res.next_cursor : undefined;
+        } while (cursor);
+
+        // 2. Delete all existing blocks
+        await Promise.all(existingBlockIds.map((id) => api.deleteBlock(id)));
+
+        // 3. Create new blocks from text (may be empty)
+        if (text?.trim()) {
+          const children = buildBodyChildren(text);
+          if (children.length > 0) {
+            await api.appendBlockChildren(pageId, children);
+          }
+        }
+
+        return { success: true };
+      } catch (err) {
+        logger.error('[Notion] replaceTicketBody error:', err.message);
+        return { success: false, error: err.message };
+      }
     },
   };
 }

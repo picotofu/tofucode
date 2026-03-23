@@ -546,6 +546,10 @@ const shortcuts = [
       { keys: ['⌘/^', 'K'], description: 'Open command palette' },
       { keys: ['⌘/^', 'P'], description: 'Open file picker' },
       { keys: ['⌘/^', 'B'], description: 'Toggle sidebar' },
+      { keys: ['⌘/^', '7'], description: 'Sidebar: Sessions tab' },
+      { keys: ['⌘/^', '8'], description: 'Sidebar: Projects tab' },
+      { keys: ['⌘/^', '9'], description: 'Sidebar: Slack tab' },
+      { keys: ['⌘/^', '0'], description: 'Sidebar: Tasks tab' },
       { keys: ['⌘/^', ','], description: 'Open settings' },
       { keys: ['⌘/^', '/'], description: 'Show keyboard shortcuts' },
     ],
@@ -1552,6 +1556,14 @@ async function handleClearCacheAndUpdate() {
   border-bottom: 1px solid var(--border-color);
   padding: 0 20px;
   gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  flex-shrink: 0;
+}
+
+.tab-bar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
 .tab-btn {
@@ -1565,6 +1577,8 @@ async function handleClearCacheAndUpdate() {
   cursor: pointer;
   transition: all 0.15s ease;
   margin-bottom: -1px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tab-btn:hover {

@@ -1,19 +1,29 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useWebSocket } from '../composables/useWebSocket';
 import { formatRelativeTime } from '../utils/format.js';
+import TasksPanel from './TasksPanel.vue';
 
 const props = defineProps({
   open: {
     type: Boolean,
     default: true,
   },
+  slackEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  notionEnabled: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(['close', 'open-settings', 'new-project']);
 
 const route = useRoute();
+const router = useRouter();
 const {
   connected,
   projects,
@@ -24,8 +34,22 @@ const {
   currentVersion,
   updateAvailable,
   slackSessionSlug,
+  tasks,
+  tasksReady,
+  tasksError,
+  tasksNextCursor,
+  tasksFilter,
+  taskStatusOptions,
+  taskAssignees,
+  lastCreatedPageId,
   getProjects,
   getRecentSessionsImmediate,
+  getTasks,
+  loadMoreTasks,
+  setTasksFilter,
+  createTask,
+  getTaskStatusOptions,
+  getTaskAssignees,
   dismissUpdate,
   send,
   onMessage,
@@ -96,12 +120,6 @@ function handleUpgrade() {
   }
 }
 
-function handleUpdateClick() {
-  if (updateAvailable.value) {
-    window.open(updateAvailable.value.updateUrl, '_blank');
-  }
-}
-
 function handleDismissUpdate(e) {
   e.stopPropagation();
   if (updateAvailable.value) {
@@ -135,6 +153,45 @@ watch(activeTab, (tab) => {
   }
 });
 
+// Fetch tasks + status options + assignees once on first tab open
+const tasksFetched = ref(false);
+
+watch(activeTab, (tab) => {
+  if (tab === 'tasks' && !tasksFetched.value) {
+    getTasks();
+    getTaskStatusOptions();
+    getTaskAssignees();
+    tasksFetched.value = true;
+  }
+});
+
+// Navigate to task view when a new ticket is created
+watch(lastCreatedPageId, (pageId) => {
+  if (pageId) {
+    router.push(`/tasks/${pageId}`);
+    closeOnMobile();
+  }
+});
+
+function handleSelectTask(pageId) {
+  router.push(`/tasks/${pageId}`);
+  closeOnMobile();
+}
+
+function handleFilterChange(filter) {
+  setTasksFilter(filter);
+}
+
+function handleCreateTask(title, assigneeId) {
+  createTask(title, assigneeId);
+  // List will refresh after lastCreatedPageId triggers navigation
+}
+
+function handleRefreshTasks() {
+  tasksFetched.value = true; // keep fetched flag — just re-fetch
+  getTasks();
+}
+
 // Current route info for highlighting
 const currentProject = computed(() => route.params.project);
 const currentSession = computed(() => route.params.session);
@@ -146,11 +203,6 @@ function fetchData() {
     getRecentSessionsImmediate();
   }
 }
-
-// Fetch on mount if already connected
-onMounted(() => {
-  fetchData();
-});
 
 // Fetch when connection becomes ready
 watch(connected, (isConnected) => {
@@ -191,6 +243,27 @@ function startNewSession(projectSlug) {
 function handleOverlayClick() {
   emit('close');
 }
+
+// Cmd/Ctrl+7–0: switch sidebar tabs (sessions, projects, slack, tasks)
+const TAB_KEYS = { 7: 'sessions', 8: 'projects', 9: 'slack', 0: 'tasks' };
+
+function handleKeydown(e) {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+  const tab = TAB_KEYS[e.key];
+  if (tab) {
+    e.preventDefault();
+    activeTab.value = tab;
+  }
+}
+
+onMounted(() => {
+  fetchData();
+  document.addEventListener('keydown', handleKeydown);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown);
+});
 </script>
 
 <template>
@@ -295,7 +368,10 @@ function handleOverlayClick() {
 
       <!-- Slack Sessions Tab -->
       <ul v-else-if="activeTab === 'slack'" class="sidebar-list">
-        <template v-if="slackSessionSlug">
+        <li v-if="!slackEnabled" class="sidebar-empty">
+          Slack is not enabled on this server
+        </li>
+        <template v-else-if="slackSessionSlug">
           <li
             v-for="session in slackSessions"
             :key="session.sessionId"
@@ -324,16 +400,35 @@ function handleOverlayClick() {
           </li>
         </template>
         <li v-else class="sidebar-empty">
-          Slack integration not configured
+          Slack bot not configured
         </li>
       </ul>
 
       <!-- Tasks Tab -->
-      <div v-else-if="activeTab === 'tasks'" class="sidebar-list">
-        <div class="sidebar-empty">
-          Tasks panel coming soon
+      <template v-else-if="activeTab === 'tasks'">
+        <div v-if="!notionEnabled" class="sidebar-list">
+          <div class="sidebar-empty">
+            Notion is not enabled. Configure it in
+            <button class="sidebar-empty-link" @click="$emit('open-settings', 'notion')">Settings → Notion</button>
+          </div>
         </div>
-      </div>
+        <TasksPanel
+          v-else
+          :tasks="tasks"
+          :tasks-ready="tasksReady"
+          :tasks-error="tasksError"
+          :tasks-next-cursor="tasksNextCursor"
+          :tasks-filter="tasksFilter"
+          :task-status-options="taskStatusOptions"
+          :task-assignees="taskAssignees"
+          @refresh="handleRefreshTasks"
+          @load-more="loadMoreTasks"
+          @select-task="handleSelectTask"
+          @filter-change="handleFilterChange"
+          @create-task="handleCreateTask"
+          @open-settings="$emit('open-settings', 'notion')"
+        />
+      </template>
 
       <!-- Projects Tab -->
       <ul v-else-if="activeTab === 'projects'" class="sidebar-list">
@@ -509,6 +604,18 @@ function handleOverlayClick() {
           <circle cx="12" cy="12" r="3"/>
         </svg>
       </button>
+
+      <!-- Close button (mobile only) -->
+      <button
+        class="sidebar-icon-btn sidebar-close-btn"
+        @click="$emit('close')"
+        title="Close sidebar"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
     </div>
   </aside>
 
@@ -556,8 +663,8 @@ function handleOverlayClick() {
   color: var(--text-primary);
   text-decoration: none;
   transition: color 0.15s;
-  flex-grow: 1;
   line-height: 36px;
+  margin-right: auto;
 }
 
 .sidebar-title:hover {
@@ -867,6 +974,21 @@ function handleOverlayClick() {
   font-size: 13px;
 }
 
+.sidebar-empty-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sidebar-empty-link:hover {
+  color: var(--text-primary);
+}
+
 .sidebar-project-toolbar {
   display: flex;
   align-items: center;
@@ -992,6 +1114,11 @@ function handleOverlayClick() {
   display: none;
 }
 
+/* Close button hidden on desktop */
+.sidebar-close-btn {
+  display: none;
+}
+
 /* Mobile styles - sidebar as overlay */
 @media (max-width: 768px) {
   .sidebar.open {
@@ -999,6 +1126,11 @@ function handleOverlayClick() {
     left: 0;
     top: 0;
     z-index: 200;
+    width: 100vw;
+  }
+
+  .sidebar-close-btn {
+    display: inline-flex;
   }
 
   .sidebar-overlay {

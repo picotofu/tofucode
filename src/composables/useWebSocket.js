@@ -34,6 +34,44 @@ const slackSessionSlug = ref(null);
 // True once the first recent_sessions response is received
 const sessionsReady = ref(false);
 
+// Tasks panel state
+const tasks = ref([]);
+const tasksNextCursor = ref(null);
+const tasksReady = ref(false);
+const tasksError = ref(null);
+const taskDetail = ref(null);
+const taskDetailLoading = ref(false);
+const taskSaveStatus = ref(null); // 'saving' | 'saved' | 'error' | null
+const taskStatusOptions = ref([]); // available status names from DB schema
+const taskAssignees = ref([]); // workspace users [{id, name, email}]
+const taskSelfEmail = ref(null); // current user email from config
+const taskComments = ref([]);
+const taskCommentsLoading = ref(false);
+const lastCreatedPageId = ref(null);
+
+// LocalStorage key for persistent filter state
+const TASKS_FILTER_KEY = 'tofucode:tasks-filter';
+
+function loadTasksFilter() {
+  try {
+    const stored = localStorage.getItem(TASKS_FILTER_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        filterByAssignee: parsed.filterByAssignee ?? '__self__',
+        filterByStatus: parsed.filterByStatus ?? '',
+        titleSearch: '',
+      };
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return { filterByAssignee: '__self__', filterByStatus: '', titleSearch: '' };
+}
+
+const tasksFilter = ref(loadTasksFilter());
+let tasksAppending = false; // module-level flag for pagination append vs replace
+
 // Clone dialog state (global so sidebar + homepage can both trigger it)
 const showCloneDialog = ref(false);
 const cloneInitialDir = ref(null);
@@ -325,6 +363,73 @@ function handleGlobalMessage(msg) {
       // Logged here; components listen via onMessage for user-facing feedback
       console.error('File creation error:', msg.error);
       break;
+
+    case 'tasks:list_result':
+      tasksReady.value = true;
+      if (msg.success) {
+        if (tasksAppending) {
+          tasks.value = [...tasks.value, ...(msg.tickets || [])];
+        } else {
+          tasks.value = msg.tickets || [];
+        }
+        tasksNextCursor.value = msg.nextCursor || null;
+        tasksError.value = null;
+      } else {
+        tasks.value = [];
+        tasksNextCursor.value = null;
+        tasksError.value = msg.error || 'Failed to load tasks';
+      }
+      tasksAppending = false;
+      break;
+
+    case 'tasks:fetch_result':
+      taskDetailLoading.value = false;
+      if (msg.success) {
+        taskDetail.value = msg;
+      } else {
+        taskDetail.value = { error: msg.error || 'Failed to load task' };
+      }
+      break;
+
+    case 'tasks:create_result':
+      if (msg.success && msg.pageId) {
+        lastCreatedPageId.value = msg.pageId;
+      }
+      break;
+
+    case 'tasks:update_result':
+      // Status update — no local state change needed; task detail re-fetch handles it
+      break;
+
+    case 'tasks:replace_result':
+      taskSaveStatus.value = msg.success ? 'saved' : 'error';
+      break;
+
+    case 'tasks:status_options_result':
+      if (msg.success) {
+        taskStatusOptions.value = msg.options || [];
+      }
+      break;
+
+    case 'tasks:assignees_result':
+      if (msg.success) {
+        taskAssignees.value = msg.users || [];
+        taskSelfEmail.value = msg.selfEmail || null;
+      }
+      break;
+
+    case 'tasks:comments_result':
+      taskCommentsLoading.value = false;
+      if (msg.success) {
+        taskComments.value = msg.comments || [];
+      }
+      break;
+
+    case 'tasks:add_comment_result':
+      if (msg.success && msg.pageId) {
+        getTaskComments(msg.pageId);
+      }
+      break;
   }
   // Call all registered message listeners
   for (const listener of globalMessageListeners) {
@@ -443,6 +548,104 @@ function dismissUpdate(version) {
   updateAvailable.value = null;
 }
 
+// Tasks panel actions
+function buildTasksListPayload(filter, extra = {}) {
+  const payload = {
+    type: 'tasks:list',
+    filterByStatus: filter.filterByStatus || undefined,
+    titleSearch: filter.titleSearch || undefined,
+    ...extra,
+  };
+  if (filter.filterByAssignee === '__self__') {
+    payload.filterBySelf = true;
+  } else if (filter.filterByAssignee) {
+    payload.filterByAssignee = filter.filterByAssignee;
+    payload.filterBySelf = false;
+  } else {
+    payload.filterBySelf = false;
+  }
+  return payload;
+}
+
+function getTasks() {
+  tasksAppending = false;
+  tasksReady.value = false;
+  tasksError.value = null;
+  sendGlobal(buildTasksListPayload(tasksFilter.value));
+}
+
+function loadMoreTasks() {
+  if (!tasksNextCursor.value) return;
+  tasksAppending = true;
+  sendGlobal(
+    buildTasksListPayload(tasksFilter.value, { cursor: tasksNextCursor.value }),
+  );
+}
+
+function setTasksFilter(partial) {
+  tasksFilter.value = { ...tasksFilter.value, ...partial };
+  // Persist assignee + status (never title search)
+  try {
+    localStorage.setItem(
+      TASKS_FILTER_KEY,
+      JSON.stringify({
+        filterByAssignee: tasksFilter.value.filterByAssignee,
+        filterByStatus: tasksFilter.value.filterByStatus,
+      }),
+    );
+  } catch {
+    // ignore storage errors
+  }
+  getTasks();
+}
+
+function fetchTaskDetail(pageId) {
+  taskDetailLoading.value = true;
+  taskDetail.value = null;
+  sendGlobal({ type: 'tasks:fetch', pageId });
+}
+
+function clearTaskDetail() {
+  taskDetail.value = null;
+}
+
+function createTask(title, assigneeId) {
+  // '__self__' and '' are UI sentinels — don't send as Notion user IDs
+  const resolvedAssigneeId =
+    assigneeId && assigneeId !== '__self__' ? assigneeId : null;
+  sendGlobal({ type: 'tasks:create', title, assigneeId: resolvedAssigneeId });
+}
+
+function updateTaskStatus(pageId, status) {
+  sendGlobal({ type: 'tasks:update', pageId, status });
+}
+
+function replaceTaskBody(pageId, body) {
+  taskSaveStatus.value = 'saving';
+  sendGlobal({ type: 'tasks:replace', pageId, body });
+}
+
+function getTaskStatusOptions() {
+  sendGlobal({ type: 'tasks:get_status_options' });
+}
+
+function getTaskAssignees() {
+  sendGlobal({ type: 'tasks:get_assignees' });
+}
+
+function getTaskComments(pageId) {
+  taskCommentsLoading.value = true;
+  sendGlobal({ type: 'tasks:get_comments', pageId });
+}
+
+function addTaskComment(pageId, content) {
+  sendGlobal({ type: 'tasks:add_comment', pageId, content });
+}
+
+function updateTaskField(pageId, field, fieldType, value) {
+  sendGlobal({ type: 'tasks:update', pageId, field, fieldType, value });
+}
+
 function disconnectGlobal() {
   if (globalReconnectTimeout) {
     clearTimeout(globalReconnectTimeout);
@@ -477,6 +680,22 @@ export function useWebSocket() {
     homePath: readonly(homePath),
     slackSessionSlug: readonly(slackSessionSlug),
 
+    // Tasks panel
+    tasks: readonly(tasks),
+    tasksNextCursor: readonly(tasksNextCursor),
+    tasksReady: readonly(tasksReady),
+    tasksError: readonly(tasksError),
+    taskDetail: readonly(taskDetail),
+    taskDetailLoading: readonly(taskDetailLoading),
+    taskSaveStatus: readonly(taskSaveStatus),
+    taskStatusOptions: readonly(taskStatusOptions),
+    taskAssignees: readonly(taskAssignees),
+    taskSelfEmail: readonly(taskSelfEmail),
+    taskComments: readonly(taskComments),
+    taskCommentsLoading: readonly(taskCommentsLoading),
+    lastCreatedPageId: readonly(lastCreatedPageId),
+    tasksFilter: readonly(tasksFilter),
+
     // Clone dialog
     showCloneDialog: readonly(showCloneDialog),
     cloneInitialDir: readonly(cloneInitialDir),
@@ -499,6 +718,21 @@ export function useWebSocket() {
     setSessionTitle,
     deleteSession: deleteSessionGlobal,
     dismissUpdate,
+
+    // Tasks panel
+    getTasks,
+    loadMoreTasks,
+    setTasksFilter,
+    fetchTaskDetail,
+    clearTaskDetail,
+    createTask,
+    updateTaskStatus,
+    updateTaskField,
+    replaceTaskBody,
+    getTaskStatusOptions,
+    getTaskAssignees,
+    getTaskComments,
+    addTaskComment,
 
     // Direct send
     send: sendGlobal,

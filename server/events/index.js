@@ -64,6 +64,17 @@ import {
   handleTestConnection as slackTest,
 } from './slack.js';
 import {
+  handleAddComment as tasksAddComment,
+  handleCreateTask as tasksCreate,
+  handleFetchTask as tasksFetch,
+  handleGetAssignees as tasksGetAssignees,
+  handleGetComments as tasksGetComments,
+  handleGetTaskStatusOptions as tasksGetStatusOptions,
+  handleListTasks as tasksList,
+  handleReplaceTask as tasksReplace,
+  handleUpdateTask as tasksUpdate,
+} from './tasks.js';
+import {
   clearHandler as terminalClear,
   execHandler as terminalExec,
   killHandler as terminalKill,
@@ -138,4 +149,13 @@ export const handlers = {
   'notion:save_config': notionSaveConfig,
   'notion:test': notionTest,
   'notion:analyse': notionAnalyse,
+  'tasks:list': tasksList,
+  'tasks:fetch': tasksFetch,
+  'tasks:create': tasksCreate,
+  'tasks:update': tasksUpdate,
+  'tasks:replace': tasksReplace,
+  'tasks:get_status_options': tasksGetStatusOptions,
+  'tasks:get_assignees': tasksGetAssignees,
+  'tasks:get_comments': tasksGetComments,
+  'tasks:add_comment': tasksAddComment,
 };

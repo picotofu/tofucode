@@ -51,9 +51,11 @@
 /**
  * @typedef {Object} TicketSummary
  * @property {string} pageId - Provider-specific ticket/page identifier
+ * @property {string} [ticketId] - Human-readable ticket ID (e.g. "AOB-123")
  * @property {string} title - Ticket title
  * @property {string} url - Ticket URL
  * @property {string} [status] - Current status value (if available)
+ * @property {string[]} assignees - Assignee display names (empty array if none)
  * @property {string} lastEditedAt - ISO 8601 timestamp of last edit
  */
 
@@ -61,9 +63,11 @@
  * @typedef {Object} FetchTicketResult
  * @property {boolean} success
  * @property {string} [pageId] - Page identifier
+ * @property {string} [ticketId] - Human-readable ticket ID (e.g. "AOB-123")
  * @property {string} [title] - Ticket title
  * @property {string} [url] - Ticket URL
  * @property {string} [status] - Current status value (if available)
+ * @property {string[]} [assignees] - Assignee display names
  * @property {string} [body] - Plain text content of the page blocks
  * @property {string} [lastEditedAt] - ISO 8601 timestamp of last edit
  * @property {string} [error] - Error message (on failure)
@@ -74,6 +78,11 @@
  * @property {string} databaseUrl - Target database/project URL
  * @property {number} [limit] - Max number of results to return (default: 20)
  * @property {string} [cursor] - Pagination cursor for next page
+ * @property {string} [filterByUserId] - Filter to tickets assigned to this user ID
+ * @property {string} [assigneeField] - Name of the assignee field in the database
+ * @property {string} [statusField] - Name of the status field in the database
+ * @property {string} [filterByStatus] - Filter by status name; '__none__' for no-status tickets
+ * @property {string} [titleSearch] - Fuzzy title search string
  */
 
 /**
