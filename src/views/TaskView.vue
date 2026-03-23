@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import AssigneeDropdown from '../components/AssigneeDropdown.vue';
 import { useWebSocket } from '../composables/useWebSocket';
 import { formatRelativeTime } from '../utils/format.js';
 
@@ -303,14 +304,12 @@ function onCommentKeydown(e) {
 
             <!-- people — assignee dropdown -->
             <template v-else-if="field.type === 'people'">
-              <select
-                class="task-field-select"
-                :value="editFields[field.field] ?? ''"
-                @change="onFieldChange(field.field, field.type, $event.target.value)"
-              >
-                <option value="">—</option>
-                <option v-for="u in taskAssignees" :key="u.id" :value="u.id">{{ u.name }}</option>
-              </select>
+              <AssigneeDropdown
+                class="task-field-assignee"
+                :model-value="editFields[field.field] ?? ''"
+                :assignees="taskAssignees"
+                @update:model-value="onFieldChange(field.field, field.type, $event)"
+              />
             </template>
 
             <!-- multi_select — read-only tags -->
@@ -594,6 +593,12 @@ function onCommentKeydown(e) {
 
 .task-field-input:focus {
   border-color: var(--text-muted);
+}
+
+.task-field-assignee {
+  flex: 1;
+  min-width: 0;
+  max-width: 200px;
 }
 
 .task-field-select {
