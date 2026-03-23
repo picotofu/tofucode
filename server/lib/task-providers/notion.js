@@ -1019,11 +1019,22 @@ export function createNotionProvider(token) {
       try {
         const db = await api.getDatabase(dbId);
         const prop = db.properties?.[statusField];
-        const options = (
-          prop?.status?.options ??
-          prop?.select?.options ??
-          []
-        ).map((o) => o.name);
+
+        let options;
+        if (prop?.type === 'status' && prop.status?.groups?.length) {
+          // Status field: sort options by group order (To-do → In Progress → Done),
+          // then by position within each group.
+          const optionById = Object.fromEntries(
+            (prop.status.options ?? []).map((o) => [o.id, o.name]),
+          );
+          options = prop.status.groups.flatMap((g) =>
+            (g.option_ids ?? []).map((id) => optionById[id]).filter(Boolean),
+          );
+        } else {
+          // Select / multi_select: preserve Notion's user-defined option order.
+          options = (prop?.select?.options ?? []).map((o) => o.name);
+        }
+
         return { success: true, options };
       } catch (err) {
         logger.error('[Notion] getStatusOptions error:', err.message);

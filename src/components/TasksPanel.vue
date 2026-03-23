@@ -183,11 +183,11 @@ function groupByStatusOnly(tasks) {
     items,
   }));
 
-  // Sort by Notion schema order (taskStatusOptions preserves it); "No status" last
+  // Sort by Notion schema order (taskStatusOptions preserves it); "No status" first
   const schemaOrder = props.taskStatusOptions;
   return groups.sort((a, b) => {
-    if (a.key === '') return 1;
-    if (b.key === '') return -1;
+    if (a.key === '') return -1;
+    if (b.key === '') return 1;
     const ai = schemaOrder.indexOf(a.key);
     const bi = schemaOrder.indexOf(b.key);
     // Known statuses sorted by schema order; unknowns go after
@@ -312,7 +312,8 @@ function statusClass(status) {
           <template v-for="group in groupedTasks" :key="group.key">
             <!-- Assignee (or status-only) group header -->
             <li class="tasks-group-header">
-              <span class="tasks-group-label">{{ group.label }}</span>
+              <span v-if="groupByStatus && !groupByAssignee" class="status-badge" :class="statusClass(group.key)">{{ group.label }}</span>
+              <span v-else class="tasks-group-label">{{ group.label }}</span>
               <span class="tasks-group-count">{{ group.items.length }}</span>
             </li>
 
