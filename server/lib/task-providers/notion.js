@@ -1161,6 +1161,13 @@ export function createNotionProvider(token) {
           };
         case 'date':
           return { [fieldName]: { date: value ? { start: value } : null } };
+        case 'people':
+          // value: userId string | null
+          return {
+            [fieldName]: {
+              people: value ? [{ object: 'user', id: value }] : [],
+            },
+          };
         case 'url':
           return { [fieldName]: { url: value || null } };
         case 'email':

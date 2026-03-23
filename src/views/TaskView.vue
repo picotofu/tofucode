@@ -1,11 +1,10 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { useWebSocket } from '../composables/useWebSocket';
 import { formatRelativeTime } from '../utils/format.js';
 
 const route = useRoute();
-const router = useRouter();
 
 const {
   fetchTaskDetail,
@@ -13,9 +12,11 @@ const {
   taskDetailLoading,
   taskSaveStatus,
   taskStatusOptions,
+  taskAssignees,
   taskComments,
   taskCommentsLoading,
   getTaskStatusOptions,
+  getTaskAssignees,
   getTaskComments,
   addTaskComment,
   replaceTaskBody,
@@ -43,6 +44,9 @@ onMounted(() => {
   if (taskStatusOptions.value.length === 0) {
     getTaskStatusOptions();
   }
+  if (taskAssignees.value.length === 0) {
+    getTaskAssignees();
+  }
   fetchTaskDetail(pageId.value);
   getTaskComments(pageId.value);
 });
@@ -61,7 +65,13 @@ watch(taskDetail, (detail) => {
     const fields = {};
     if (detail.properties) {
       for (const [fieldName, info] of Object.entries(detail.properties)) {
-        fields[fieldName] = info.value;
+        // For people fields, store the first assignee's id for the dropdown
+        if (info.type === 'people') {
+          const arr = Array.isArray(info.value) ? info.value : [];
+          fields[fieldName] = arr[0]?.id ?? '';
+        } else {
+          fields[fieldName] = info.value;
+        }
       }
     }
     editFields.value = fields;
@@ -105,7 +115,7 @@ function saveField(fieldName, fieldType, value, immediate = false) {
 
 function onFieldChange(fieldName, fieldType, value) {
   editFields.value[fieldName] = value;
-  const immediate = ['select', 'status', 'checkbox', 'date'].includes(
+  const immediate = ['select', 'status', 'checkbox', 'date', 'people'].includes(
     fieldType,
   );
   saveField(fieldName, fieldType, value, immediate);
@@ -139,24 +149,12 @@ function getFieldOptions(fieldName) {
   return taskDetail.value?.fieldOptions?.[fieldName] ?? [];
 }
 
-// Get the display value for a people field (array of names)
-function getPeopleDisplay(fieldName) {
-  const val = taskDetail.value?.properties?.[fieldName]?.value;
-  if (!val) return [];
-  if (Array.isArray(val)) return val;
-  return [val];
-}
-
 // Get the display tags for a multi_select field
 function getMultiSelectDisplay(fieldName) {
   const val = taskDetail.value?.properties?.[fieldName]?.value;
   if (!val) return [];
   if (Array.isArray(val)) return val;
   return [];
-}
-
-function goBack() {
-  router.back();
 }
 
 function statusClass(status) {
@@ -200,14 +198,8 @@ function onCommentKeydown(e) {
 
 <template>
   <div class="task-view">
-    <!-- Top bar: back + save indicator + Notion link -->
+    <!-- Top bar: save indicator + Notion link -->
     <div class="task-topbar">
-      <button class="task-back-btn" title="Back" @click="goBack">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
-      </button>
-
       <span
         v-if="saveLabel"
         class="task-save-indicator"
@@ -309,16 +301,16 @@ function onCommentKeydown(e) {
               />
             </template>
 
-            <!-- people — read-only pills -->
+            <!-- people — assignee dropdown -->
             <template v-else-if="field.type === 'people'">
-              <div class="task-field-people">
-                <span
-                  v-for="name in getPeopleDisplay(field.field)"
-                  :key="name"
-                  class="task-people-pill"
-                >{{ name }}</span>
-                <span v-if="getPeopleDisplay(field.field).length === 0" class="task-field-empty">—</span>
-              </div>
+              <select
+                class="task-field-select"
+                :value="editFields[field.field] ?? ''"
+                @change="onFieldChange(field.field, field.type, $event.target.value)"
+              >
+                <option value="">—</option>
+                <option v-for="u in taskAssignees" :key="u.id" :value="u.id">{{ u.name }}</option>
+              </select>
             </template>
 
             <!-- multi_select — read-only tags -->
@@ -428,28 +420,6 @@ function onCommentKeydown(e) {
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
   min-height: 44px;
-}
-
-.task-back-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  background: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s;
-}
-
-.task-back-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border-color: var(--text-muted);
 }
 
 .task-save-indicator {
@@ -675,7 +645,6 @@ function onCommentKeydown(e) {
   accent-color: var(--text-secondary);
 }
 
-.task-field-people,
 .task-field-tags {
   display: flex;
   flex-wrap: wrap;
@@ -684,7 +653,6 @@ function onCommentKeydown(e) {
   min-width: 0;
 }
 
-.task-people-pill,
 .task-tag {
   display: inline-flex;
   align-items: center;
