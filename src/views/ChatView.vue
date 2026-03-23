@@ -10,6 +10,7 @@ import {
   watch,
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import AppHeader from '../components/AppHeader.vue';
 import AskUserQuestionModal from '../components/AskUserQuestionModal.vue';
 import ChatMessages from '../components/ChatMessages.vue';
 import DebugPopover from '../components/DebugPopover.vue';

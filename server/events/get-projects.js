@@ -26,7 +26,7 @@ import { getProjectsList } from '../lib/projects.js';
 import { send } from '../lib/ws.js';
 import { loadSlackConfigRaw } from '../slack/config.js';
 
-export function handler(ws, _message, _context) {
+export async function handler(ws, _message, _context) {
   const slackConfig = loadSlackConfigRaw();
   const slackSessionSlug =
     slackConfig.hideSlackSessions && slackConfig.sessionLogPath
@@ -35,7 +35,7 @@ export function handler(ws, _message, _context) {
 
   send(ws, {
     type: 'projects_list',
-    projects: getProjectsList(),
+    projects: await getProjectsList(),
     slackSessionSlug,
   });
 }

@@ -61,7 +61,8 @@ export async function handler(ws, message, context) {
   context.currentSessionId = null;
 
   // Find project info or create basic info from slug
-  const projectInfo = getProjectsList().find((p) => p.slug === projectSlug) || {
+  const allProjects = await getProjectsList();
+  const projectInfo = allProjects.find((p) => p.slug === projectSlug) || {
     slug: projectSlug,
     name: getProjectDisplayName(projectSlug),
     path: slugToPath(projectSlug),
