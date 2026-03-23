@@ -308,7 +308,6 @@ function onCommentKeydown(e) {
                 class="task-field-assignee"
                 :model-value="editFields[field.field] ?? ''"
                 :assignees="taskAssignees"
-                size="md"
                 @update:model-value="onFieldChange(field.field, field.type, $event)"
               />
             </template>
@@ -596,6 +595,12 @@ function onCommentKeydown(e) {
   border-color: var(--text-muted);
 }
 
+.task-field-assignee {
+  flex: 1;
+  min-width: 0;
+  max-width: 200px;
+}
+
 .task-field-select {
   flex: 1;
   min-width: 0;
@@ -643,12 +648,6 @@ function onCommentKeydown(e) {
   height: 16px;
   cursor: pointer;
   accent-color: var(--text-secondary);
-}
-
-.task-field-assignee {
-  flex: 1;
-  min-width: 0;
-  max-width: 200px;
 }
 
 .task-field-tags {

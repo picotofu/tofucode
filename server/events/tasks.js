@@ -305,7 +305,7 @@ export async function handleGetTaskStatusOptions(ws) {
 }
 
 /**
- * Get assignees: DB assignees first (prioritised), then remaining workspace users appended.
+ * Get assignees present in actual tickets for the assignee dropdown
  * @param {import('ws').WebSocket} ws
  */
 export async function handleGetAssignees(ws) {
@@ -314,18 +314,16 @@ export async function handleGetAssignees(ws) {
     if (!ctx) return;
 
     const { provider, config, databaseUrl, assigneeField } = ctx;
-
-    // Run both fetches in parallel
     const [dbUsers, workspaceUsers] = await Promise.all([
       provider.listAssigneesFromDb(databaseUrl, assigneeField),
       provider.listWorkspaceUsers(),
     ]);
-
-    // Build merged list: DB users first (prioritised), then remaining workspace users
+    // DB assignees first (already in use), then remaining workspace users
     const seen = new Set(dbUsers.map((u) => u.id));
-    const remaining = workspaceUsers.filter((u) => !seen.has(u.id));
-    const users = [...dbUsers, ...remaining];
-
+    const users = [
+      ...dbUsers,
+      ...workspaceUsers.filter((u) => !seen.has(u.id)),
+    ];
     send(ws, {
       type: 'tasks:assignees_result',
       success: true,

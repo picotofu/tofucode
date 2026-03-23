@@ -268,7 +268,7 @@ onUnmounted(() => {
 
 <template>
   <aside class="sidebar" :class="{ open }">
-    <div class="sidebar-content" :class="{ 'sidebar-content-hidden': activeTab === 'tasks' && notionEnabled }">
+    <div class="sidebar-content" :class="{ 'sidebar-content-tasks': activeTab === 'tasks' && notionEnabled }">
       <!-- Recent Sessions Tab -->
       <!-- Skeleton while sessions are loading -->
       <ul v-if="activeTab === 'sessions' && !sessionsReady" class="sidebar-list">
@@ -404,7 +404,7 @@ onUnmounted(() => {
         </li>
       </ul>
 
-      <!-- Tasks Tab: not-configured message only; panel itself is outside sidebar-content -->
+      <!-- Tasks Tab -->
       <template v-else-if="activeTab === 'tasks'">
         <div v-if="!notionEnabled" class="sidebar-list">
           <div class="sidebar-empty">
@@ -412,6 +412,22 @@ onUnmounted(() => {
             <button class="sidebar-empty-link" @click="$emit('open-settings', 'notion')">Settings → Notion</button>
           </div>
         </div>
+        <TasksPanel
+          v-else
+          :tasks="tasks"
+          :tasks-ready="tasksReady"
+          :tasks-error="tasksError"
+          :tasks-next-cursor="tasksNextCursor"
+          :tasks-filter="tasksFilter"
+          :task-status-options="taskStatusOptions"
+          :task-assignees="taskAssignees"
+          @refresh="handleRefreshTasks"
+          @load-more="loadMoreTasks"
+          @select-task="handleSelectTask"
+          @filter-change="handleFilterChange"
+          @create-task="handleCreateTask"
+          @open-settings="$emit('open-settings', 'notion')"
+        />
       </template>
 
       <!-- Projects Tab -->
@@ -454,24 +470,6 @@ onUnmounted(() => {
         </li>
       </ul>
     </div>
-
-    <!-- Tasks panel: direct flex child so height:100% resolves correctly -->
-    <TasksPanel
-      v-if="activeTab === 'tasks' && notionEnabled"
-      :tasks="tasks"
-      :tasks-ready="tasksReady"
-      :tasks-error="tasksError"
-      :tasks-next-cursor="tasksNextCursor"
-      :tasks-filter="tasksFilter"
-      :task-status-options="taskStatusOptions"
-      :task-assignees="taskAssignees"
-      @refresh="handleRefreshTasks"
-      @load-more="loadMoreTasks"
-      @select-task="handleSelectTask"
-      @filter-change="handleFilterChange"
-      @create-task="handleCreateTask"
-      @open-settings="$emit('open-settings', 'notion')"
-    />
 
     <!-- Projects toolbar (pinned, only in projects tab) -->
     <div v-if="activeTab === 'projects'" class="sidebar-project-toolbar">
@@ -825,17 +823,17 @@ onUnmounted(() => {
   overflow-y: auto;
   padding: 8px;
   padding-bottom: 0;
-}
-
-/* When TasksPanel is shown as a direct flex child, collapse the content div */
-.sidebar-content-hidden {
-  display: none;
-}
-
-/* TasksPanel as a direct sidebar flex child — fills remaining space correctly */
-.sidebar :deep(.tasks-panel) {
-  flex: 1;
   min-height: 0;
+}
+
+/* When the tasks tab is active and TasksPanel is rendering, let the panel
+   manage its own scroll/flex layout. We make sidebar-content a pass-through
+   flex container so TasksPanel gets the full flex: 1 height. */
+.sidebar-content-tasks {
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar-list {

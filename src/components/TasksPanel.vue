@@ -54,12 +54,7 @@ function onTitleInput() {
   titleSearchTimer = setTimeout(() => emitFilter(), 300);
 }
 
-function onFilterAssigneeChange(value) {
-  localAssignee.value = value;
-  emitFilter();
-}
-
-// ── Assignee head options (Me / Anyone) ────────────────────────────────────
+// ── Assignee dropdown options ───────────────────────────────────────────────
 
 const FILTER_HEAD_OPTIONS = [
   { value: '__self__', label: 'Me' },
@@ -67,6 +62,11 @@ const FILTER_HEAD_OPTIONS = [
 ];
 
 const CREATE_HEAD_OPTIONS = [{ value: '__self__', label: 'Me' }];
+
+function onFilterAssigneeChange(value) {
+  localAssignee.value = value;
+  emitFilter();
+}
 
 // ── Create form ────────────────────────────────────────────────────────────
 
@@ -76,6 +76,7 @@ const createAssignee = ref('__self__');
 function confirmCreate() {
   const title = createTitle.value.trim();
   if (!title) return;
+  // Pass assignee info alongside title; parent handles it
   emit('create-task', title, createAssignee.value);
   createTitle.value = '';
   createAssignee.value = '__self__';
@@ -154,7 +155,6 @@ function statusClass(status) {
             :model-value="localAssignee"
             :assignees="taskAssignees"
             :head-options="FILTER_HEAD_OPTIONS"
-            size="md"
             @update:model-value="onFilterAssigneeChange"
           />
 
@@ -265,11 +265,12 @@ function statusClass(status) {
           <!-- Assignee picker -->
           <AssigneeDropdown
             v-model="createAssignee"
-            class="tasks-create-assignee ad-bare"
+            class="tasks-create-assignee"
             :assignees="taskAssignees"
             :head-options="CREATE_HEAD_OPTIONS"
             :popover-up="true"
             size="sm"
+            :bare="true"
           />
 
           <!-- Confirm button (borderless) -->
@@ -293,7 +294,8 @@ function statusClass(status) {
 .tasks-panel {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -381,7 +383,7 @@ function statusClass(status) {
   color: var(--text-muted);
 }
 
-/* ── Assignee dropdown layout helpers ────────── */
+/* ── Assignee dropdown sizing ─────────────────── */
 .tasks-filter-assignee {
   flex: 1;
   min-width: 0;

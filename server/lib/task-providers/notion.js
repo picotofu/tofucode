@@ -1073,7 +1073,7 @@ export function createNotionProvider(token) {
     },
 
     /**
-     * List all workspace users (person type only).
+     * List all workspace users (people type only).
      * @returns {Promise<Array<{id: string, name: string}>>}
      */
     async listWorkspaceUsers() {
