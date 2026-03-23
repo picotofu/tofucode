@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { formatRelativeTime } from '../utils/format.js';
 import AssigneeDropdown from './AssigneeDropdown.vue';
 
@@ -107,6 +107,65 @@ onBeforeUnmount(() => {
   scrollObserver?.disconnect();
   clearTimeout(titleSearchTimer);
 });
+
+// ── Grouping ────────────────────────────────────────────────────────────────
+// groupByAssignee: localAssignee === '' (Anyone)
+// groupByStatus:  localStatus === ''
+// Both: assignee outer, status inner
+
+const groupByAssignee = computed(() => localAssignee.value === '');
+const groupByStatus = computed(() => localStatus.value === '');
+
+// Returns [{ key, label, items }] for assignee grouping
+// items is either a flat array (status filtered) or [{ key, label, items }] for sub-grouping
+const groupedTasks = computed(() => {
+  if (!groupByAssignee.value && !groupByStatus.value) return null;
+
+  if (groupByAssignee.value && !groupByStatus.value) {
+    return groupByAssigneeOnly(props.tasks);
+  }
+
+  if (!groupByAssignee.value && groupByStatus.value) {
+    return groupByStatusOnly(props.tasks);
+  }
+
+  // Both: assignee outer, status inner
+  return groupByAssigneeOnly(props.tasks).map((g) => ({
+    ...g,
+    subGroups: groupByStatusOnly(g.items),
+  }));
+});
+
+function groupByAssigneeOnly(tasks) {
+  const map = new Map(); // assignee name → tasks[]
+  for (const task of tasks) {
+    const names = task.assignees?.length ? task.assignees : ['Unassigned'];
+    for (const name of names) {
+      if (!map.has(name)) map.set(name, []);
+      map.get(name).push(task);
+    }
+  }
+  return Array.from(map.entries()).map(([label, items]) => ({
+    key: label,
+    label,
+    items,
+  }));
+}
+
+function groupByStatusOnly(tasks) {
+  const map = new Map(); // status → tasks[]
+  for (const task of tasks) {
+    const key = task.status || '';
+    const label = task.status || 'No status';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(task);
+  }
+  return Array.from(map.entries()).map(([key, items]) => ({
+    key,
+    label: key || 'No status',
+    items,
+  }));
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -217,7 +276,75 @@ function statusClass(status) {
           No tasks found
         </div>
 
-        <!-- Task list -->
+        <!-- Grouped list -->
+        <ul v-else-if="groupedTasks" class="tasks-list">
+          <template v-for="group in groupedTasks" :key="group.key">
+            <!-- Assignee (or status-only) group header -->
+            <li class="tasks-group-header">
+              <span class="tasks-group-label">{{ group.label }}</span>
+              <span class="tasks-group-count">{{ group.items.length }}</span>
+            </li>
+
+            <!-- Status sub-groups (when grouping by both) -->
+            <template v-if="group.subGroups">
+              <template v-for="sub in group.subGroups" :key="sub.key">
+                <li class="tasks-group-header tasks-group-header-sub">
+                  <span class="status-badge" :class="statusClass(sub.key)">{{ sub.label }}</span>
+                  <span class="tasks-group-count">{{ sub.items.length }}</span>
+                </li>
+                <li v-for="task in sub.items" :key="task.pageId" class="tasks-item">
+                  <button class="tasks-item-inner" @click="emit('select-task', task.pageId)">
+                    <div class="tasks-item-icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11l3 3L22 4" />
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                      </svg>
+                    </div>
+                    <div class="tasks-item-content">
+                      <p class="tasks-item-title">{{ task.title }}</p>
+                      <p class="tasks-item-meta">
+                        <span v-if="task.ticketId" class="tasks-item-ticket-id">{{ task.ticketId }}</span>
+                        <span v-if="task.lastEditedAt">{{ formatRelativeTime(task.lastEditedAt) }}</span>
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              </template>
+            </template>
+
+            <!-- Flat items under group (status-only or assignee-only grouping) -->
+            <template v-else>
+              <li v-for="task in group.items" :key="task.pageId" class="tasks-item">
+                <button class="tasks-item-inner" @click="emit('select-task', task.pageId)">
+                  <div class="tasks-item-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M9 11l3 3L22 4" />
+                      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                    </svg>
+                  </div>
+                  <div class="tasks-item-content">
+                    <p class="tasks-item-title">{{ task.title }}</p>
+                    <p class="tasks-item-meta">
+                      <span v-if="task.ticketId" class="tasks-item-ticket-id">{{ task.ticketId }}</span>
+                      <!-- Show assignee pills when grouped by status (not grouped by assignee) -->
+                      <template v-if="groupByStatus && !groupByAssignee && task.assignees?.length">
+                        <span v-for="name in task.assignees" :key="name" class="tasks-item-assignee-pill">{{ name }}</span>
+                      </template>
+                      <!-- Show status badge when grouped by assignee (not grouped by status) -->
+                      <span v-if="groupByAssignee && !groupByStatus && task.status" class="status-badge" :class="statusClass(task.status)">{{ task.status }}</span>
+                      <span v-if="task.lastEditedAt">{{ formatRelativeTime(task.lastEditedAt) }}</span>
+                    </p>
+                  </div>
+                </button>
+              </li>
+            </template>
+          </template>
+
+          <!-- Infinite scroll sentinel inside grouped list -->
+          <li><div ref="scrollSentinelRef" class="tasks-scroll-sentinel" /></li>
+        </ul>
+
+        <!-- Flat list -->
         <ul v-else class="tasks-list">
           <li v-for="task in tasks" :key="task.pageId" class="tasks-item">
             <button class="tasks-item-inner" @click="emit('select-task', task.pageId)">
@@ -242,7 +369,7 @@ function statusClass(status) {
           </li>
         </ul>
 
-        <!-- Infinite scroll sentinel -->
+        <!-- Infinite scroll sentinel (flat list) -->
         <div ref="scrollSentinelRef" class="tasks-scroll-sentinel" />
       </template>
     </template>
@@ -392,6 +519,54 @@ function statusClass(status) {
 .tasks-create-assignee {
   flex: 1;
   min-width: 0;
+}
+
+/* ── Group headers ────────────────────────────── */
+.tasks-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 4px;
+  margin-top: 4px;
+}
+
+.tasks-group-header:first-child {
+  margin-top: 0;
+}
+
+.tasks-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tasks-group-header-sub {
+  padding-left: 14px;
+  margin-top: 2px;
+}
+
+.tasks-group-header-sub .tasks-group-label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.tasks-group-count {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 1px 6px;
+  flex-shrink: 0;
 }
 
 /* ── List ─────────────────────────────────────── */
