@@ -418,6 +418,19 @@ The bot's classifier supports an optional `CLAUDE.md` file for injecting project
 
 ---
 
+## Task Management
+
+tofucode includes a built-in task panel (sidebar **Tasks** tab, or press `T`) backed by Notion.
+
+- **Browse & filter** — filter by assignee (self / anyone / specific person) and status; live title search
+- **Grouping** — automatically groups by assignee when "Anyone" is selected, by status when all statuses are shown, or both together (assignee outer → status inner); status groups follow Notion's To-do → In Progress → Done category order
+- **Task detail** — click any task to open a detail view with editable title, status, assignee, and body
+- **Create tickets** — create new Notion tickets directly from the sidebar
+
+**Setup:** Configure your Notion API token and database URL in **Settings → Notion**.
+
+---
+
 ## Security
 
 - **Authentication enabled by default** - Set password on first run

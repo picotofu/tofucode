@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Task Management (Notion)** — Sidebar Tasks tab to browse, filter, create, and edit Notion tickets without leaving tofucode
+  - Task list with filter by assignee (self / anyone / specific person) and status (any / specific); title search
+  - Task grouping: group by status when "Anyone" selected, group by assignee when all statuses selected, both together (assignee outer → status inner)
+  - Group ordering: status groups follow Notion's To-do → In Progress → Done category order; assignee groups put "you" first, then alphabetical, Unassigned last
+  - Status group headers rendered as coloured pills (consistent with sub-group headers in nested mode)
+  - Task detail view (TaskView): editable title, status, assignee (people field), and body; keyboard shortcut `T` to open tasks
+  - Shared `AssigneeDropdown` component used in both sidebar filter, create-ticket form, and TaskView people field
+  - Teleported popover with `getBoundingClientRect` positioning to escape `overflow: hidden` ancestor clipping
+  - Workspace users merged with DB-derived assignees; includes `email` for self-identification
 - **Slack Bot Integration** — Baked-in Slack bot that listens to configured channels via Socket Mode and responds as the user's identity using Claude
   - Two-pass classifier: Haiku (fast/cheap) first, escalates to Sonnet on low confidence or when context is needed
   - Actions: `ignore`, `acknowledge`, `answer`, `ticket` (creates Notion ticket with Slack thread permalink), `work` (starts a tofucode session in the mapped project)
@@ -23,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Server `homePath` in connected message** — Server includes `homePath` (root config path or `homedir()`) in the `connected` WebSocket message; clients use this to set the traversal root without a separate request
 
 ### Changed
+- **Slack classifier: ticket-first model** — Dropped `work` action; classifier now always creates a Notion ticket first with a rich body, then starts a work session if warranted; ticket footer is a borderless box layout
 - **Files toolbar moved into FilesPanel** — Dotfiles toggle, New File, New Folder, and MD Mode buttons are now part of the `FilesPanel` component rather than injected via slot, eliminating duplicate rendering when the component is reused
 - **Breadcrumb path edit UX** — Tapping the path bar no longer opens edit mode; a pencil icon button toggles edit mode; a check button submits; Escape cancels; edit is clamped to root
 - **Mobile toolbar layout** — On mobile (≤639px) the toolbar buttons wrap to their own row above the path bar, right-aligned
@@ -33,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings modal mobile layout** — now renders full-screen on mobile instead of a floating card
 - **`isDesktop` not reactive** — sidebar initial state now uses `window.matchMedia` with a resize listener; switching to mobile auto-closes the sidebar
 - **File download race condition** — concurrent file downloads no longer collide; tracking moved from a single ref to a `Map`
+- **Slack DM threading** — all bot replies within a channel conversation now anchor to the first message, maintaining proper thread context
+- **Assignee dropdown adblocker fix** — renamed CSS class prefix from `ad-` to `asgn-` to prevent adblockers from hiding the dropdown element
 - **Slack settings save** — blocks save with an alert if Slack is enabled but bot token is empty
 - **Notion field mapping overwrite** — "Analyse Structure" now prompts for confirmation before replacing existing manual mappings
 - **`isUpdatingFromProps` timing** — replaced fragile `setTimeout(0)` with `nextTick` in SettingsModal
