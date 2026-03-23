@@ -1,37 +1,32 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuth } from '../composables/useAuth';
-import AuthView from '../views/AuthView.vue';
-import ChatView from '../views/ChatView.vue';
-import ProjectsView from '../views/ProjectsView.vue';
-import SessionsView from '../views/SessionsView.vue';
-import TaskView from '../views/TaskView.vue';
 
 const routes = [
   {
     path: '/auth',
     name: 'auth',
-    component: AuthView,
+    component: () => import('../views/AuthView.vue'),
     meta: { public: true },
   },
   {
     path: '/',
     name: 'projects',
-    component: ProjectsView,
+    component: () => import('../views/ProjectsView.vue'),
   },
   {
     path: '/project/:project',
     name: 'sessions',
-    component: SessionsView,
+    component: () => import('../views/SessionsView.vue'),
   },
   {
     path: '/project/:project/session/:session',
     name: 'chat',
-    component: ChatView,
+    component: () => import('../views/ChatView.vue'),
   },
   {
     path: '/tasks/:pageId',
     name: 'task',
-    component: TaskView,
+    component: () => import('../views/TaskView.vue'),
   },
 ];
 

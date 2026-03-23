@@ -106,6 +106,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import compress from 'compression';
 import express from 'express';
+import expressStaticGzip from 'express-static-gzip';
 import { WebSocketServer } from 'ws';
 import { config } from './config.js';
 import {
@@ -310,6 +311,14 @@ if (existsSync(docsPath)) {
 // ============================================
 const distPath = join(rootDir, 'dist');
 if (existsSync(distPath)) {
+  // Block source map files from being served (security: prevents source code leak)
+  app.use((req, res, next) => {
+    if (req.path.endsWith('.map')) {
+      return res.status(404).end();
+    }
+    next();
+  });
+
   // Service Worker files - MUST NOT be cached to ensure updates work
   app.use((req, res, next) => {
     if (req.path === '/sw.js' || req.path.startsWith('/workbox-')) {
@@ -322,12 +331,17 @@ if (existsSync(distPath)) {
     next();
   });
 
-  // Serve static files with caching for assets
+  // Serve pre-compressed static files (Brotli > Gzip > raw)
+  // vite-plugin-compression2 generates .br and .gz files at build time
   app.use(
-    express.static(distPath, {
-      maxAge: '1y',
-      immutable: true,
-      index: false, // Don't auto-serve index.html
+    expressStaticGzip(distPath, {
+      enableBrotli: true,
+      orderPreference: ['br', 'gz'],
+      serveStatic: {
+        maxAge: '1y',
+        immutable: true,
+        index: false, // Don't auto-serve index.html
+      },
     }),
   );
 

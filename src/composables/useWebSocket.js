@@ -482,9 +482,16 @@ function sendAndWait(message, responseType, timeout = 30000) {
   });
 }
 
-// Global actions
+// Debounced getProjects to prevent duplicate calls from Sidebar + view components
+let projectsDebounceTimer = null;
 function getProjects() {
-  sendGlobal({ type: 'get_projects' });
+  if (projectsDebounceTimer) {
+    clearTimeout(projectsDebounceTimer);
+  }
+  projectsDebounceTimer = setTimeout(() => {
+    projectsDebounceTimer = null;
+    sendGlobal({ type: 'get_projects' });
+  }, 50);
 }
 
 function selectProjectGlobal(slug) {
@@ -510,12 +517,15 @@ function getRecentSessions() {
 }
 
 // Immediate version for explicit user actions (e.g., opening sidebar)
+// Still debounced at 50ms to coalesce duplicate calls from Sidebar + view components
 function getRecentSessionsImmediate() {
   if (recentSessionsDebounceTimer) {
     clearTimeout(recentSessionsDebounceTimer);
-    recentSessionsDebounceTimer = null;
   }
-  sendGlobal({ type: 'get_recent_sessions' });
+  recentSessionsDebounceTimer = setTimeout(() => {
+    recentSessionsDebounceTimer = null;
+    sendGlobal({ type: 'get_recent_sessions' });
+  }, 50);
 }
 
 // Higher-limit version for the command palette (needs full history for search)

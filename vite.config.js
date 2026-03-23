@@ -101,6 +101,17 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-vue': ['vue', 'vue-router'],
+          'vendor-highlight': ['highlight.js/lib/core'],
+          'vendor-markdown': ['marked', 'dompurify'],
+          'vendor-tabulator': ['tabulator-tables'],
+          'vendor-editor': ['tiny-markdown-editor'],
+        },
+      },
+    },
   }
 })

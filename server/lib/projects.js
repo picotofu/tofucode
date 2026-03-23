@@ -2,26 +2,29 @@
  * Project utilities - list projects from ~/.claude/projects/
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { config, getProjectDisplayName, slugToPath } from '../config.js';
 
 /**
  * Get list of available projects from ~/.claude/projects/
  * Scans for actual .jsonl session files to catch projects with empty/missing sessions-index.json
- * @returns {Array<{slug: string, name: string, path: string, sessionCount: number, lastModified: string|null}>}
+ * @returns {Promise<Array<{slug: string, name: string, path: string, sessionCount: number, lastModified: string|null}>>}
  */
-export function getProjectsList() {
+export async function getProjectsList() {
   try {
     if (!existsSync(config.projectsDir)) {
       return [];
     }
 
-    const entries = readdirSync(config.projectsDir, { withFileTypes: true });
+    const entries = await readdir(config.projectsDir, { withFileTypes: true });
     const projects = [];
 
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
+    // Process all project directories in parallel
+    const projectPromises = entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => {
         const slug = entry.name;
         const displayName = getProjectDisplayName(slug);
         const sessionsDir = join(config.projectsDir, slug);
@@ -34,7 +37,7 @@ export function getProjectsList() {
         // First, try to use sessions-index.json (faster path)
         if (existsSync(indexPath)) {
           try {
-            const data = JSON.parse(readFileSync(indexPath, 'utf-8'));
+            const data = JSON.parse(await readFile(indexPath, 'utf-8'));
             if (data.entries?.length > 0) {
               sessionCount = data.entries.length;
               // Track indexed sessions
@@ -44,68 +47,72 @@ export function getProjectsList() {
 
               // Use JSONL file mtime for accurate timestamps
               // (sessions-index.json's modified field is stale)
-              let latestMtime = null;
-              for (const entry of data.entries) {
+              const statPromises = data.entries.map(async (entry) => {
                 const jsonlPath = join(sessionsDir, `${entry.sessionId}.jsonl`);
-                if (existsSync(jsonlPath)) {
-                  try {
-                    const stats = statSync(jsonlPath);
-                    if (!latestMtime || stats.mtime > latestMtime) {
-                      latestMtime = stats.mtime;
-                    }
-                  } catch (_err) {
-                    // Ignore stat errors (file may have been deleted)
-                  }
+                try {
+                  const stats = await stat(jsonlPath);
+                  return stats.mtime;
+                } catch {
+                  return null;
                 }
-              }
+              });
+
+              const mtimes = (await Promise.all(statPromises)).filter(Boolean);
+              const latestMtime =
+                mtimes.length > 0
+                  ? mtimes.reduce((a, b) => (a > b ? a : b))
+                  : null;
+
               lastModified = latestMtime
                 ? latestMtime.toISOString()
                 : data.entries[0].modified;
             }
-          } catch (_err) {
+          } catch {
             // Malformed sessions-index.json, fall through to scan
           }
         }
 
         // If no sessions found in index, scan directory for .jsonl files
         // This catches projects with empty/missing index but actual session files
-        // Performance impact: ~0.3ms average for typical setup (negligible)
         if (sessionCount === 0 && existsSync(sessionsDir)) {
           try {
-            const files = readdirSync(sessionsDir);
-            let latestMtime = null;
+            const files = await readdir(sessionsDir);
+            const jsonlFiles = files.filter(
+              (file) => file.endsWith('.jsonl') && !file.startsWith('agent-'),
+            );
 
-            for (const file of files) {
-              if (file.endsWith('.jsonl') && !file.startsWith('agent-')) {
-                const sessionId = file.replace('.jsonl', '');
-                // Validate UUID format to avoid counting non-session files
-                if (
-                  /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
-                    sessionId,
-                  )
-                ) {
-                  if (!sessionIds.has(sessionId)) {
-                    sessionCount++;
-                    sessionIds.add(sessionId);
-
-                    // Get mtime for sorting
-                    try {
-                      const stats = statSync(join(sessionsDir, file));
-                      if (!latestMtime || stats.mtime > latestMtime) {
-                        latestMtime = stats.mtime;
-                      }
-                    } catch (_err) {
-                      // Ignore stat errors
-                    }
+            const statPromises = jsonlFiles.map(async (file) => {
+              const sessionId = file.replace('.jsonl', '');
+              // Validate UUID format to avoid counting non-session files
+              if (
+                /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
+                  sessionId,
+                )
+              ) {
+                if (!sessionIds.has(sessionId)) {
+                  try {
+                    const stats = await stat(join(sessionsDir, file));
+                    return { sessionId, mtime: stats.mtime };
+                  } catch {
+                    return { sessionId, mtime: null };
                   }
                 }
               }
+              return null;
+            });
+
+            const results = (await Promise.all(statPromises)).filter(Boolean);
+            sessionCount += results.length;
+            for (const r of results) {
+              sessionIds.add(r.sessionId);
             }
 
-            if (latestMtime) {
+            const mtimes = results.map((r) => r.mtime).filter(Boolean);
+            if (mtimes.length > 0) {
+              const latestMtime = mtimes.reduce((a, b) => (a > b ? a : b));
               lastModified = latestMtime.toISOString();
             }
-          } catch (_err) {
+          } catch {
             // Directory read error, skip
           }
         }
@@ -125,20 +132,24 @@ export function getProjectsList() {
               relativePath.startsWith('..') ||
               resolve(relativePath).startsWith('..')
             ) {
-              continue;
+              return null;
             }
           }
 
-          projects.push({
+          return {
             slug,
             name: displayName,
             path: projectPath,
             sessionCount,
             lastModified,
-          });
+          };
         }
-      }
-    }
+
+        return null;
+      });
+
+    const results = await Promise.all(projectPromises);
+    projects.push(...results.filter(Boolean));
 
     // Sort by last modified
     return projects.sort((a, b) => {

@@ -9,6 +9,7 @@ import {
   watch,
 } from 'vue';
 import { useRouter } from 'vue-router';
+import AppHeader from '../components/AppHeader.vue';
 import FilesPanel from '../components/FilesPanel.vue';
 import { useFilesManager } from '../composables/useFilesManager.js';
 import { useWebSocket } from '../composables/useWebSocket';
