@@ -1,5 +1,6 @@
 <script setup>
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onUnmounted, ref, toRaw, watch } from 'vue';
+import { useWebSocket } from '../composables/useWebSocket';
 import McpServerForm from './McpServerForm.vue';
 import McpServerList from './McpServerList.vue';
 import UsageStats from './UsageStats.vue';
@@ -94,8 +95,8 @@ const emit = defineEmits([
   'mcp-test',
 ]);
 
-// Local copy of settings
-const localSettings = ref({ ...props.settings });
+// Local copy of settings (deep-cloned to avoid mutating shared prop references)
+const localSettings = ref(structuredClone(toRaw(props.settings)));
 
 // Flag to prevent watch loop
 let isUpdatingFromProps = false;
@@ -105,7 +106,7 @@ watch(
   () => props.settings,
   (newSettings) => {
     isUpdatingFromProps = true;
-    localSettings.value = { ...newSettings };
+    localSettings.value = structuredClone(toRaw(newSettings));
     // Reset flag after Vue's reactivity system has processed the change
     nextTick(() => {
       isUpdatingFromProps = false;
@@ -132,6 +133,11 @@ function closeModal() {
 function handleKeydown(e) {
   if (e.key === 'Escape') {
     e.preventDefault();
+    // Close folder browser first if open
+    if (folderBrowser.value) {
+      closeFolderBrowser();
+      return;
+    }
     // If MCP tab is in add/edit sub-view, return to list instead of closing modal
     if (activeTab.value === 'mcp' && mcpView.value !== 'list') {
       mcpOnFormCancel();
@@ -158,10 +164,25 @@ watch(
 // Cleanup on unmount
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
+  window.removeEventListener('resize', onViewportResize);
   clearTimeout(mcpListTestTimer);
   clearTimeout(mcpFormTestTimer);
   clearTimeout(mcpMutationErrorTimer);
+  clearTimeout(blurTimer);
+  unsubFolderBrowserFn?.();
 });
+
+// ── Viewport dimensions ───────────────────────────────────────────────────────
+
+const viewportWidth = ref(window.innerWidth);
+const viewportHeight = ref(window.innerHeight);
+
+function onViewportResize() {
+  viewportWidth.value = window.innerWidth;
+  viewportHeight.value = window.innerHeight;
+}
+
+window.addEventListener('resize', onViewportResize);
 
 // --- Slack Settings ---
 const SLACK_DEFAULTS = {
@@ -215,8 +236,9 @@ watch(
   },
 );
 
-// Fetch Slack config when switching to Slack tab
+// Fetch Slack config when switching to Slack tab; close folder browser when leaving notes tab
 watch(activeTab, (tab) => {
+  if (tab !== 'notes') closeFolderBrowser();
   if (tab === 'slack') {
     // Seed with defaults immediately so the form renders right away
     if (!slackLocal.value) {
@@ -309,6 +331,124 @@ function removeWatchedChannel(index) {
   if (!slackLocal.value?.watchedChannels) return;
   slackLocal.value.watchedChannels.splice(index, 1);
 }
+
+// ── Notes include paths ─────────────────────────────────────────────────────
+
+function addNotesIncludePath() {
+  if (!localSettings.value.notesIncludePaths) {
+    localSettings.value.notesIncludePaths = [];
+  }
+  localSettings.value.notesIncludePaths.push({ path: '', label: '' });
+}
+
+function removeNotesIncludePath(index) {
+  if (!localSettings.value.notesIncludePaths) return;
+  localSettings.value.notesIncludePaths.splice(index, 1);
+}
+
+// ── Folder browser ───────────────────────────────────────────────────────────
+
+const { send: wsSend, onMessage: wsOnMessage } = useWebSocket();
+
+// target: 'basePath' | { type: 'include', index: number }
+const folderBrowser = ref(null);
+
+function openFolderBrowser(target, initialPath) {
+  // If already open for this target, don't re-fetch
+  const existing = folderBrowser.value;
+  if (existing) {
+    const sameTarget =
+      target === existing.target ||
+      (target?.type === existing.target?.type &&
+        target?.index === existing.target?.index);
+    if (sameTarget) return;
+  }
+  const startPath = initialPath?.trim() || null;
+  folderBrowser.value = {
+    target,
+    currentPath: startPath || '',
+    pendingPath: startPath, // null = home dir (accept any result while loading)
+    items: [],
+    loading: true,
+    error: null,
+  };
+  wsSend({ type: 'files:browse', path: startPath });
+}
+
+function closeFolderBrowser() {
+  folderBrowser.value = null;
+}
+
+function folderBrowserNavigate(path) {
+  if (!folderBrowser.value) return;
+  folderBrowser.value.loading = true;
+  folderBrowser.value.error = null;
+  folderBrowser.value.pendingPath = path;
+  wsSend({ type: 'files:browse', path });
+}
+
+function folderBrowserSelect() {
+  if (!folderBrowser.value) return;
+  const path = folderBrowser.value.currentPath;
+  const target = folderBrowser.value.target;
+  if (target === 'basePath') {
+    localSettings.value.notesBasePath = path;
+  } else if (target?.type === 'include') {
+    if (!localSettings.value.notesIncludePaths) return;
+    localSettings.value.notesIncludePaths[target.index].path = path;
+  }
+  closeFolderBrowser();
+}
+
+// Parent path helper
+function folderBrowserParent(path) {
+  if (!path || path === '/') return null;
+  const parts = path.split('/').filter(Boolean);
+  if (parts.length === 0) return null;
+  parts.pop();
+  return `/${parts.join('/')}` || '/';
+}
+
+// Handle focus leaving a path-input wrapper (input + browser panel)
+// Use setTimeout so click events on the browser fire before blur closes it
+let blurTimer = null;
+function onPathWrapperFocusout(target, _initialPath) {
+  clearTimeout(blurTimer);
+  blurTimer = setTimeout(() => {
+    // Only close if this wrapper's browser is still open
+    if (!folderBrowser.value) return;
+    const fb = folderBrowser.value;
+    const sameTarget =
+      target === fb.target ||
+      (target?.type === fb.target?.type && target?.index === fb.target?.index);
+    if (sameTarget) closeFolderBrowser();
+  }, 150);
+}
+
+function onPathWrapperFocusin(target, initialPath) {
+  clearTimeout(blurTimer);
+  openFolderBrowser(target, initialPath);
+}
+
+const unsubFolderBrowserFn = wsOnMessage((msg) => {
+  const fb = folderBrowser.value;
+  if (!fb || !fb.loading) return;
+  if (msg.type === 'files:browse:result') {
+    // If we have a known pending path, only accept matching result
+    if (fb.pendingPath !== null && msg.path !== fb.pendingPath) return;
+    fb.currentPath = msg.path;
+    fb.pendingPath = null;
+    fb.items = (msg.items || [])
+      .filter((item) => item.isDirectory)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    fb.loading = false;
+    fb.error = null;
+  } else if (msg.type === 'files:browse:error') {
+    if (fb.pendingPath !== null && msg.path !== fb.pendingPath) return;
+    fb.loading = false;
+    fb.error = msg.error || 'Could not open folder';
+  }
+});
 
 // Helper: look up channel name from fetched list (fallback to stored name)
 function resolveChannelName(ch) {
@@ -546,10 +686,11 @@ const shortcuts = [
       { keys: ['⌘/^', 'K'], description: 'Open command palette' },
       { keys: ['⌘/^', 'P'], description: 'Open file picker' },
       { keys: ['⌘/^', 'B'], description: 'Toggle sidebar' },
-      { keys: ['⌘/^', '7'], description: 'Sidebar: Sessions tab' },
-      { keys: ['⌘/^', '8'], description: 'Sidebar: Projects tab' },
-      { keys: ['⌘/^', '9'], description: 'Sidebar: Slack tab' },
-      { keys: ['⌘/^', '0'], description: 'Sidebar: Tasks tab' },
+      { keys: ['⌘/^', '6'], description: 'Sidebar: Sessions tab' },
+      { keys: ['⌘/^', '7'], description: 'Sidebar: Projects tab' },
+      { keys: ['⌘/^', '8'], description: 'Sidebar: Slack tab' },
+      { keys: ['⌘/^', '9'], description: 'Sidebar: Tasks tab' },
+      { keys: ['⌘/^', '0'], description: 'Sidebar: Notes tab' },
       { keys: ['⌘/^', ','], description: 'Open settings' },
       { keys: ['⌘/^', '/'], description: 'Show keyboard shortcuts' },
     ],
@@ -590,6 +731,10 @@ const shortcuts = [
       { keys: ['⌘/^', 'S'], description: 'Save file' },
       { keys: ['Escape'], description: 'Close editor' },
     ],
+  },
+  {
+    category: 'Notes',
+    items: [{ keys: ['⌘/^', 'D'], description: "Jump to today's daily note" }],
   },
 ];
 
@@ -713,6 +858,11 @@ async function handleClearCacheAndUpdate() {
           :class="{ active: activeTab === 'mcp' }"
           @click="activeTab = 'mcp'"
         >MCP</button>
+        <button
+          class="tab-btn"
+          :class="{ active: activeTab === 'notes' }"
+          @click="activeTab = 'notes'"
+        >Notes</button>
         <button
           class="tab-btn"
           :class="{ active: activeTab === 'shortcuts' }"
@@ -894,6 +1044,18 @@ async function handleClearCacheAndUpdate() {
                 <span>{{ isRestarting ? 'Connecting...' : 'Connected' }}</span>
               </div>
             </transition>
+          </div>
+        </div>
+
+        <!-- Viewport -->
+        <div class="setting-item">
+          <div class="setting-header">
+            <span class="setting-title">Viewport</span>
+          </div>
+          <p class="setting-description">Current browser window dimensions.</p>
+          <div class="viewport-display">
+            <span class="viewport-value">{{ viewportWidth }} × {{ viewportHeight }}</span>
+            <span class="viewport-label">px</span>
           </div>
         </div>
         </template>
@@ -1467,6 +1629,142 @@ async function handleClearCacheAndUpdate() {
           />
         </template><!-- end MCP Tab -->
 
+        <!-- Notes Tab -->
+        <template v-if="activeTab === 'notes'">
+          <div class="setting-item">
+            <div class="setting-header">
+              <span class="setting-title">Notes Vault Path</span>
+            </div>
+            <p class="setting-description">
+              Primary notes vault. Daily notes, calendar, and quick note features use this path.
+            </p>
+            <div
+              class="path-input-wrapper"
+              @focusin="onPathWrapperFocusin('basePath', localSettings.notesBasePath)"
+              @focusout="onPathWrapperFocusout('basePath')"
+            >
+              <input
+                type="text"
+                v-model="localSettings.notesBasePath"
+                class="setting-input"
+                placeholder="/home/user/notes"
+              />
+              <div v-if="folderBrowser?.target === 'basePath'" class="folder-browser" @mousedown.prevent>
+                <div class="folder-browser-header">
+                  <button
+                    v-if="folderBrowserParent(folderBrowser.currentPath)"
+                    class="folder-browser-up"
+                    title="Go up"
+                    @click="folderBrowserNavigate(folderBrowserParent(folderBrowser.currentPath))"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                  </button>
+                  <span class="folder-browser-path">{{ folderBrowser.currentPath || '~' }}</span>
+                  <button class="folder-browser-select" @click="folderBrowserSelect">Select</button>
+                </div>
+                <div v-if="folderBrowser.loading" class="folder-browser-loading">Loading…</div>
+                <div v-else-if="folderBrowser.error" class="folder-browser-error">{{ folderBrowser.error }}</div>
+                <ul v-else class="folder-browser-list">
+                  <li
+                    v-for="item in folderBrowser.items"
+                    :key="item.path"
+                    class="folder-browser-item"
+                    @click="folderBrowserNavigate(item.path)"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    {{ item.name }}
+                  </li>
+                  <li v-if="folderBrowser.items.length === 0" class="folder-browser-empty">No subfolders</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <hr class="divider" />
+
+          <div class="setting-item">
+            <div class="setting-header">
+              <span class="setting-title">Include Paths</span>
+            </div>
+            <p class="setting-description">
+              Additional folders containing markdown files. These appear as linked folders in the notes sidebar for quick access.
+            </p>
+
+            <template v-for="(entry, i) in (localSettings.notesIncludePaths || [])" :key="i">
+              <div class="notes-include-row">
+                <input
+                  type="text"
+                  v-model="entry.label"
+                  class="setting-input notes-include-label"
+                  placeholder="Label"
+                />
+                <div
+                  class="path-input-wrapper path-input-wrapper--flex"
+                  @focusin="onPathWrapperFocusin({ type: 'include', index: i }, entry.path)"
+                  @focusout="onPathWrapperFocusout({ type: 'include', index: i })"
+                >
+                  <input
+                    type="text"
+                    v-model="entry.path"
+                    class="setting-input"
+                    placeholder="/absolute/path"
+                  />
+                  <div v-if="folderBrowser?.target?.type === 'include' && folderBrowser?.target?.index === i" class="folder-browser" @mousedown.prevent>
+                    <div class="folder-browser-header">
+                      <button
+                        v-if="folderBrowserParent(folderBrowser.currentPath)"
+                        class="folder-browser-up"
+                        title="Go up"
+                        @click="folderBrowserNavigate(folderBrowserParent(folderBrowser.currentPath))"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="15 18 9 12 15 6"/>
+                        </svg>
+                      </button>
+                      <span class="folder-browser-path">{{ folderBrowser.currentPath || '~' }}</span>
+                      <button class="folder-browser-select" @click="folderBrowserSelect">Select</button>
+                    </div>
+                    <div v-if="folderBrowser.loading" class="folder-browser-loading">Loading…</div>
+                    <div v-else-if="folderBrowser.error" class="folder-browser-error">{{ folderBrowser.error }}</div>
+                    <ul v-else class="folder-browser-list">
+                      <li
+                        v-for="item in folderBrowser.items"
+                        :key="item.path"
+                        class="folder-browser-item"
+                        @click="folderBrowserNavigate(item.path)"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        {{ item.name }}
+                      </li>
+                      <li v-if="folderBrowser.items.length === 0" class="folder-browser-empty">No subfolders</li>
+                    </ul>
+                  </div>
+                </div>
+                <button class="remove-btn" @click="removeNotesIncludePath(i)" title="Remove">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            </template>
+
+            <button class="notes-add-include-btn" @click="addNotesIncludePath">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Add path
+            </button>
+          </div>
+        </template><!-- end Notes Tab -->
+
         <!-- Keyboard Shortcuts Tab -->
         <template v-if="activeTab === 'shortcuts'">
           <table class="shortcuts-table">
@@ -1782,6 +2080,26 @@ async function handleClearCacheAndUpdate() {
   margin-top: 8px;
 }
 
+.viewport-display {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.viewport-value {
+  font-size: 20px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+.viewport-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .restart-btn {
   padding: 8px 16px;
   font-size: 13px;
@@ -2078,6 +2396,175 @@ async function handleClearCacheAndUpdate() {
   color: #ef4444;
   border-color: #ef4444;
   background: rgba(239, 68, 68, 0.1);
+}
+
+/* Notes include paths */
+.notes-include-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.notes-include-label {
+  width: 100px;
+  flex-shrink: 0;
+  margin-top: 0 !important;
+}
+
+.notes-include-row .remove-btn {
+  flex-shrink: 0;
+  height: 36px;
+  width: 36px;
+  padding: 0;
+  margin-top: 0;
+}
+
+.notes-add-include-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.notes-add-include-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+/* Path input wrapper — opens folder browser on focus */
+.path-input-wrapper {
+  position: relative;
+  margin-top: 8px;
+}
+
+.path-input-wrapper .setting-input {
+  margin-top: 0;
+}
+
+.path-input-wrapper--flex {
+  flex: 1;
+  margin-top: 0;
+}
+
+/* Folder browser panel */
+.folder-browser {
+  margin-top: 4px;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.folder-browser-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+}
+
+.folder-browser-up {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.folder-browser-up:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.folder-browser-path {
+  flex: 1;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.folder-browser-select {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.folder-browser-select:hover {
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  border-color: var(--text-primary);
+}
+
+.folder-browser-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.folder-browser-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.folder-browser-item:hover {
+  background: var(--bg-hover);
+}
+
+.folder-browser-item svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.folder-browser-loading,
+.folder-browser-error,
+.folder-browser-empty {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.folder-browser-error {
+  color: #ef4444;
 }
 
 .add-channel-btn {

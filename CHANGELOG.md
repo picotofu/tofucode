@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Notes (Obsidian-like vault)** — Full markdown notes system with sidebar file navigator, mini calendar, daily notes, and fuzzy search
+  - New `/notes` route with URL-reflected state (browser navigation works natively)
+  - `NotesPanel` sidebar tab: vault file tree with folder expand/collapse, active-note highlight, and recently opened notes (last 5, localStorage)
+  - `MiniCalendar` component: month nav, day-of-week grid, dot indicators for existing daily notes, today/selected highlighting
+  - Daily notes: idempotent create `{vault}/daily/YYYY-MM-DD.md` with pre-populated heading template; "Today" toolbar button
+  - Fuzzy search across all vault files (reuses existing `files:search` WebSocket event)
+  - `Cmd+D` / `Ctrl+D` shortcut to open today's daily note from anywhere in the Notes view
+  - Dotfiles toggle button in notes toolbar (right-aligned, state persisted in localStorage)
+  - Notes settings tab: absolute vault path input with helper text
+  - `notesBasePath` setting added to server defaults; propagated via settings provider
+  - Sidebar tab shortcut shifted to `Cmd+0`; tab activation state persisted in localStorage
+  - Sidebar tree filters to md-containing folders only (via server `hasMarkdown` flag); hides dotfiles by default
+  - Lazy tree initialisation: eager parallel recursive fetch on first tab activation; re-fetches when vault path changes
 - **Task Management (Notion)** — Sidebar Tasks tab to browse, filter, create, and edit Notion tickets without leaving tofucode
   - Task list with filter by assignee (self / anyone / specific person) and status (any / specific); title search
   - Task grouping: group by status when "Anyone" selected, group by assignee when all statuses selected, both together (assignee outer → status inner)

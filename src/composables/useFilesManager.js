@@ -187,6 +187,12 @@ export function useFilesManager({
         break;
 
       case 'files:read:result':
+        console.log(
+          '[FM:read:result]',
+          msg.path,
+          '| openedFile=',
+          openedFile.value?.path,
+        );
         if (openedFile.value && openedFile.value.path === msg.path) {
           openedFile.value = {
             path: msg.path,
@@ -201,7 +207,7 @@ export function useFilesManager({
 
       case 'files:read:error':
         console.error('Read error:', msg.error);
-        if (openedFile.value) {
+        if (openedFile.value && openedFile.value.path === msg.path) {
           openedFile.value = null;
         }
         break;

@@ -15,11 +15,11 @@ import { onUnmounted, watch } from 'vue';
  * @param {() => void} close - Function that sets isOpen to false
  * @param {{ mobileOnly?: boolean, mobileBreakpoint?: number }} [options]
  *   mobileOnly: if true, only pushes history sentinel when on mobile.
- *   mobileBreakpoint: max-width in px to consider "mobile" (default: 768).
+ *   mobileBreakpoint: max-width in px to consider "mobile/tablet" (default: 1024).
  *   Useful for overlays that become non-blocking panels on desktop.
  */
 export function useBackButton(isOpen, close, options = {}) {
-  const { mobileOnly = false, mobileBreakpoint = 768 } = options;
+  const { mobileOnly = false, mobileBreakpoint = 1024 } = options;
 
   // Tracks whether the current close was triggered by the popstate event.
   // If so, the sentinel is already consumed — we must NOT call history.back() again.
@@ -69,4 +69,15 @@ export function useBackButton(isOpen, close, options = {}) {
   onUnmounted(() => {
     window.removeEventListener('popstate', onPopstate);
   });
+
+  // Call this before a router.push() to consume the sentinel without calling history.back(),
+  // which would race with and cancel the pending navigation.
+  function consumeSentinel() {
+    if (sentinelPushed) {
+      sentinelPushed = false;
+      closedByPopstate = true; // prevents watch from calling history.back() on subsequent close
+    }
+  }
+
+  return { consumeSentinel };
 }

@@ -14,6 +14,9 @@ const DEFAULT_SETTINGS = {
   enableMemo: true, // Enable memo feature (Cmd+M quick access)
   // Discord settings (only meaningful when DISCORD_ENABLED=true on the server)
   discordSyncEnabled: true, // Mirror Web UI sessions to Discord
+  // Notes vault
+  notesBasePath: '', // Absolute path to notes vault root (e.g. /home/user/notes)
+  notesIncludePaths: [], // Additional paths to browse: [{ path: '/abs/path', label: 'Label' }]
 };
 
 export function loadSettings() {

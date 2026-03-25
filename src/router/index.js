@@ -28,6 +28,11 @@ const routes = [
     name: 'task',
     component: () => import('../views/TaskView.vue'),
   },
+  {
+    path: '/notes/:notePath(.*)*',
+    name: 'notes',
+    component: () => import('../views/NotesView.vue'),
+  },
 ];
 
 const router = createRouter({

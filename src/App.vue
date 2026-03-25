@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, provide, ref } from 'vue';
+import { onMounted, onUnmounted, provide, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import CommandPalette from './components/CommandPalette.vue';
 import FilePicker from './components/FilePicker.vue';
@@ -53,6 +53,8 @@ const settings = ref({
   quickAccessFile: 'TODO.md',
   enableMemo: true,
   discordSyncEnabled: true,
+  notesBasePath: '',
+  notesIncludePaths: [],
 });
 
 // Server capability flags (not user settings — set by server environment)
@@ -259,7 +261,17 @@ function openPaletteNewProject() {
 // File picker state
 const showFilePicker = ref(false);
 
+// Sidebar ref — used to call exposed methods (e.g. openTodayNote)
+const sidebarRef = ref(null);
+
 function handleGlobalKeydown(e) {
+  // Cmd+D / Ctrl+D: Jump to today's daily note (notes view only)
+  if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+    if (route.name === 'notes') {
+      e.preventDefault();
+      sidebarRef.value?.openTodayNote();
+    }
+  }
   // Ctrl+K or Cmd+K: Open command palette
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault();
@@ -374,11 +386,12 @@ function handleFilePickerDownload(file) {
 }
 
 // Sidebar state - shared across all pages
-const desktopMq = window.matchMedia('(min-width: 769px)');
+// Desktop = >1024px. Tablet (641-1024px) behaves like mobile (overlay sidebar).
+const desktopMq = window.matchMedia('(min-width: 1025px)');
 const isDesktop = ref(desktopMq.matches);
 function onDesktopMqChange(e) {
   isDesktop.value = e.matches;
-  // Auto-close sidebar when switching to mobile
+  // Auto-close sidebar when switching to tablet/mobile
   if (!e.matches) {
     closeSidebar();
   }
@@ -406,7 +419,19 @@ function closeSidebar() {
 }
 
 // Android back button closes sessions sidebar on mobile instead of navigating away
-useBackButton(sidebarOpen, closeSidebar, { mobileOnly: true });
+const { consumeSentinel } = useBackButton(sidebarOpen, closeSidebar, {
+  mobileOnly: true,
+});
+
+// On mobile, close sidebar whenever the route changes (e.g. tapping a note/task/project).
+// Consume the useBackButton sentinel first so it doesn't call history.back() and race
+// with the just-completed navigation.
+watch(route, () => {
+  if (!isDesktop.value && sidebarOpen.value) {
+    consumeSentinel();
+    closeSidebar();
+  }
+});
 
 // Provide sidebar state to child components
 provide('sidebar', {
@@ -423,6 +448,8 @@ provide('settings', {
   symbolToolbar: () => settings.value.symbolToolbar,
   quickAccessFile: () => settings.value.quickAccessFile,
   enableMemo: () => settings.value.enableMemo,
+  notesBasePath: () => settings.value.notesBasePath,
+  notesIncludePaths: () => settings.value.notesIncludePaths || [],
   maxFileSizeMb, // server cap (ref)
 });
 
@@ -444,7 +471,7 @@ onUnmounted(() => {
 
 <template>
   <div class="app" :class="{ 'sidebar-open': sidebarOpen }">
-    <Sidebar :open="sidebarOpen" :slack-enabled="slackEnabled" :notion-enabled="notionConfig?.enabled ?? false" @close="closeSidebar" @open-settings="openSettings" @new-project="openPaletteNewProject" />
+    <Sidebar ref="sidebarRef" :open="sidebarOpen" :slack-enabled="slackEnabled" :notion-enabled="notionConfig?.enabled ?? false" @close="closeSidebar" @open-settings="openSettings" @new-project="openPaletteNewProject" />
     <div class="app-main">
       <router-view />
     </div>
@@ -522,7 +549,7 @@ onUnmounted(() => {
 }
 
 /* Mobile: sidebar is overlay */
-@media (max-width: 768px) {
+@media (max-width: 640px) {
   .app {
     display: block;
   }

@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useWebSocket } from '../composables/useWebSocket';
 import { formatRelativeTime } from '../utils/format.js';
+import NotesPanel from './NotesPanel.vue';
 import TasksPanel from './TasksPanel.vue';
 
 const props = defineProps({
@@ -128,7 +129,19 @@ function handleDismissUpdate(e) {
   }
 }
 
-const activeTab = ref('sessions');
+const SIDEBAR_TAB_KEY = 'tofucode:sidebar-tab';
+const VALID_TABS = new Set(['sessions', 'projects', 'slack', 'tasks', 'notes']);
+
+function loadSavedTab() {
+  const saved = localStorage.getItem(SIDEBAR_TAB_KEY);
+  return saved && VALID_TABS.has(saved) ? saved : 'sessions';
+}
+
+const activeTab = ref(loadSavedTab());
+
+watch(activeTab, (tab) => {
+  localStorage.setItem(SIDEBAR_TAB_KEY, tab);
+});
 
 // Slack unread badge — server-synced lastViewedAt timestamp
 // Populated from slack:config response; null = never viewed (all sessions are unread)
@@ -166,17 +179,30 @@ watch(activeTab, (tab) => {
   }
 });
 
+// Initialize notes panel on first tab open
+const notesPanelRef = ref(null);
+
+watch(activeTab, (tab) => {
+  if (tab === 'notes') {
+    notesPanelRef.value?.initNotes();
+  }
+});
+
+function openTodayNote() {
+  notesPanelRef.value?.openTodayNote();
+}
+
+defineExpose({ openTodayNote });
+
 // Navigate to task view when a new ticket is created
 watch(lastCreatedPageId, (pageId) => {
   if (pageId) {
     router.push(`/tasks/${pageId}`);
-    closeOnMobile();
   }
 });
 
 function handleSelectTask(pageId) {
   router.push(`/tasks/${pageId}`);
-  closeOnMobile();
 }
 
 function handleFilterChange(filter) {
@@ -229,13 +255,6 @@ watch(
   },
 );
 
-// Only close sidebar on mobile (where it's an overlay)
-function closeOnMobile() {
-  if (window.innerWidth <= 768) {
-    emit('close');
-  }
-}
-
 function startNewSession(projectSlug) {
   // Full page reload to ensure clean WebSocket state
   window.location.href = `/project/${projectSlug}/session/new`;
@@ -245,8 +264,14 @@ function handleOverlayClick() {
   emit('close');
 }
 
-// Cmd/Ctrl+7–0: switch sidebar tabs (sessions, projects, slack, tasks)
-const TAB_KEYS = { 7: 'sessions', 8: 'projects', 9: 'slack', 0: 'tasks' };
+// Cmd/Ctrl+6–0: switch sidebar tabs (sessions, projects, slack, tasks, notes)
+const TAB_KEYS = {
+  6: 'sessions',
+  7: 'projects',
+  8: 'slack',
+  9: 'tasks',
+  0: 'notes',
+};
 
 function handleKeydown(e) {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
@@ -269,7 +294,7 @@ onUnmounted(() => {
 
 <template>
   <aside class="sidebar" :class="{ open }">
-    <div class="sidebar-content" :class="{ 'sidebar-content-tasks': activeTab === 'tasks' && notionEnabled }">
+    <div class="sidebar-content" :class="{ 'sidebar-content-tasks': activeTab === 'tasks' && notionEnabled, 'sidebar-content-notes': activeTab === 'notes' }">
       <!-- Recent Sessions Tab -->
       <!-- Skeleton while sessions are loading -->
       <ul v-if="activeTab === 'sessions' && !sessionsReady" class="sidebar-list">
@@ -348,7 +373,7 @@ onUnmounted(() => {
                 <router-link
                   :to="{ name: 'sessions', params: { project: session.projectSlug } }"
                   class="item-project"
-                  @click.stop="closeOnMobile"
+                  @click.stop
                 >
                   {{ session.projectName }}
                 </router-link>
@@ -432,6 +457,13 @@ onUnmounted(() => {
         />
       </template>
 
+      <!-- Notes Tab -->
+      <NotesPanel
+        v-else-if="activeTab === 'notes'"
+        ref="notesPanelRef"
+        @open-settings="(tab) => $emit('open-settings', tab)"
+      />
+
       <!-- Projects Tab -->
       <ul v-else-if="activeTab === 'projects'" class="sidebar-list">
         <li
@@ -443,7 +475,6 @@ onUnmounted(() => {
           <router-link
             :to="{ name: 'sessions', params: { project: project.slug } }"
             class="sidebar-link"
-            @click="closeOnMobile"
           >
             <div class="item-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -564,10 +595,25 @@ onUnmounted(() => {
           <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
         </svg>
       </button>
+      <!-- Notes tab -->
+      <button
+        class="sidebar-tab"
+        :class="{ active: activeTab === 'notes' }"
+        @click="activeTab = 'notes'"
+        title="Notes"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+      </button>
     </nav>
 
     <div class="sidebar-header">
-      <router-link :to="{ name: 'projects' }" class="sidebar-title" @click="closeOnMobile">
+      <router-link :to="{ name: 'projects' }" class="sidebar-title">
         <img src="/icons/icon-192.png" alt="tofucode" class="sidebar-logo" />
       </router-link>
 
@@ -831,7 +877,8 @@ onUnmounted(() => {
 /* When the tasks tab is active and TasksPanel is rendering, let the panel
    manage its own scroll/flex layout. We make sidebar-content a pass-through
    flex container so TasksPanel gets the full flex: 1 height. */
-.sidebar-content-tasks {
+.sidebar-content-tasks,
+.sidebar-content-notes {
   overflow: hidden;
   padding: 0;
   display: flex;
@@ -1132,8 +1179,31 @@ onUnmounted(() => {
   display: none;
 }
 
-/* Mobile styles - sidebar as overlay */
-@media (max-width: 768px) {
+/* Tablet styles - sidebar as overlay at desktop width */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .sidebar.open {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 200;
+    width: var(--sidebar-width, 260px);
+  }
+
+  .sidebar-close-btn {
+    display: inline-flex;
+  }
+
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 199;
+  }
+}
+
+/* Mobile styles - sidebar as overlay full width */
+@media (max-width: 640px) {
   .sidebar.open {
     position: fixed;
     left: 0;
