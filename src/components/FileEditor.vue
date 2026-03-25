@@ -412,10 +412,14 @@ watch(
     if (type === 'markdown' && !loading) {
       await nextTick();
       if (mdEditorRef.value) {
+        // Use props.content directly — editorContent may not have been synced yet
+        // if the content watcher and this watcher fire in the same flush
+        const initContent = props.content || editorContent.value;
         tinyMdeInstance = new TinyMDE({
           element: mdEditorRef.value,
-          content: editorContent.value,
+          content: initContent,
         });
+        editorContent.value = initContent;
 
         tinyMdeInstance.addEventListener('change', () => {
           const newContent = tinyMdeInstance.getContent();
