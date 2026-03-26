@@ -8,7 +8,27 @@ import { useWebSocket } from '../composables/useWebSocket';
 const route = useRoute();
 const settingsContext = inject('settings');
 const sidebar = inject('sidebar');
-const { send, onMessage, connected } = useWebSocket();
+const { send, onMessage, connected, recentSessions, sessionStatuses } =
+  useWebSocket();
+
+// Recent sessions switcher — show 2 recent sessions for quick navigation
+const displayedRecentSessions = computed(() => {
+  const recent = recentSessions.value || [];
+  return recent.slice(0, 2);
+});
+
+function getSessionDisplayTitle(session) {
+  const projectName = session.projectName || 'Unknown';
+  const title = session.title || session.firstPrompt || 'Untitled';
+  return `${projectName} / ${title}`;
+}
+
+function getSessionUrl(session) {
+  const projectSlug =
+    session.projectSlug ||
+    session.projectPath?.replace(/\//g, '-').replace(/^-/, '');
+  return `/project/${projectSlug}/session/${session.sessionId}`;
+}
 
 const notesBasePath = computed(() => settingsContext.notesBasePath());
 const autoSave = computed(() => settingsContext.autoSaveFiles());
@@ -184,6 +204,7 @@ const configured = computed(() => !!notesBasePath.value);
     <main class="notes-content">
       <FileEditor
         v-if="openedFile"
+        :key="openedFile.path"
         ref="fileEditorRef"
         class="notes-editor"
         :file-path="openedFile.path"
@@ -220,6 +241,26 @@ const configured = computed(() => !!notesBasePath.value);
       </div>
     </main>
 
+    <!-- Mobile: recent sessions row above footer (hidden on desktop) -->
+    <div v-if="displayedRecentSessions.length > 0" class="recent-sessions-row mobile-only">
+      <div class="recent-sessions-group">
+        <a
+          v-for="session in displayedRecentSessions"
+          :key="session.sessionId"
+          :href="getSessionUrl(session)"
+          class="recent-session-item"
+          :title="getSessionDisplayTitle(session)"
+        >
+          <span v-if="sessionStatuses.get(session.sessionId)" class="recent-session-status" :class="sessionStatuses.get(session.sessionId).status">
+            <svg v-if="sessionStatuses.get(session.sessionId).status === 'running'" width="10" height="10" viewBox="0 0 24 24" class="status-spinner"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round"/></svg>
+            <svg v-else-if="sessionStatuses.get(session.sessionId).status === 'completed'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <svg v-else-if="sessionStatuses.get(session.sessionId).status === 'error'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </span>
+          <span class="recent-session-text">{{ getSessionDisplayTitle(session) }}</span>
+        </a>
+      </div>
+    </div>
+
     <!-- Bottom footer bar -->
     <div class="notes-footer-bar">
       <!-- Hamburger: toggle sidebar -->
@@ -235,15 +276,33 @@ const configured = computed(() => !!notesBasePath.value);
       <span v-if="openedFile" class="footer-path" :title="displayPath">{{ displayPath }}</span>
       <span v-else class="footer-path footer-path--empty">Notes</span>
 
+      <!-- Dirty indicator -->
+      <span v-if="fileEditorRef?.isDirty" class="footer-dirty" title="Unsaved changes">*</span>
+
+      <!-- Desktop: recent sessions inline (hidden on mobile) -->
+      <div v-if="displayedRecentSessions.length > 0" class="recent-sessions-group desktop-only">
+        <a
+          v-for="session in displayedRecentSessions"
+          :key="session.sessionId"
+          :href="getSessionUrl(session)"
+          class="recent-session-item"
+          :title="getSessionDisplayTitle(session)"
+        >
+          <span v-if="sessionStatuses.get(session.sessionId)" class="recent-session-status" :class="sessionStatuses.get(session.sessionId).status">
+            <svg v-if="sessionStatuses.get(session.sessionId).status === 'running'" width="10" height="10" viewBox="0 0 24 24" class="status-spinner"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round"/></svg>
+            <svg v-else-if="sessionStatuses.get(session.sessionId).status === 'completed'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <svg v-else-if="sessionStatuses.get(session.sessionId).status === 'error'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </span>
+          <span class="recent-session-text">{{ getSessionDisplayTitle(session) }}</span>
+        </a>
+      </div>
+
       <!-- Stats — hidden on mobile -->
       <span v-if="openedFile && !openedFile.loading" class="footer-stats">
         <span class="stat-item" :title="`File size: ${fileSize}`">{{ fileSize }}</span>
         <span class="stat-item" :title="`Total lines: ${totalLines}`">≡ {{ totalLines }}</span>
         <span class="stat-item" :title="`Total characters: ${totalChars}`">∑ {{ totalChars }}</span>
       </span>
-
-      <!-- Dirty indicator -->
-      <span v-if="fileEditorRef?.isDirty" class="footer-dirty" title="Unsaved changes">*</span>
 
       <!-- TOC toggle -->
       <button
@@ -361,6 +420,7 @@ const configured = computed(() => !!notesBasePath.value);
   overflow: hidden;
   text-overflow: ellipsis;
   direction: rtl;
+  unicode-bidi: plaintext;
   text-align: left;
 }
 
@@ -410,9 +470,108 @@ const configured = computed(() => !!notesBasePath.value);
   opacity: 0.7;
 }
 
-@media (max-width: 768px) {
+/* Recent sessions row (mobile: separate row above footer; desktop: inline in footer) */
+.recent-sessions-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  flex-shrink: 0;
+}
+
+.recent-sessions-group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.recent-session-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  max-width: 150px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.recent-session-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.recent-session-item:active {
+  transform: scale(0.98);
+}
+
+.recent-session-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.recent-session-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.recent-session-status.running {
+  color: #3b82f6;
+}
+
+.recent-session-status.completed {
+  color: var(--success-color);
+}
+
+.recent-session-status.error {
+  color: var(--error-color);
+}
+
+.recent-session-status .status-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive visibility */
+.desktop-only {
+  display: none;
+}
+
+@media (min-width: 641px) {
+  .desktop-only {
+    display: flex;
+  }
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+@media (max-width: 640px) {
   .footer-stats {
     display: none;
+  }
+  .recent-sessions-row .recent-session-item {
+    flex: 1;
+    max-width: none;
   }
 }
 </style>

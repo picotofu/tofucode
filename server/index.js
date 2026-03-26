@@ -323,7 +323,7 @@ if (existsSync(distPath)) {
   // then redirects to /. Lives under /api/ so the old SW's NavigationRoute
   // denylist excludes it — the browser hits the server directly, bypassing any
   // stale SW that would otherwise intercept the navigation and return old HTML.
-  app.get('/api/sw-reset', (req, res) => {
+  app.get('/api/sw-reset', (_req, res) => {
     res.set({ 'Content-Type': 'text/html', 'Cache-Control': 'no-store' });
     res.send(`<!DOCTYPE html><html><head><title>Resetting…</title></head><body>
 <script>
