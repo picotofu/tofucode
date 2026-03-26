@@ -319,6 +319,28 @@ if (existsSync(distPath)) {
     next();
   });
 
+  // SW reset: serves an HTML page that wipes all SW registrations and caches,
+  // then redirects to /. Lives under /api/ so the old SW's NavigationRoute
+  // denylist excludes it — the browser hits the server directly, bypassing any
+  // stale SW that would otherwise intercept the navigation and return old HTML.
+  app.get('/api/sw-reset', (_req, res) => {
+    res.set({ 'Content-Type': 'text/html', 'Cache-Control': 'no-store' });
+    res.send(`<!DOCTYPE html><html><head><title>Resetting…</title></head><body>
+<script>
+(async () => {
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(r => r.unregister()));
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+  }
+  location.replace('/');
+})();
+</script>
+<p>Clearing service worker cache, please wait…</p>
+</body></html>`);
+  });
+
   // Service Worker files - MUST NOT be cached to ensure updates work
   app.use((req, res, next) => {
     if (req.path === '/sw.js' || req.path.startsWith('/workbox-')) {

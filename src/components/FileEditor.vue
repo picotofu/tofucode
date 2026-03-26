@@ -691,9 +691,118 @@ onUnmounted(() => {
   </div>
 </template>
 
-<style scoped>
+<style>
+/* TinyMDE base CSS — must be unscoped so dynamically injected elements get styled */
 @import 'tiny-markdown-editor/dist/tiny-mde.min.css';
 
+/* TinyMDE dark theme overrides */
+.TinyMDE {
+  background-color: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.7;
+  padding: 0;
+}
+
+.TinyMDE.TinyMDE_empty::before {
+  color: var(--text-muted);
+}
+
+/* Code blocks */
+.TMCode,
+.TMFencedCodeBacktick,
+.TMFencedCodeTilde,
+.TMIndentedCode {
+  background-color: var(--bg-tertiary);
+  font-family: var(--font-mono);
+}
+
+.TMCodeFenceBacktickOpen,
+.TMCodeFenceTildeOpen {
+  border-bottom-color: var(--border-color);
+  font-family: var(--font-mono);
+}
+
+.TMCodeFenceBacktickClose,
+.TMCodeFenceTildeClose {
+  border-top-color: var(--border-color);
+  font-family: var(--font-mono);
+}
+
+.TMCode {
+  border-color: var(--border-color);
+}
+
+/* Markdown syntax markers */
+.TMMark {
+  color: var(--text-muted);
+}
+
+.TMMark_TMH1,
+.TMMark_TMH2,
+.TMMark_TMOL,
+.TMMark_TMUL {
+  color: var(--warning-color);
+}
+
+/* Headings */
+.TMH1,
+.TMSetextH1 {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 32px;
+  margin-bottom: 8px;
+}
+
+.TMH2,
+.TMSetextH2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Blockquotes */
+.TMBlockquote {
+  border-left-color: var(--border-color);
+}
+
+/* Links */
+.TMLink {
+  text-decoration-color: var(--accent-color);
+}
+
+.TMAutolink,
+.TMLinkDestination {
+  color: var(--accent-color);
+}
+
+.TMLinkLabel_Definition,
+.TMLinkLabel_Valid {
+  color: var(--success-color);
+}
+
+.TMLinkLabel_Invalid {
+  color: var(--error-color);
+}
+
+/* Info string (language in code fence) */
+.TMInfoString {
+  color: var(--text-muted);
+}
+
+/* Horizontal rule */
+.TMHR::before {
+  border-bottom-color: var(--border-color);
+}
+
+/* HTML */
+.TMHTML,
+.TMHTMLBlock {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+</style>
+
+<style scoped>
 .file-editor {
   display: flex;
   flex-direction: column;
@@ -839,17 +948,9 @@ onUnmounted(() => {
   background: #fff;
 }
 
-/* TinyMDE dark theme overrides */
+/* Override base .TinyMDE font size — file editor uses 14px, chat input uses 13px */
 .markdown-editor :deep(.TinyMDE) {
-  background: transparent;
-  color: var(--text-primary);
-  border: none;
   font-size: 14px;
-  line-height: 1.7;
-}
-
-.markdown-editor :deep(.TinyMDE.TinyMDE_empty::before) {
-  color: var(--text-muted);
 }
 
 /* Symbol toolbar */

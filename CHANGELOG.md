@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Notes view: TinyMDE markdown formatting not applied on page refresh** — TinyMDE syntax theme CSS (`.TMH1`, `.TMMark_TMH1`, etc.) was only defined in `ChatView.vue`'s unscoped styles, so it was never loaded when navigating directly to the `/notes` route. Moved the base `@import` and all theme overrides into an unscoped `<style>` block in `FileEditor.vue` so they load with the component regardless of which view uses it
+- **Notes view: footer path visually showing trailing slash** — `direction: rtl` without `unicode-bidi: plaintext` caused the Bidi algorithm to move the leading `/` to appear at the end. Added `unicode-bidi: plaintext` to `.footer-path`
+- **Notes view: TinyMDE not reinitialising when switching notes** — added `:key="openedFile.path"` to `<FileEditor>` in `NotesView` to force a clean remount when the active file changes, ensuring TinyMDE always initialises with the correct content
+
 ### Added
 - **Notes (Obsidian-like vault)** — Full markdown notes system with sidebar file navigator, mini calendar, daily notes, and fuzzy search
   - New `/notes` route with URL-reflected state (browser navigation works natively)

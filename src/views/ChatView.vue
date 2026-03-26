@@ -2679,105 +2679,14 @@ watch(
 </template>
 
 <style>
-/* Import TinyMDE CSS */
-@import 'tiny-markdown-editor/dist/tiny-mde.min.css';
+/* TinyMDE base CSS and theme overrides are in FileEditor.vue (unscoped) */
 
-/* TinyMDE dark theme overrides */
-.TinyMDE {
-  background-color: transparent;
-  color: var(--text-primary);
-  font-family: var(--font-sans);
+/* Chat input TinyMDE: smaller font + constrained height — scoped to .tinyMDE container to override FileEditor defaults */
+.tinyMDE .TinyMDE {
   font-size: 13px;
   line-height: 1.5;
-  padding: 0;
-}
-
-/* Only constrain height in the chat input, not in file editor */
-.tinyMDE .TinyMDE {
   max-height: 300px;
   overflow-y: auto;
-}
-
-.TinyMDE.TinyMDE_empty::before {
-  color: var(--text-muted);
-}
-
-/* Code blocks */
-.TMCode,
-.TMFencedCodeBacktick,
-.TMFencedCodeTilde,
-.TMIndentedCode {
-  background-color: var(--bg-tertiary);
-  font-family: var(--font-mono);
-}
-
-.TMCodeFenceBacktickOpen,
-.TMCodeFenceTildeOpen {
-  border-bottom-color: var(--border-color);
-  font-family: var(--font-mono);
-}
-
-.TMCodeFenceBacktickClose,
-.TMCodeFenceTildeClose {
-  border-top-color: var(--border-color);
-  font-family: var(--font-mono);
-}
-
-.TMCode {
-  border-color: var(--border-color);
-}
-
-/* Markdown syntax markers */
-.TMMark {
-  color: var(--text-muted);
-}
-
-.TMMark_TMH1,
-.TMMark_TMH2,
-.TMMark_TMOL,
-.TMMark_TMUL {
-  color: var(--warning-color);
-}
-
-/* Blockquotes */
-.TMBlockquote {
-  border-left-color: var(--border-color);
-}
-
-/* Links */
-.TMLink {
-  text-decoration-color: var(--accent-color);
-}
-
-.TMAutolink,
-.TMLinkDestination {
-  color: var(--accent-color);
-}
-
-.TMLinkLabel_Definition,
-.TMLinkLabel_Valid {
-  color: var(--success-color);
-}
-
-.TMLinkLabel_Invalid {
-  color: var(--error-color);
-}
-
-/* Info string (language in code fence) */
-.TMInfoString {
-  color: var(--text-muted);
-}
-
-/* Horizontal rule */
-.TMHR::before {
-  border-bottom-color: var(--border-color);
-}
-
-/* HTML */
-.TMHTML,
-.TMHTMLBlock {
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
 }
 </style>
 

@@ -1,11 +1,12 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AssigneeDropdown from '../components/AssigneeDropdown.vue';
 import { useWebSocket } from '../composables/useWebSocket';
 import { formatRelativeTime } from '../utils/format.js';
 
 const route = useRoute();
+const sidebar = inject('sidebar');
 
 const {
   fetchTaskDetail,
@@ -199,34 +200,6 @@ function onCommentKeydown(e) {
 
 <template>
   <div class="task-view">
-    <!-- Top bar: save indicator + Notion link -->
-    <div class="task-topbar">
-      <span
-        v-if="saveLabel"
-        class="task-save-indicator"
-        :class="{ 'save-error': taskSaveStatus === 'error' }"
-      >
-        {{ saveLabel }}
-      </span>
-      <span v-else class="task-save-spacer" />
-
-      <a
-        v-if="taskDetail?.url"
-        :href="taskDetail.url"
-        target="_blank"
-        rel="noopener"
-        class="task-notion-link"
-        title="Open in Notion"
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-          <polyline points="15 3 21 3 21 9" />
-          <line x1="10" y1="14" x2="21" y2="3" />
-        </svg>
-        Notion
-      </a>
-    </div>
-
     <!-- Scrollable content area -->
     <div class="task-scroll">
       <!-- Loading -->
@@ -398,6 +371,40 @@ function onCommentKeydown(e) {
         </div>
       </template>
     </div>
+
+    <!-- Footer bar: sidebar toggle + Notion URL -->
+    <div class="task-footer-bar">
+      <button class="task-footer-btn" title="Toggle sidebar" @click="sidebar?.toggle()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+      <a
+        v-if="taskDetail?.url"
+        :href="taskDetail.url"
+        target="_blank"
+        rel="noopener"
+        class="task-footer-notion"
+        :title="taskDetail.url"
+      >
+        <span class="task-footer-notion-url">{{ taskDetail.url }}</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+          <polyline points="15 3 21 3 21 9" />
+          <line x1="10" y1="14" x2="21" y2="3" />
+        </svg>
+      </a>
+      <span v-else class="task-footer-notion task-footer-notion--empty">No Notion link</span>
+      <span
+        v-if="saveLabel"
+        class="task-save-indicator"
+        :class="{ 'save-error': taskSaveStatus === 'error' }"
+      >
+        {{ saveLabel }}
+      </span>
+    </div>
   </div>
 </template>
 
@@ -405,55 +412,9 @@ function onCommentKeydown(e) {
 .task-view {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: 100vh;
   background: var(--bg-primary);
   overflow: hidden;
-}
-
-/* ── Top bar ──────────────────────────────────── */
-.task-topbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
-  min-height: 44px;
-}
-
-.task-save-indicator {
-  flex: 1;
-  font-size: 11px;
-  color: var(--text-muted);
-  text-align: center;
-}
-
-.task-save-indicator.save-error {
-  color: var(--error-color);
-}
-
-.task-save-spacer {
-  flex: 1;
-}
-
-.task-notion-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  text-decoration: none;
-  flex-shrink: 0;
-  transition: color 0.15s;
-  padding: 4px 8px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-}
-
-.task-notion-link:hover {
-  color: var(--text-secondary);
-  border-color: var(--text-muted);
 }
 
 /* ── Scroll area ─────────────────────────────── */
@@ -840,5 +801,81 @@ function onCommentKeydown(e) {
 .task-comment-submit:not(:disabled):hover {
   background: var(--bg-hover);
   border-color: var(--text-secondary);
+}
+
+/* ── Footer bar ─────────────────────────────── */
+.task-footer-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  height: 44px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  flex-shrink: 0;
+}
+
+.task-footer-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.task-footer-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.task-footer-notion {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+  overflow: hidden;
+}
+
+.task-footer-notion:hover {
+  color: var(--text-secondary);
+}
+
+.task-footer-notion-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
+.task-footer-notion--empty {
+  font-style: italic;
+}
+
+.task-footer-notion svg {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.task-save-indicator {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.task-save-indicator.save-error {
+  color: var(--error-color);
 }
 </style>
