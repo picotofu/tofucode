@@ -734,7 +734,12 @@ const shortcuts = [
   },
   {
     category: 'Notes',
-    items: [{ keys: ['⌘/^', 'D'], description: "Jump to today's daily note" }],
+    items: [
+      {
+        keys: ['⌘/^', 'Shift', 'D'],
+        description: "Jump to today's daily note",
+      },
+    ],
   },
 ];
 

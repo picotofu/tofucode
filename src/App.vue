@@ -265,8 +265,8 @@ const showFilePicker = ref(false);
 const sidebarRef = ref(null);
 
 function handleGlobalKeydown(e) {
-  // Cmd+D / Ctrl+D: Jump to today's daily note (notes view only)
-  if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+  // Cmd+Shift+D / Ctrl+Shift+D: Jump to today's daily note (notes view only)
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'd') {
     if (route.name === 'notes') {
       e.preventDefault();
       sidebarRef.value?.openTodayNote();
