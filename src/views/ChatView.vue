@@ -742,6 +742,10 @@ function initTinyMDE() {
         if (!editor) return;
         const sel = editor.getSelection();
         if (!sel || sel.col !== 0 || sel.row === 0) return;
+        // If there's an active selection (anchor differs from focus), let TinyMDE handle it natively
+        const anchor = editor.getSelection(true);
+        if (anchor && (anchor.row !== sel.row || anchor.col !== sel.col))
+          return;
         // Cursor is at start of a non-first line — merge with previous line
         e.preventDefault();
         const content = editor.getContent();

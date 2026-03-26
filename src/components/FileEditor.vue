@@ -353,6 +353,9 @@ function setupMobileBackspaceFix() {
     if (!tinyMdeInstance) return;
     const sel = tinyMdeInstance.getSelection();
     if (!sel || sel.col !== 0 || sel.row === 0) return;
+    // If there's an active selection (anchor differs from focus), let TinyMDE handle it natively
+    const anchor = tinyMdeInstance.getSelection(true);
+    if (anchor && (anchor.row !== sel.row || anchor.col !== sel.col)) return;
     // Cursor is at start of a non-first line — merge with previous line
     e.preventDefault();
     const content = tinyMdeInstance.getContent();
