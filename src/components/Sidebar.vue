@@ -170,14 +170,18 @@ watch(activeTab, (tab) => {
 // Fetch tasks + status options + assignees once on first tab open
 const tasksFetched = ref(false);
 
-watch(activeTab, (tab) => {
-  if (tab === 'tasks' && !tasksFetched.value) {
-    getTasks();
-    getTaskStatusOptions();
-    getTaskAssignees();
-    tasksFetched.value = true;
-  }
-});
+watch(
+  activeTab,
+  (tab) => {
+    if (tab === 'tasks' && !tasksFetched.value) {
+      getTasks();
+      getTaskStatusOptions();
+      getTaskAssignees();
+      tasksFetched.value = true;
+    }
+  },
+  { immediate: true },
+);
 
 // Initialize notes panel on first tab open
 const notesPanelRef = ref(null);
