@@ -800,8 +800,8 @@ async function handleClearCacheAndUpdate() {
       await Promise.all(cacheNames.map((name) => caches.delete(name)));
     }
 
-    // Reload the page to get fresh content
-    window.location.reload(true);
+    // Navigate to reload — location.replace re-fetches index.html fresh (served no-cache by server)
+    location.replace(location.href);
   } catch (error) {
     console.error('Failed to clear cache:', error);
     alert('Failed to clear cache. Please try manually clearing browser data.');
@@ -1008,6 +1008,7 @@ async function handleClearCacheAndUpdate() {
               </svg>
               <span>{{ isUpdatingPWA ? 'Clearing...' : 'Clear Cache & Update' }}</span>
             </button>
+            <a href="/api/sw-reset" class="sw-reset-link">If the button doesn't work, try the hard reset page</a>
           </div>
         </div>
 
@@ -2127,6 +2128,18 @@ async function handleClearCacheAndUpdate() {
 
 .restart-btn .spin {
   animation: spin 1s linear infinite;
+}
+
+.sw-reset-link {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s;
+}
+
+.sw-reset-link:hover {
+  color: var(--text-secondary);
 }
 
 .connection-pill {
