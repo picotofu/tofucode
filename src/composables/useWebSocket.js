@@ -620,9 +620,16 @@ function clearTaskDetail() {
 }
 
 function createTask(title, assigneeId) {
-  // '__self__' and '' are UI sentinels — don't send as Notion user IDs
-  const resolvedAssigneeId =
-    assigneeId && assigneeId !== '__self__' ? assigneeId : null;
+  let resolvedAssigneeId = null;
+  if (assigneeId === '__self__') {
+    // Resolve to the actual Notion user ID by matching selfEmail in taskAssignees
+    const selfUser = taskSelfEmail.value
+      ? taskAssignees.value.find((u) => u.email === taskSelfEmail.value)
+      : null;
+    resolvedAssigneeId = selfUser?.id ?? null;
+  } else if (assigneeId) {
+    resolvedAssigneeId = assigneeId;
+  }
   sendGlobal({ type: 'tasks:create', title, assigneeId: resolvedAssigneeId });
 }
 
