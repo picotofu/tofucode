@@ -265,12 +265,11 @@ const showFilePicker = ref(false);
 const sidebarRef = ref(null);
 
 function handleGlobalKeydown(e) {
-  // Cmd+Shift+D / Ctrl+Shift+D: Jump to today's daily note (notes view only)
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'd') {
-    if (route.name === 'notes') {
-      e.preventDefault();
-      sidebarRef.value?.openTodayNote();
-    }
+  // Cmd+D / Ctrl+D: Jump to today's daily note (from any view)
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'd') {
+    e.preventDefault();
+    const today = new Date().toISOString().slice(0, 10);
+    router.push({ name: 'notes', params: { notePath: `daily/${today}.md` } });
   }
   // Ctrl+K or Cmd+K: Open command palette
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
