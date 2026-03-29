@@ -27,10 +27,6 @@ const updateAvailable = ref(null); // { currentVersion, latestVersion, updateUrl
 const rootPath = ref(null);
 // Home path — topmost browsable directory (rootPath if set, otherwise server home)
 const homePath = ref(null);
-// Slack session slug — set when hideSlackSessions is enabled and sessionLogPath is configured
-// Used to filter slack classifier sessions from the main sessions/projects lists
-const slackSessionSlug = ref(null);
-
 // True once the first recent_sessions response is received
 const sessionsReady = ref(false);
 
@@ -221,9 +217,6 @@ function handleGlobalMessage(msg) {
 
     case 'projects_list':
       projects.value = msg.projects;
-      if (msg.slackSessionSlug !== undefined) {
-        slackSessionSlug.value = msg.slackSessionSlug;
-      }
       break;
 
     case 'project_selected':
@@ -237,9 +230,6 @@ function handleGlobalMessage(msg) {
     case 'recent_sessions':
       recentSessions.value = msg.sessions;
       sessionsReady.value = true;
-      if (msg.slackSessionSlug !== undefined) {
-        slackSessionSlug.value = msg.slackSessionSlug;
-      }
       break;
 
     case 'folder_contents':
@@ -695,7 +685,6 @@ export function useWebSocket() {
     updateAvailable: readonly(updateAvailable),
     rootPath: readonly(rootPath),
     homePath: readonly(homePath),
-    slackSessionSlug: readonly(slackSessionSlug),
 
     // Tasks panel
     tasks: readonly(tasks),

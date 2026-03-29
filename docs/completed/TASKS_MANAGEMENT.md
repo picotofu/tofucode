@@ -21,9 +21,6 @@ server/lib/task-providers/
 
 server/events/notion.js          # WebSocket handlers for Settings UI
 src/components/SettingsModal.vue # Notion tab in Settings
-server/slack/lib/notion-tickets.json  # Thread-ts → pageId mapping for deduplication
-server/slack/lib/classifier.js   # Injects Notion field mappings for ticket generation
-server/slack/events/shared.js    # handleTicketAction, handleWorkAction, handleTicketUpdate
 ```
 
 ---
@@ -88,28 +85,11 @@ Key capabilities:
 
 ---
 
-### Slack Bot Integration (Current Consumer)
-
-The Slack bot is the primary consumer of the TaskProvider layer:
-
-**Trigger → Notion flow:**
-
-1. Slack message received → classifier runs → determines action
-2. `ticket` action → fetch Slack permalink → `createTicket()` → store `threadTs → pageId` in `notion-tickets.json`
-3. `work` action → `createTicket()` with In Progress status → start tofucode session
-4. Thread reply → lookup existing `pageId` → `updateTicket({ appendText })` (no duplicate)
-5. PR created → scan session output for GitHub PR URLs → `updateTicket({ appendText: prUrl })`
-
-**Deduplication:** `~/.tofucode/notion-tickets.json` maps `threadTs → pageId` to prevent
-duplicate tickets when a Slack thread receives follow-up replies.
-
----
-
 ## Feature Ideas / Potential Next Steps
 
 > To be discussed and planned — not yet scoped
 
-- **Web UI: Task creation panel** — create Notion tickets directly from tofucode (not just via Slack)
+- **Web UI: Task creation panel** — create Notion tickets directly from tofucode
 - **Session → ticket linking** — auto-associate a running session with a Notion ticket
 - **Ticket status sidebar** — show linked ticket status/context alongside active session
 - **Notion database view** — browse tickets in the Notion DB from within tofucode UI
@@ -126,7 +106,6 @@ duplicate tickets when a Slack thread receives follow-up replies.
 - [x] Provider registry (`index.js`) — extensible for future providers
 - [x] WebSocket handlers for Settings UI (`server/events/notion.js`)
 - [x] Settings UI — Notion tab with token, database URL, field mappings, test + analyse
-- [x] Slack bot integration — ticket creation, thread reply updates, PR linking
 - [x] Tasks sidebar tab — list, filter (assignee + status + search), create, task detail view (TaskView)
 - [x] AssigneeDropdown shared component — teleported popover, fuzzy search, used in filter/create/TaskView
 - [x] Workspace users merged with DB assignees; email field for self-identification

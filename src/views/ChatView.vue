@@ -332,9 +332,9 @@ function handleKeydown(e) {
     return;
   }
 
-  // Mode switching: Ctrl/Cmd+1/2/3
+  // Mode switching: Ctrl/Cmd+5/6/7
   if (e.ctrlKey || e.metaKey) {
-    if (e.key === '1') {
+    if (e.key === '5') {
       e.preventDefault();
       currentMode.value = 'chat';
       nextTick(() => {
@@ -348,7 +348,7 @@ function handleKeydown(e) {
       });
       return;
     }
-    if (e.key === '2') {
+    if (e.key === '6') {
       e.preventDefault();
       // If already in terminal mode, cycle through history → active → bookmarks
       if (currentMode.value === 'terminal') {
@@ -367,7 +367,7 @@ function handleKeydown(e) {
       });
       return;
     }
-    if (e.key === '3') {
+    if (e.key === '7') {
       e.preventDefault();
       currentMode.value = 'files';
       nextTick(() => {

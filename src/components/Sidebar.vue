@@ -11,10 +11,6 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
-  slackEnabled: {
-    type: Boolean,
-    default: false,
-  },
   notionEnabled: {
     type: Boolean,
     default: false,
@@ -34,7 +30,6 @@ const {
   terminalCounts,
   currentVersion,
   updateAvailable,
-  slackSessionSlug,
   tasks,
   tasksReady,
   tasksError,
@@ -61,32 +56,9 @@ const {
 // Project sort state (default: recent first; true = A-Z)
 const sortAZ = ref(false);
 
-// Filter out slack sessions from the main lists when hideSlackSessions is enabled
-const filteredRecentSessions = computed(() => {
-  if (!slackSessionSlug.value) return recentSessions.value;
-  return recentSessions.value.filter(
-    (s) => s.projectSlug !== slackSessionSlug.value,
-  );
-});
-
-const filteredProjects = computed(() => {
-  if (!slackSessionSlug.value) return projects.value;
-  return projects.value.filter((p) => p.slug !== slackSessionSlug.value);
-});
-
-// Slack-only sessions for the dedicated Slack tab
-const slackSessions = computed(() => {
-  if (!slackSessionSlug.value) return [];
-  return recentSessions.value.filter(
-    (s) => s.projectSlug === slackSessionSlug.value,
-  );
-});
-
 const sortedProjects = computed(() => {
-  if (!sortAZ.value) return filteredProjects.value;
-  return [...filteredProjects.value].sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
+  if (!sortAZ.value) return projects.value;
+  return [...projects.value].sort((a, b) => a.name.localeCompare(b.name));
 });
 
 // Upgrade state
@@ -130,7 +102,7 @@ function handleDismissUpdate(e) {
 }
 
 const SIDEBAR_TAB_KEY = 'tofucode:sidebar-tab';
-const VALID_TABS = new Set(['sessions', 'projects', 'slack', 'tasks', 'notes']);
+const VALID_TABS = new Set(['sessions', 'projects', 'tasks', 'notes']);
 
 function loadSavedTab() {
   const saved = localStorage.getItem(SIDEBAR_TAB_KEY);
@@ -141,30 +113,6 @@ const activeTab = ref(loadSavedTab());
 
 watch(activeTab, (tab) => {
   localStorage.setItem(SIDEBAR_TAB_KEY, tab);
-});
-
-// Slack unread badge — server-synced lastViewedAt timestamp
-// Populated from slack:config response; null = never viewed (all sessions are unread)
-const slackLastViewed = ref(null);
-
-onMessage((msg) => {
-  if (msg.type === 'slack:config' && msg.lastViewedAt !== undefined) {
-    slackLastViewed.value = msg.lastViewedAt;
-  }
-});
-
-const slackUnreadCount = computed(() => {
-  if (!slackSessionSlug.value) return 0;
-  // If never viewed, all sessions count as unread
-  const lastViewed = slackLastViewed.value || '1970-01-01T00:00:00.000Z';
-  return slackSessions.value.filter((s) => s.modified > lastViewed).length;
-});
-
-// Notify server when user opens the Slack tab — syncs lastViewedAt across all devices/tabs
-watch(activeTab, (tab) => {
-  if (tab === 'slack') {
-    send({ type: 'slack:mark_viewed' });
-  }
 });
 
 // Fetch tasks + status options + assignees once on first tab open
@@ -242,13 +190,6 @@ watch(connected, (isConnected) => {
   }
 });
 
-// Fetch slack config once the slug is first known to populate lastViewedAt for the unread badge
-watch(slackSessionSlug, (slug, prev) => {
-  if (slug && !prev && connected.value) {
-    send({ type: 'slack:get_config' });
-  }
-});
-
 // Refresh data when sidebar opens
 watch(
   () => props.open,
@@ -268,13 +209,12 @@ function handleOverlayClick() {
   emit('close');
 }
 
-// Cmd/Ctrl+6–0: switch sidebar tabs (sessions, projects, slack, tasks, notes)
+// Cmd/Ctrl+1–4: switch sidebar tabs (sessions, projects, tasks, notes)
 const TAB_KEYS = {
-  6: 'sessions',
-  7: 'projects',
-  8: 'slack',
-  9: 'tasks',
-  0: 'notes',
+  1: 'sessions',
+  2: 'projects',
+  3: 'tasks',
+  4: 'notes',
 };
 
 function handleKeydown(e) {
@@ -315,7 +255,7 @@ onUnmounted(() => {
       <!-- Actual sessions list -->
       <ul v-else-if="activeTab === 'sessions'" class="sidebar-list">
         <li
-          v-for="session in filteredRecentSessions"
+          v-for="session in recentSessions"
           :key="session.sessionId"
           class="sidebar-item"
           :class="{ active: currentSession === session.sessionId }"
@@ -391,46 +331,8 @@ onUnmounted(() => {
             </div>
           </a>
         </li>
-        <li v-if="filteredRecentSessions.length === 0" class="sidebar-empty">
+        <li v-if="recentSessions.length === 0" class="sidebar-empty">
           No recent sessions
-        </li>
-      </ul>
-
-      <!-- Slack Sessions Tab -->
-      <ul v-else-if="activeTab === 'slack'" class="sidebar-list">
-        <li v-if="!slackEnabled" class="sidebar-empty">
-          Slack is not enabled on this server
-        </li>
-        <template v-else-if="slackSessionSlug">
-          <li
-            v-for="session in slackSessions"
-            :key="session.sessionId"
-            class="sidebar-item"
-            :class="{ active: currentSession === session.sessionId }"
-          >
-            <a
-              :href="`/project/${session.projectSlug}/session/${session.sessionId}`"
-              class="sidebar-link"
-            >
-              <div class="item-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
-              </div>
-              <div class="item-content">
-                <p class="item-title truncate">{{ session.title || session.firstPrompt }}</p>
-                <p class="item-meta">
-                  <span>{{ formatRelativeTime(session.modified) }}</span>
-                </p>
-              </div>
-            </a>
-          </li>
-          <li v-if="slackSessions.length === 0" class="sidebar-empty">
-            No Slack sessions yet
-          </li>
-        </template>
-        <li v-else class="sidebar-empty">
-          Slack bot not configured
         </li>
       </ul>
 
@@ -565,27 +467,6 @@ onUnmounted(() => {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
         </svg>
-      </button>
-      <!-- Slack tab -->
-      <button
-        class="sidebar-tab"
-        :class="{ active: activeTab === 'slack' }"
-        @click="activeTab = 'slack'"
-        title="Slack Sessions"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5z"/>
-          <path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
-          <path d="M9.5 14c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5S8 21.33 8 20.5v-5c0-.83.67-1.5 1.5-1.5z"/>
-          <path d="M3.5 14H5v1.5c0 .83-.67 1.5-1.5 1.5S2 16.33 2 15.5 2.67 14 3.5 14z"/>
-          <path d="M14 14.5c0-.83.67-1.5 1.5-1.5h5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-5c-.83 0-1.5-.67-1.5-1.5z"/>
-          <path d="M15.5 19H14v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"/>
-          <path d="M10 9.5C10 8.67 9.33 8 8.5 8h-5C2.67 8 2 8.67 2 9.5S2.67 11 3.5 11h5c.83 0 1.5-.67 1.5-1.5z"/>
-          <path d="M8.5 5H10V3.5C10 2.67 9.33 2 8.5 2S7 2.67 7 3.5 7.67 5 8.5 5z"/>
-        </svg>
-        <span v-if="slackUnreadCount > 0" class="slack-badge">
-          {{ slackUnreadCount > 99 ? '99+' : slackUnreadCount }}
-        </span>
       </button>
       <!-- Tasks tab -->
       <button
@@ -852,23 +733,6 @@ onUnmounted(() => {
   background: var(--bg-tertiary);
 }
 
-.slack-badge {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  background: #ef4444;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  border-radius: 8px;
-  line-height: 16px;
-  text-align: center;
-  box-sizing: border-box;
-  pointer-events: none;
-}
 
 .sidebar-content {
   flex: 1;

@@ -32,26 +32,13 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import {
-  config,
-  getProjectDisplayName,
-  pathToSlug,
-  slugToPath,
-} from '../config.js';
+import { config, getProjectDisplayName, slugToPath } from '../config.js';
 import { logger } from '../lib/logger.js';
 import { loadTitles } from '../lib/session-titles.js';
 import { send } from '../lib/ws.js';
-import { loadSlackConfigRaw } from '../slack/config.js';
 
 export function handler(ws, message) {
-  const slackConfig = loadSlackConfigRaw();
-  const slackSessionSlug =
-    slackConfig.hideSlackSessions && slackConfig.sessionLogPath
-      ? pathToSlug(slackConfig.sessionLogPath)
-      : null;
-  // When slack sessions are hidden, bump the default limit so the visible list
-  // stays full after slack sessions are filtered out client-side
-  const limit = message.limit || (slackSessionSlug ? 200 : 50);
+  const limit = message.limit || 50;
 
   try {
     if (!existsSync(config.projectsDir)) {
@@ -234,10 +221,9 @@ export function handler(ws, message) {
     send(ws, {
       type: 'recent_sessions',
       sessions: limitedSessions,
-      slackSessionSlug,
     });
   } catch (err) {
     logger.error('Failed to load recent sessions:', err.message);
-    send(ws, { type: 'recent_sessions', sessions: [], slackSessionSlug });
+    send(ws, { type: 'recent_sessions', sessions: [] });
   }
 }

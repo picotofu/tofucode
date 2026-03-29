@@ -70,15 +70,6 @@ async function gracefulShutdown(signal) {
       }
     }
 
-    // Stop Slack bot
-    try {
-      const { stopSlackBot } = await import('./slack/bot.js');
-      await stopSlackBot();
-      logger.log('Slack bot stopped');
-    } catch (err) {
-      logger.error('Error stopping Slack bot:', err);
-    }
-
     // Close HTTP server
     if (httpServer) {
       httpServer.close(() => {
@@ -571,17 +562,6 @@ async function onServerReady() {
     } catch (err) {
       logger.error('Error starting Discord bot:', err);
     }
-  }
-
-  // Start Slack bot (config-driven, not env-var-driven)
-  try {
-    const { startSlackBot } = await import('./slack/bot.js');
-    const slackClient = await startSlackBot();
-    if (slackClient) {
-      logger.log('Slack bot started');
-    }
-  } catch (err) {
-    logger.error('Error starting Slack bot:', err);
   }
 }
 

@@ -56,14 +56,6 @@ import { handler as selectProject } from './select-project.js';
 import { handler as selectSession } from './select-session.js';
 import { handler as setSessionTitle } from './set-session-title.js';
 import {
-  handleGetConfig as slackGetConfig,
-  handleListChannels as slackListChannels,
-  handleMarkViewed as slackMarkViewed,
-  handleRestart as slackRestart,
-  handleSaveConfig as slackSaveConfig,
-  handleTestConnection as slackTest,
-} from './slack.js';
-import {
   handleAddComment as tasksAddComment,
   handleCreateTask as tasksCreate,
   handleFetchTask as tasksFetch,
@@ -139,12 +131,6 @@ export const handlers = {
   'queue:get': queueGet,
   'draft:set': draftSet,
   'draft:get': draftGet,
-  'slack:get_config': slackGetConfig,
-  'slack:save_config': slackSaveConfig,
-  'slack:mark_viewed': slackMarkViewed,
-  'slack:test': slackTest,
-  'slack:restart': slackRestart,
-  'slack:list_channels': slackListChannels,
   'notion:get_config': notionGetConfig,
   'notion:save_config': notionSaveConfig,
   'notion:test': notionTest,

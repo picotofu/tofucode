@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Slack Bot Integration** — Removed built-in Slack bot (Socket Mode listener, classifier, dispatcher, Settings UI tab, sidebar tab); use external Slack MCP tools instead
+
 ### Fixed
 - **Notes view: TinyMDE markdown formatting not applied on page refresh** — TinyMDE syntax theme CSS (`.TMH1`, `.TMMark_TMH1`, etc.) was only defined in `ChatView.vue`'s unscoped styles, so it was never loaded when navigating directly to the `/notes` route. Moved the base `@import` and all theme overrides into an unscoped `<style>` block in `FileEditor.vue` so they load with the component regardless of which view uses it
 - **Notes view: footer path visually showing trailing slash** — `direction: rtl` without `unicode-bidi: plaintext` caused the Bidi algorithm to move the leading `/` to appear at the end. Added `unicode-bidi: plaintext` to `.footer-path`
@@ -35,22 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Shared `AssigneeDropdown` component used in both sidebar filter, create-ticket form, and TaskView people field
   - Teleported popover with `getBoundingClientRect` positioning to escape `overflow: hidden` ancestor clipping
   - Workspace users merged with DB-derived assignees; includes `email` for self-identification
-- **Slack Bot Integration** — Baked-in Slack bot that listens to configured channels via Socket Mode and responds as the user's identity using Claude
-  - Two-pass classifier: Haiku (fast/cheap) first, escalates to Sonnet on low confidence or when context is needed
-  - Actions: `ignore`, `acknowledge`, `answer`, `ticket` (creates Notion ticket with Slack thread permalink), `work` (starts a tofucode session in the mapped project)
-  - Confidence gate: low-confidence work actions fall back to ticket creation + waiting for user clarification instead of auto-starting
-  - Notion ticket lifecycle: thread permalink linked on creation, updates on new thread replies, ticket set to In Progress before work starts, PR URL linked on detection
-  - Session visibility: work sessions write JSONL to `~/.claude/projects/<slug>/` — appear naturally in the tofucode Web UI for monitoring
-  - Classifier sessions optionally persisted to a configurable `sessionLogPath` (JSONL, readable in tofucode UI) with auto-generated titles like `[#channel] action: message snippet`
-  - Settings UI: Slack tab with tokens, connectivity pill + Restart Bot button, fuzzy channel picker (public + private), project root path, session log path, identity and classifier prompt override
-  - Channel picker fetches public and private channels via GET (Slack API quirk: POST ignores `types` filter); deduplicates by ID via two separate calls
 - **3-tab homepage** — Homepage now has a bottom tab nav (Sessions, Folders, Files) with Heroicons; Sessions tab shows recent sessions and recent projects; Folders tab is a directory-only browser for launching sessions; Files tab is a standalone file browser defaulting to the home directory
 - **Independent file browser** — Files tab on homepage provides a full-featured file browser (browse, search, open, edit, create, rename, delete) outside of any session, defaulting to the home directory and persisting the last visited path in localStorage
 - **Traversal root guard** — File browser enforces a topmost browsable path (`--root` config if set, otherwise `homedir()`); breadcrumb segments above the root are shown as muted static text; up button and path edit are clamped to this boundary; session files tab defaults to the project path but allows traversal up to the root; homepage files tab defaults to the root itself
 - **Server `homePath` in connected message** — Server includes `homePath` (root config path or `homedir()`) in the `connected` WebSocket message; clients use this to set the traversal root without a separate request
 
 ### Changed
-- **Slack classifier: ticket-first model** — Dropped `work` action; classifier now always creates a Notion ticket first with a rich body, then starts a work session if warranted; ticket footer is a borderless box layout
 - **Files toolbar moved into FilesPanel** — Dotfiles toggle, New File, New Folder, and MD Mode buttons are now part of the `FilesPanel` component rather than injected via slot, eliminating duplicate rendering when the component is reused
 - **Breadcrumb path edit UX** — Tapping the path bar no longer opens edit mode; a pencil icon button toggles edit mode; a check button submits; Escape cancels; edit is clamped to root
 - **Mobile toolbar layout** — On mobile (≤639px) the toolbar buttons wrap to their own row above the path bar, right-aligned
@@ -61,12 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings modal mobile layout** — now renders full-screen on mobile instead of a floating card
 - **`isDesktop` not reactive** — sidebar initial state now uses `window.matchMedia` with a resize listener; switching to mobile auto-closes the sidebar
 - **File download race condition** — concurrent file downloads no longer collide; tracking moved from a single ref to a `Map`
-- **Slack DM threading** — all bot replies within a channel conversation now anchor to the first message, maintaining proper thread context
 - **Assignee dropdown adblocker fix** — renamed CSS class prefix from `ad-` to `asgn-` to prevent adblockers from hiding the dropdown element
-- **Slack settings save** — blocks save with an alert if Slack is enabled but bot token is empty
 - **Notion field mapping overwrite** — "Analyse Structure" now prompts for confirmation before replacing existing manual mappings
 - **`isUpdatingFromProps` timing** — replaced fragile `setTimeout(0)` with `nextTick` in SettingsModal
-- **Silent `~/.claude.json` parse failure** — Slack MCP token fallback now logs a warning instead of swallowing the error
 - Files tab on homepage was starting at filesystem root instead of home directory — server-side null path now defaults to `homedir()` before validation
 - Traversal guard lost after session change — `resetState()` now restores `filesRootPath` to `homePath` instead of clearing it
 - Muted breadcrumb segments were still receiving hover highlight — fixed with `pointer-events: none`

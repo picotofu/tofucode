@@ -29,9 +29,13 @@
 | Shortcut | Action | Notes |
 |----------|--------|-------|
 | `Ctrl/Cmd+K` | Open session selector | ✅ Already implemented |
-| `Ctrl/Cmd+1` | Switch to Chat mode | Auto-focus chat input |
-| `Ctrl/Cmd+2` | Switch to Terminal mode | Auto-focus terminal input |
-| `Ctrl/Cmd+3` | Switch to Files mode | Auto-focus search input |
+| `Ctrl/Cmd+1` | Sidebar: Sessions tab | — |
+| `Ctrl/Cmd+2` | Sidebar: Projects tab | — |
+| `Ctrl/Cmd+3` | Sidebar: Tasks tab | — |
+| `Ctrl/Cmd+4` | Sidebar: Notes tab | — |
+| `Ctrl/Cmd+5` | Switch to Chat mode | Auto-focus chat input |
+| `Ctrl/Cmd+6` | Switch to Terminal mode | Auto-focus terminal input |
+| `Ctrl/Cmd+7` | Switch to Files mode | Auto-focus search input |
 | `Ctrl/Cmd+↑` | Navigate to previous turn | Chat mode only |
 | `Ctrl/Cmd+↓` | Navigate to next turn | Chat mode only |
 | `Escape` | Close modals / Blur input | Extend existing behavior |
@@ -73,9 +77,9 @@ function handleKeydown(e) {
     return;
   }
 
-  // Mode switching: Ctrl/Cmd+1/2/3
+  // Mode switching: Ctrl/Cmd+5/6/7
   if (e.ctrlKey || e.metaKey) {
-    if (e.key === '1') {
+    if (e.key === '5') {
       e.preventDefault();
       currentMode.value = 'chat';
       nextTick(() => {
@@ -84,13 +88,13 @@ function handleKeydown(e) {
       });
       return;
     }
-    if (e.key === '2') {
+    if (e.key === '6') {
       e.preventDefault();
       currentMode.value = 'terminal';
       nextTick(() => terminalInputRef.value?.focus());
       return;
     }
-    if (e.key === '3') {
+    if (e.key === '7') {
       e.preventDefault();
       currentMode.value = 'files';
       nextTick(() => {
@@ -237,9 +241,13 @@ Attach to terminal input:
 
 **Global (All Modes):**
 - `Ctrl/Cmd+K` - Open session selector ✅ (already implemented)
-- `Ctrl/Cmd+1` - Switch to Chat mode + auto-focus
-- `Ctrl/Cmd+2` - Switch to Terminal mode + auto-focus
-- `Ctrl/Cmd+3` - Switch to Files mode + auto-focus
+- `Ctrl/Cmd+1` - Sidebar: Sessions tab
+- `Ctrl/Cmd+2` - Sidebar: Projects tab
+- `Ctrl/Cmd+3` - Sidebar: Tasks tab
+- `Ctrl/Cmd+4` - Sidebar: Notes tab
+- `Ctrl/Cmd+5` - Switch to Chat mode + auto-focus
+- `Ctrl/Cmd+6` - Switch to Terminal mode + auto-focus
+- `Ctrl/Cmd+7` - Switch to Files mode + auto-focus
 - `Ctrl/Cmd+↑` - Navigate to previous conversation turn (chat mode)
 - `Ctrl/Cmd+↓` - Navigate to next conversation turn (chat mode)
 - `Escape` - Close modals / Blur input

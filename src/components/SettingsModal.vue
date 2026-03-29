@@ -26,26 +26,6 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  slackEnabled: {
-    type: Boolean,
-    default: false,
-  },
-  slackConfig: {
-    type: Object,
-    default: null,
-  },
-  slackTestResult: {
-    type: Object,
-    default: null,
-  },
-  slackBotConnected: {
-    type: Boolean,
-    default: false,
-  },
-  slackChannels: {
-    type: Array,
-    default: () => [],
-  },
   notionConfig: {
     type: Object,
     default: null,
@@ -79,11 +59,6 @@ const emit = defineEmits([
   'update',
   'restart',
   'fetch-usage',
-  'slack-fetch-config',
-  'slack-save-config',
-  'slack-test',
-  'slack-restart',
-  'slack-list-channels',
   'notion-fetch-config',
   'notion-save-config',
   'notion-test',
@@ -184,70 +159,9 @@ function onViewportResize() {
 
 window.addEventListener('resize', onViewportResize);
 
-// --- Slack Settings ---
-const SLACK_DEFAULTS = {
-  enabled: false,
-  botToken: '',
-  appToken: '',
-  projectRootPath: '',
-  sessionLogPath: '',
-  hideSlackSessions: false,
-  respondDm: true,
-  debounceMs: 10000,
-  watchedChannels: [],
-  identity: { name: '', role: '', tone: 'concise, professional' },
-  classifier: {
-    systemPrompt: '',
-  },
-};
-
-const slackLocal = ref(null);
-const slackSaving = ref(false);
-const slackTesting = ref(false);
-const slackRestarting = ref(false);
-const slackLoading = ref(false);
-
-// Sync incoming config from server into local state
-watch(
-  () => props.slackConfig,
-  (cfg) => {
-    slackLoading.value = false;
-    if (!slackSaving.value) {
-      // Merge server config over defaults so all fields are always present
-      slackLocal.value = {
-        ...SLACK_DEFAULTS,
-        ...(cfg || {}),
-        identity: { ...SLACK_DEFAULTS.identity, ...(cfg?.identity || {}) },
-        classifier: {
-          ...SLACK_DEFAULTS.classifier,
-          ...(cfg?.classifier || {}),
-        },
-      };
-    }
-  },
-  { deep: true },
-);
-
-// Watch test results to reset testing state
-watch(
-  () => props.slackTestResult,
-  () => {
-    slackTesting.value = false;
-  },
-);
-
-// Fetch Slack config when switching to Slack tab; close folder browser when leaving notes tab
+// Close folder browser when leaving notes tab
 watch(activeTab, (tab) => {
   if (tab !== 'notes') closeFolderBrowser();
-  if (tab === 'slack') {
-    // Seed with defaults immediately so the form renders right away
-    if (!slackLocal.value) {
-      slackLocal.value = structuredClone(SLACK_DEFAULTS);
-    }
-    slackLoading.value = true;
-    emit('slack-fetch-config');
-    emit('slack-list-channels');
-  }
   if (tab === 'notion') {
     if (!notionLocal.value) {
       notionLocal.value = structuredClone(NOTION_DEFAULTS);
@@ -256,81 +170,6 @@ watch(activeTab, (tab) => {
     emit('notion-fetch-config');
   }
 });
-
-function slackSave() {
-  if (!slackLocal.value) return;
-  if (slackLocal.value.enabled && !slackLocal.value.botToken?.trim()) {
-    alert('Bot token is required when Slack is enabled.');
-    return;
-  }
-  slackSaving.value = true;
-  emit('slack-save-config', slackLocal.value);
-  setTimeout(() => {
-    slackSaving.value = false;
-  }, 1000);
-}
-
-function slackTest() {
-  slackTesting.value = true;
-  emit('slack-test');
-}
-
-function slackRestartBot() {
-  slackRestarting.value = true;
-  emit('slack-restart');
-  setTimeout(() => {
-    slackRestarting.value = false;
-  }, 3000);
-}
-
-// --- Channel fuzzy search picker ---
-const channelSearch = ref('');
-const channelPickerOpen = ref(false);
-
-const filteredChannels = computed(() => {
-  const q = channelSearch.value.trim().toLowerCase();
-  const all = props.slackChannels;
-  const watchedIds = new Set(
-    (slackLocal.value?.watchedChannels || []).map((c) => c.id),
-  );
-  const available = all.filter((c) => !watchedIds.has(c.id));
-  if (!q) return available.slice(0, 50);
-  return available
-    .filter(
-      (c) => c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q),
-    )
-    .slice(0, 50);
-});
-
-function openChannelPicker() {
-  channelSearch.value = '';
-  channelPickerOpen.value = true;
-  // Only fetch if we don't have channels yet; tab open already triggers a fetch
-  if (!props.slackChannels.length) {
-    emit('slack-list-channels');
-  }
-}
-
-function closeChannelPicker() {
-  channelPickerOpen.value = false;
-  channelSearch.value = '';
-}
-
-function selectChannel(channel) {
-  if (!slackLocal.value) return;
-  if (!slackLocal.value.watchedChannels) slackLocal.value.watchedChannels = [];
-  slackLocal.value.watchedChannels.push({
-    id: channel.id,
-    name: channel.name,
-    respondMode: 'auto',
-  });
-  closeChannelPicker();
-}
-
-function removeWatchedChannel(index) {
-  if (!slackLocal.value?.watchedChannels) return;
-  slackLocal.value.watchedChannels.splice(index, 1);
-}
 
 // ── Notes include paths ─────────────────────────────────────────────────────
 
@@ -449,18 +288,6 @@ const unsubFolderBrowserFn = wsOnMessage((msg) => {
     fb.error = msg.error || 'Could not open folder';
   }
 });
-
-// Helper: look up channel name from fetched list (fallback to stored name)
-function resolveChannelName(ch) {
-  const found = props.slackChannels.find((c) => c.id === ch.id);
-  return found?.name || ch.name || ch.id;
-}
-
-// Helper: look up whether channel is private from fetched list
-function resolveChannelPrivate(ch) {
-  const found = props.slackChannels.find((c) => c.id === ch.id);
-  return found?.is_private ?? ch.is_private ?? false;
-}
 
 // --- Notion Settings ---
 const NOTION_DEFAULTS = {
@@ -686,11 +513,10 @@ const shortcuts = [
       { keys: ['⌘/^', 'K'], description: 'Open command palette' },
       { keys: ['⌘/^', 'P'], description: 'Open file picker' },
       { keys: ['⌘/^', 'B'], description: 'Toggle sidebar' },
-      { keys: ['⌘/^', '6'], description: 'Sidebar: Sessions tab' },
-      { keys: ['⌘/^', '7'], description: 'Sidebar: Projects tab' },
-      { keys: ['⌘/^', '8'], description: 'Sidebar: Slack tab' },
-      { keys: ['⌘/^', '9'], description: 'Sidebar: Tasks tab' },
-      { keys: ['⌘/^', '0'], description: 'Sidebar: Notes tab' },
+      { keys: ['⌘/^', '1'], description: 'Sidebar: Sessions tab' },
+      { keys: ['⌘/^', '2'], description: 'Sidebar: Projects tab' },
+      { keys: ['⌘/^', '3'], description: 'Sidebar: Tasks tab' },
+      { keys: ['⌘/^', '4'], description: 'Sidebar: Notes tab' },
       { keys: ['⌘/^', ','], description: 'Open settings' },
       { keys: ['⌘/^', '/'], description: 'Show keyboard shortcuts' },
     ],
@@ -698,9 +524,9 @@ const shortcuts = [
   {
     category: 'Chat View',
     items: [
-      { keys: ['⌘/^', '1'], description: 'Switch to Chat tab' },
-      { keys: ['⌘/^', '2'], description: 'Switch to Terminal tab' },
-      { keys: ['⌘/^', '3'], description: 'Switch to Files tab' },
+      { keys: ['⌘/^', '5'], description: 'Switch to Chat tab' },
+      { keys: ['⌘/^', '6'], description: 'Switch to Terminal tab' },
+      { keys: ['⌘/^', '7'], description: 'Switch to Files tab' },
       { keys: ['⌘/^', 'M'], description: 'Toggle memo' },
       { keys: ['⌘/^', 'N'], description: 'New session from current project' },
       { keys: ['⌘/^', 'J'], description: 'Jump to next session' },
@@ -852,12 +678,6 @@ async function handleClearCacheAndUpdate() {
           :class="{ active: activeTab === 'notion' }"
           @click="activeTab = 'notion'"
         >Notion</button>
-        <button
-          v-if="slackEnabled"
-          class="tab-btn"
-          :class="{ active: activeTab === 'slack' }"
-          @click="activeTab = 'slack'"
-        >Slack<span v-if="slackBotConnected" class="tab-status-dot" /></button>
         <button
           class="tab-btn"
           :class="{ active: activeTab === 'mcp' }"
@@ -1066,378 +886,9 @@ async function handleClearCacheAndUpdate() {
         </div>
         </template>
 
-        <!-- Slack Tab -->
-        <template v-if="activeTab === 'slack'">
-          <div v-if="slackLoading && !slackLocal" class="slack-loading">
-            <div class="pill-spinner" />
-            <span>Loading...</span>
-          </div>
-          <template v-else-if="slackLocal">
-          <!-- Enable Toggle -->
-          <div class="setting-item">
-            <label class="setting-label">
-              <input
-                type="checkbox"
-                v-model="slackLocal.enabled"
-                class="setting-checkbox"
-              />
-              <span class="setting-title">Enable Slack Bot</span>
-            </label>
-            <p class="setting-description">
-              Listen and respond to messages in watched channels and @mentions
-            </p>
-            <div class="slack-status-row">
-              <div class="connection-pill" :class="{ connected: slackBotConnected }">
-                <svg v-if="slackBotConnected" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-                <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-                <span>{{ slackBotConnected ? 'Socket Connected' : 'Socket Disconnected' }}</span>
-              </div>
-              <button class="restart-btn" @click="slackRestartBot" :disabled="slackRestarting">
-                <svg v-if="!slackRestarting" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M23 4v6h-6"/>
-                  <path d="M1 20v-6h6"/>
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                </svg>
-                <svg v-else width="14" height="14" viewBox="0 0 24 24" class="spin">
-                  <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
-                </svg>
-                <span>{{ slackRestarting ? 'Restarting...' : 'Restart Bot' }}</span>
-              </button>
-            </div>
-          </div>
-
-          <hr class="divider" />
-
-          <!-- Tokens -->
-          <div class="section-heading">Tokens</div>
-
-          <div class="setting-item">
-            <div class="setting-header">
-              <span class="setting-title">Bot Token (xoxp-)</span>
-            </div>
-            <p class="setting-description">
-              User OAuth Token from your Slack App. Posts as your identity.
-            </p>
-            <input
-              type="text"
-              v-model="slackLocal.botToken"
-              class="setting-input"
-              placeholder="xoxp-..."
-              autocomplete="off"
-            />
-            <div class="notion-actions">
-              <button class="restart-btn" @click="slackTest" :disabled="slackTesting || !slackLocal.botToken">
-                <svg v-if="!slackTesting" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                  <polyline points="22 4 12 14.01 9 11.01"/>
-                </svg>
-                <svg v-else width="14" height="14" viewBox="0 0 24 24" class="spin">
-                  <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
-                </svg>
-                <span>{{ slackTesting ? 'Testing...' : 'Test Connection' }}</span>
-              </button>
-            </div>
-            <div v-if="slackTestResult" class="slack-test-result" :class="{ success: slackTestResult.success, error: !slackTestResult.success }">
-              <template v-if="slackTestResult.success">
-                Connected as <strong>{{ slackTestResult.user }}</strong> ({{ slackTestResult.team }})
-              </template>
-              <template v-else>
-                {{ slackTestResult.error }}
-              </template>
-            </div>
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-header">
-              <span class="setting-title">App Token (xapp-)</span>
-            </div>
-            <p class="setting-description">
-              App-Level Token with <code>connections:write</code> scope for Socket Mode.
-            </p>
-            <input
-              type="text"
-              v-model="slackLocal.appToken"
-              class="setting-input"
-              placeholder="xapp-..."
-              autocomplete="off"
-            />
-          </div>
-
-          <hr class="divider" />
-
-          <!-- Project Root Path -->
-          <div class="setting-item">
-            <div class="setting-header">
-              <span class="setting-title">Project Root Path</span>
-            </div>
-            <p class="setting-description">
-              Root directory containing your projects. The classifier will identify the correct project from this list when work is needed.
-            </p>
-            <input
-              type="text"
-              v-model="slackLocal.projectRootPath"
-              class="setting-input"
-              placeholder="/home/user/projects"
-            />
-          </div>
-
-          <!-- Session Log Path -->
-          <div class="setting-item">
-            <div class="setting-header">
-              <span class="setting-title">Session Log Path <span class="optional-tag">optional</span></span>
-            </div>
-            <p class="setting-description">
-              Folder to persist Claude Code session logs from work triggers. Each session is saved as <code>{sessionId}.log</code>. Leave empty to disable.
-            </p>
-            <input
-              type="text"
-              v-model="slackLocal.sessionLogPath"
-              class="setting-input"
-              placeholder="/home/user/slack-sessions"
-            />
-          </div>
-
-          <!-- Hide Slack Sessions -->
-          <div class="setting-item">
-            <label class="setting-label">
-              <input
-                type="checkbox"
-                v-model="slackLocal.hideSlackSessions"
-                class="setting-checkbox"
-                :disabled="!slackLocal.sessionLogPath"
-              />
-              <span class="setting-title" :class="{ 'text-muted': !slackLocal.sessionLogPath }">Hide Slack Sessions from Sidebar</span>
-            </label>
-            <p class="setting-description">
-              Hide Slack classifier sessions from the main Sessions tab and homepage. When enabled, they appear in a dedicated <strong>Slack</strong> tab in the sidebar. Requires Session Log Path to be set.
-            </p>
-          </div>
-
-          <hr class="divider" />
-
-          <!-- Watched Channels -->
-          <div class="section-heading">Watched Channels</div>
-
-          <!-- Respond to DMs -->
-          <div class="setting-item">
-            <label class="setting-label">
-              <input
-                type="checkbox"
-                v-model="slackLocal.respondDm"
-                class="setting-checkbox"
-              />
-              <span class="setting-title">Respond to Direct Messages</span>
-            </label>
-            <p class="setting-description">
-              Classify and respond to DMs sent directly to you
-            </p>
-          </div>
-
-          <!-- Debounce Window -->
-          <div class="setting-item">
-            <div class="setting-label">
-              <span class="setting-title">Debounce Window (ms)</span>
-            </div>
-            <input
-              type="number"
-              v-model.number="slackLocal.debounceMs"
-              min="1000"
-              max="60000"
-              step="1000"
-              class="setting-input"
-            />
-            <p class="setting-description">
-              How long to wait after the last message before processing. Groups rapid successive messages into one. Default: 10000ms (10s)
-            </p>
-          </div>
-
-          <div
-            v-for="(ch, i) in slackLocal.watchedChannels"
-            :key="ch.id || i"
-            class="channel-row"
-          >
-            <div class="channel-fields channel-fields-watched">
-              <div class="channel-name-cell">
-                <span class="channel-privacy-icon">
-                  <svg v-if="resolveChannelPrivate(ch)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                  <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                    <line x1="4" y1="9" x2="20" y2="9"/>
-                    <line x1="4" y1="15" x2="20" y2="15"/>
-                    <line x1="10" y1="3" x2="8" y2="21"/>
-                    <line x1="16" y1="3" x2="14" y2="21"/>
-                  </svg>
-                </span>
-                <span class="channel-name-text">{{ resolveChannelName(ch) }}</span>
-              </div>
-              <select v-model="ch.respondMode" class="setting-select">
-                <option value="auto">Auto</option>
-                <option value="mention-only">Mention Only</option>
-              </select>
-            </div>
-            <button class="remove-btn" @click="removeWatchedChannel(i)" title="Remove channel">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-
-          <button class="add-channel-btn" @click="openChannelPicker">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Add Channel
-          </button>
-
-          <!-- Channel Fuzzy Picker -->
-          <div v-if="channelPickerOpen" class="channel-picker-overlay" @click.self="closeChannelPicker">
-            <div class="channel-picker">
-              <div class="channel-picker-header">
-                <input
-                  ref="channelSearchInput"
-                  v-model="channelSearch"
-                  class="channel-picker-search"
-                  placeholder="Search channels..."
-                  autofocus
-                />
-                <button class="remove-btn" @click="closeChannelPicker" title="Close">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </div>
-              <div class="channel-picker-list">
-                <div v-if="!props.slackChannels.length" class="channel-picker-empty">
-                  No channels loaded. Check your Bot Token.
-                </div>
-                <div v-else-if="!filteredChannels.length" class="channel-picker-empty">
-                  No matching channels.
-                </div>
-                <button
-                  v-for="ch in filteredChannels"
-                  :key="ch.id"
-                  class="channel-picker-item"
-                  @click="selectChannel(ch)"
-                >
-                  <span class="channel-privacy-icon">
-                    <svg v-if="ch.is_private" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                    </svg>
-                    <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                      <line x1="4" y1="9" x2="20" y2="9"/>
-                      <line x1="4" y1="15" x2="20" y2="15"/>
-                      <line x1="10" y1="3" x2="8" y2="21"/>
-                      <line x1="16" y1="3" x2="14" y2="21"/>
-                    </svg>
-                  </span>
-                  <span class="channel-picker-name">{{ ch.name }}</span>
-                  <span class="channel-id-badge">{{ ch.id }}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <hr class="divider" />
-
-          <!-- Identity -->
-          <div class="section-heading">Identity</div>
-
-          <div class="setting-item">
-            <div class="setting-header">
-              <span class="setting-title">Name</span>
-            </div>
-            <input
-              type="text"
-              v-model="slackLocal.identity.name"
-              class="setting-input"
-              placeholder="Your name (e.g. Jane)"
-            />
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-header">
-              <span class="setting-title">Role</span>
-            </div>
-            <input
-              type="text"
-              v-model="slackLocal.identity.role"
-              class="setting-input"
-              placeholder="Your role (e.g. Senior Backend Engineer)"
-            />
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-header">
-              <span class="setting-title">Tone</span>
-            </div>
-            <input
-              type="text"
-              v-model="slackLocal.identity.tone"
-              class="setting-input"
-              placeholder="Response tone (e.g. concise, professional)"
-            />
-          </div>
-
-          <hr class="divider" />
-
-          <!-- Classifier -->
-          <div class="section-heading">Classifier</div>
-
-          <div class="setting-item">
-            <div class="setting-header">
-              <span class="setting-title">System Prompt Override</span>
-            </div>
-            <p class="setting-description">
-              Custom system prompt for the message classifier. Leave empty to use the default.
-            </p>
-            <textarea
-              v-model="slackLocal.classifier.systemPrompt"
-              class="setting-textarea"
-              rows="4"
-              placeholder="Optional: override the default classification prompt..."
-            />
-          </div>
-
-          <p class="setting-description" style="margin: 0 0 8px;">
-            Configure Notion in the <strong>Notion</strong> tab for task management (optional).
-          </p>
-
-          <hr class="divider" />
-
-          <!-- Actions -->
-          <div class="section-heading">Actions</div>
-
-          <div class="slack-actions">
-            <button class="restart-btn" @click="slackSave" :disabled="slackSaving">
-              <svg v-if="!slackSaving" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                <polyline points="17 21 17 13 7 13 7 21"/>
-                <polyline points="7 3 7 8 15 8"/>
-              </svg>
-              <svg v-else width="14" height="14" viewBox="0 0 24 24" class="spin">
-                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
-              </svg>
-              <span>{{ slackSaving ? 'Saving...' : 'Save Config' }}</span>
-            </button>
-          </div>
-
-          </template><!-- end v-else-if="slackLocal" -->
-        </template><!-- end Slack Tab -->
-
         <!-- Notion Tab -->
         <template v-if="activeTab === 'notion'">
-          <div v-if="notionLoading && !notionLocal" class="slack-loading">
+          <div v-if="notionLoading && !notionLocal" class="integration-loading">
             <div class="pill-spinner" />
             <span>Loading...</span>
           </div>
@@ -1454,7 +905,7 @@ async function handleClearCacheAndUpdate() {
               <span class="setting-title">Enable Notion Integration</span>
             </label>
             <p class="setting-description">
-              When enabled, the Slack bot will create tickets in your Notion database.
+              When enabled, tickets can be created in your Notion database from tofucode.
             </p>
           </div>
 
@@ -1490,7 +941,7 @@ async function handleClearCacheAndUpdate() {
                 <span>{{ notionTesting ? 'Testing...' : 'Test Connection' }}</span>
               </button>
             </div>
-            <div v-if="notionTestDisplay" class="slack-test-result" :class="{ success: notionTestDisplay.success, error: !notionTestDisplay.success }">
+            <div v-if="notionTestDisplay" class="integration-test-result" :class="{ success: notionTestDisplay.success, error: !notionTestDisplay.success }">
               {{ notionTestDisplay.success ? notionTestDisplay.message : notionTestDisplay.error }}
             </div>
           </div>
@@ -1524,10 +975,10 @@ async function handleClearCacheAndUpdate() {
                 <span>{{ notionAnalysing ? 'Analysing...' : 'Analyse Structure' }}</span>
               </button>
             </div>
-            <div v-if="notionAnalyseDisplay && !notionAnalyseDisplay.success" class="slack-test-result error">
+            <div v-if="notionAnalyseDisplay && !notionAnalyseDisplay.success" class="integration-test-result error">
               {{ notionAnalyseDisplay.error }}
             </div>
-            <div v-if="notionAnalyseDisplay?.success" class="slack-test-result success">
+            <div v-if="notionAnalyseDisplay?.success" class="integration-test-result success">
               {{ notionAnalyseDisplay.fields?.length }} fields detected — mappings populated below.
             </div>
           </div>
@@ -1543,19 +994,19 @@ async function handleClearCacheAndUpdate() {
             <div
               v-for="(mapping, i) in notionLocal.fieldMappings"
               :key="i"
-              class="channel-row"
+              class="mapping-row"
             >
-              <div class="channel-fields mapping-fields">
+              <div class="mapping-fields">
                 <input
                   type="text"
                   v-model="mapping.field"
-                  class="setting-input channel-input"
+                  class="setting-input mapping-input"
                   placeholder="Field name"
                 />
                 <input
                   type="text"
                   v-model="mapping.purpose"
-                  class="setting-input channel-input"
+                  class="setting-input mapping-input"
                   placeholder="How to fill this field"
                 />
               </div>
@@ -1566,7 +1017,7 @@ async function handleClearCacheAndUpdate() {
                 </svg>
               </button>
             </div>
-            <button class="add-channel-btn" @click="addNotionFieldMapping">
+            <button class="add-mapping-btn" @click="addNotionFieldMapping">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
@@ -1580,7 +1031,7 @@ async function handleClearCacheAndUpdate() {
           <!-- Actions -->
           <div class="section-heading">Actions</div>
 
-          <div class="slack-actions">
+          <div class="integration-actions">
             <button class="restart-btn" @click="notionSave" :disabled="notionSaving">
               <svg v-if="!notionSaving" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -2195,8 +1646,7 @@ async function handleClearCacheAndUpdate() {
   }
 }
 
-/* Slack tab styles */
-.slack-loading {
+.integration-loading {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2205,174 +1655,20 @@ async function handleClearCacheAndUpdate() {
   font-size: 13px;
 }
 
-.channel-row {
+.mapping-row {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
 }
 
-.channel-fields {
+.mapping-fields {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 2fr;
   gap: 6px;
 }
 
-.channel-fields-watched {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.channel-name-cell {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  height: 34px;
-  box-sizing: border-box;
-  background: var(--bg-secondary);
-  border: 1.5px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 0 10px;
-  font-size: 13px;
-}
-
-.channel-privacy-icon {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  color: var(--text-muted);
-  width: 12px;
-}
-
-.channel-name-text {
-  font-weight: 500;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.channel-id-badge {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-muted);
-  background: var(--bg-tertiary);
-  border-radius: 3px;
-  padding: 1px 5px;
-  flex-shrink: 0;
-}
-
-.channel-fields-watched .setting-select {
-  width: 130px;
-  height: 34px;
-  box-sizing: border-box;
-  flex-shrink: 0;
-}
-
-.channel-row .remove-btn {
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  flex-shrink: 0;
-}
-
-.channel-input {
-  margin-top: 0 !important;
-  font-size: 12px !important;
-  padding: 8px !important;
-}
-
-/* Channel fuzzy picker */
-.channel-picker-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 20000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
-}
-
-.channel-picker {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  width: 380px;
-  max-height: 420px;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  overflow: hidden;
-}
-
-.channel-picker-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.channel-picker-search {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  font-size: 13px;
-  color: var(--text-primary);
-  font-family: inherit;
-}
-
-.channel-picker-search::placeholder {
-  color: var(--text-muted);
-}
-
-.channel-picker-list {
-  overflow-y: auto;
-  flex: 1;
-}
-
-.channel-picker-empty {
-  padding: 20px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.channel-picker-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 9px 14px;
-  background: transparent;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.1s ease;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-family: inherit;
-}
-
-.channel-picker-item:hover {
-  background: var(--bg-secondary);
-}
-
-.channel-picker-name {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: 500;
-}
 
 .setting-select {
   width: 100%;
@@ -2585,7 +1881,7 @@ async function handleClearCacheAndUpdate() {
   color: #ef4444;
 }
 
-.add-channel-btn {
+.add-mapping-btn {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2602,7 +1898,7 @@ async function handleClearCacheAndUpdate() {
   justify-content: center;
 }
 
-.add-channel-btn:hover {
+.add-mapping-btn:hover {
   color: var(--text-primary);
   border-color: var(--text-muted);
   background: var(--bg-secondary);
@@ -2615,61 +1911,33 @@ async function handleClearCacheAndUpdate() {
   margin-top: 10px;
 }
 
-.mapping-fields {
-  grid-template-columns: 1fr 2fr !important;
-}
 
-.slack-actions {
+.integration-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
 }
 
-.slack-test-result {
+.integration-test-result {
   margin-top: 12px;
   padding: 8px 12px;
   font-size: 12px;
   border-radius: var(--radius-sm);
 }
 
-.slack-test-result.success {
+.integration-test-result.success {
   background: rgba(34, 197, 94, 0.1);
   border: 1px solid rgba(34, 197, 94, 0.3);
   color: rgb(34, 197, 94);
 }
 
-.slack-test-result.error {
+.integration-test-result.error {
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
   color: rgb(239, 68, 68);
 }
 
-.tab-status-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgb(34, 197, 94);
-  margin-left: 5px;
-  vertical-align: middle;
-  margin-bottom: 1px;
-}
-
-.slack-status-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.slack-status-row .connection-pill {
-  display: inline-flex;
-}
-
-.slack-status-row .restart-btn {
-  margin-top: 0;
-}
 
 .optional-tag {
   font-size: 10px;

@@ -29,7 +29,7 @@ Sidebar (new "Notes" tab)          Main View (new /notes route)
 - Both use global WS (`useWebSocket`) — no new server events needed
 - `notesBasePath` setting gates the entire feature (empty = disabled)
 - Sidebar active tab persisted in localStorage (survives page refresh)
-- Keyboard shortcuts shifted: Cmd+6=sessions, Cmd+7=projects, Cmd+8=slack, Cmd+9=tasks, Cmd+0=notes
+- Keyboard shortcuts: Cmd+1=sessions, Cmd+2=projects, Cmd+3=tasks, Cmd+4=notes; Cmd+5=chat, Cmd+6=terminal, Cmd+7=files
 
 ## Files to Modify
 
@@ -150,7 +150,7 @@ Main view for the `/notes` route.
 **`src/components/Sidebar.vue`:**
 - Import `NotesPanel`
 - Add `'notes'` to activeTab type
-- Shift `TAB_KEYS`: `6=sessions, 7=projects, 8=slack, 9=tasks, 0=notes`
+- `TAB_KEYS`: `1=sessions, 2=projects, 3=tasks, 4=notes`
 - Add tab button after tasks tab: notebook/pen SVG icon, title "Notes"
 - Add `sidebar-content-notes` class (pass-through flex, same as `sidebar-content-tasks`)
 - Add content block: `<NotesPanel v-else-if="activeTab === 'notes'" @open-settings="..." />`

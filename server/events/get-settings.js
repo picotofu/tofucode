@@ -9,7 +9,6 @@ export async function handler(ws) {
     settings,
     // Server capability flags — not user-editable, inform the frontend what's available
     discordEnabled: process.env.DISCORD_ENABLED === 'true',
-    slackEnabled: true, // Always true — Slack is UI-configured, not env-var gated
     maxFileSizeMb: config.maxFileSizeMb,
   });
 }

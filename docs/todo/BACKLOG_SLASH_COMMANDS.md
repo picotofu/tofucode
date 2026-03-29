@@ -63,7 +63,6 @@ Native Claude Code CLI has 53+ built-in slash commands that provide quick access
 ### Integrations (4 commands)
 - `/ide [open]` - Manage IDE integrations
 - `/install-github-app` - Setup GitHub Actions
-- `/install-slack-app` - Install Slack app
 - `/remote-env` - Configure remote environment
 
 ### Help & Discovery (4 commands)
@@ -157,7 +156,6 @@ Native Claude Code CLI has 53+ built-in slash commands that provide quick access
 #### Integrations & Account
 - `/ide` - Not applicable (web-only)
 - `/install-github-app` - External to web UI
-- `/install-slack-app` - External to web UI
 - `/remote-env` - Not applicable (runs on local server)
 - `/mobile` - External to web UI
 - `/logout` - Use Logout button instead
@@ -253,7 +251,7 @@ export function handler(ws, message, context) {
 **Option A: Autocomplete Dropdown**
 - Show `/` commands in autocomplete as user types
 - Arrow keys to navigate, Enter to select
-- Similar to Discord, Slack command UX
+- Similar to Discord command UX
 
 **Option B: Command Palette**
 - Keyboard shortcut (Cmd/Ctrl+K) opens command palette

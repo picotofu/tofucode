@@ -59,16 +59,9 @@ const settings = ref({
 
 // Server capability flags (not user settings — set by server environment)
 const discordEnabled = ref(false);
-const slackEnabled = ref(false);
 const maxFileSizeMb = ref(10);
 
-// Slack config state (separate from general settings)
-const slackConfig = ref(null);
-const slackTestResult = ref(null);
-const slackBotConnected = ref(false);
-const slackChannels = ref([]);
-
-// Notion config state (independent of Slack)
+// Notion config state
 const notionConfig = ref(null);
 const notionTestResult = ref(null);
 const notionAnalyseResult = ref(null);
@@ -127,28 +120,6 @@ function handleRestart() {
   send({ type: 'restart' });
 }
 
-// Slack event handlers
-function fetchSlackConfig() {
-  send({ type: 'slack:get_config' });
-}
-
-function saveSlackConfig(config) {
-  send({ type: 'slack:save_config', config });
-}
-
-function testSlackConnection() {
-  slackTestResult.value = null;
-  send({ type: 'slack:test' });
-}
-
-function restartSlackBot() {
-  send({ type: 'slack:restart' });
-}
-
-function fetchSlackChannels() {
-  send({ type: 'slack:list_channels' });
-}
-
 // Notion event handlers
 function fetchNotionConfig() {
   send({ type: 'notion:get_config' });
@@ -175,24 +146,9 @@ onMessage((msg) => {
     if (msg.discordEnabled !== undefined) {
       discordEnabled.value = msg.discordEnabled;
     }
-    if (msg.slackEnabled !== undefined) {
-      slackEnabled.value = msg.slackEnabled;
-    }
     if (msg.maxFileSizeMb !== undefined) {
       maxFileSizeMb.value = msg.maxFileSizeMb;
     }
-  } else if (msg.type === 'slack:config') {
-    slackConfig.value = msg.config;
-  } else if (msg.type === 'slack:status') {
-    slackBotConnected.value = msg.connected;
-  } else if (msg.type === 'slack:test_result') {
-    slackTestResult.value = msg;
-  } else if (msg.type === 'slack:channels') {
-    slackChannels.value = msg.channels || [];
-  } else if (msg.type === 'slack:save_result') {
-    // Save acknowledged — config will follow as separate slack:config message
-  } else if (msg.type === 'slack:restart_result') {
-    // Restart acknowledged
   } else if (msg.type === 'notion:config') {
     notionConfig.value = msg.config;
   } else if (msg.type === 'notion:test_result') {
@@ -470,7 +426,7 @@ onUnmounted(() => {
 
 <template>
   <div class="app" :class="{ 'sidebar-open': sidebarOpen }">
-    <Sidebar ref="sidebarRef" :open="sidebarOpen" :slack-enabled="slackEnabled" :notion-enabled="notionConfig?.enabled ?? false" @close="closeSidebar" @open-settings="openSettings" @new-project="openPaletteNewProject" />
+    <Sidebar ref="sidebarRef" :open="sidebarOpen" :notion-enabled="notionConfig?.enabled ?? false" @close="closeSidebar" @open-settings="openSettings" @new-project="openPaletteNewProject" />
     <div class="app-main">
       <router-view />
     </div>
@@ -494,11 +450,6 @@ onUnmounted(() => {
       :connected="connected"
       :usage-stats="usageStats"
       :discord-enabled="discordEnabled"
-      :slack-enabled="slackEnabled"
-      :slack-config="slackConfig"
-      :slack-test-result="slackTestResult"
-      :slack-bot-connected="slackBotConnected"
-      :slack-channels="slackChannels"
       :notion-config="notionConfig"
       :notion-test-result="notionTestResult"
       :notion-analyse-result="notionAnalyseResult"
@@ -509,11 +460,6 @@ onUnmounted(() => {
       @update="updateSettings"
       @restart="handleRestart"
       @fetch-usage="fetchUsageStats"
-      @slack-fetch-config="fetchSlackConfig"
-      @slack-save-config="saveSlackConfig"
-      @slack-test="testSlackConnection"
-      @slack-restart="restartSlackBot"
-      @slack-list-channels="fetchSlackChannels"
       @notion-fetch-config="fetchNotionConfig"
       @notion-save-config="saveNotionConfig"
       @notion-test="testNotionConnection"

@@ -1,7 +1,7 @@
 /**
  * Notion Configuration
  *
- * Manages Notion integration settings, stored separately from Slack config.
+ * Manages Notion integration settings.
  * Config file: ~/.tofucode/notion-config.json
  *
  * Schema:
