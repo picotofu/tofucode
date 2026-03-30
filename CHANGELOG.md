@@ -7,14 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Removed
-- **Slack Bot Integration** — Removed built-in Slack bot (Socket Mode listener, classifier, dispatcher, Settings UI tab, sidebar tab); use external Slack MCP tools instead
-
-### Fixed
-- **Notes view: TinyMDE markdown formatting not applied on page refresh** — TinyMDE syntax theme CSS (`.TMH1`, `.TMMark_TMH1`, etc.) was only defined in `ChatView.vue`'s unscoped styles, so it was never loaded when navigating directly to the `/notes` route. Moved the base `@import` and all theme overrides into an unscoped `<style>` block in `FileEditor.vue` so they load with the component regardless of which view uses it
-- **Notes view: footer path visually showing trailing slash** — `direction: rtl` without `unicode-bidi: plaintext` caused the Bidi algorithm to move the leading `/` to appear at the end. Added `unicode-bidi: plaintext` to `.footer-path`
-- **Notes view: TinyMDE not reinitialising when switching notes** — added `:key="openedFile.path"` to `<FileEditor>` in `NotesView` to force a clean remount when the active file changes, ensuring TinyMDE always initialises with the correct content
-
 ### Added
 - **Notes (Obsidian-like vault)** — Full markdown notes system with sidebar file navigator, mini calendar, daily notes, and fuzzy search
   - New `/notes` route with URL-reflected state (browser navigation works natively)
@@ -22,11 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `MiniCalendar` component: month nav, day-of-week grid, dot indicators for existing daily notes, today/selected highlighting
   - Daily notes: idempotent create `{vault}/daily/YYYY-MM-DD.md` with pre-populated heading template; "Today" toolbar button
   - Fuzzy search across all vault files (reuses existing `files:search` WebSocket event)
-  - `Cmd+D` / `Ctrl+D` shortcut to open today's daily note from anywhere in the Notes view
+  - `Cmd+D` / `Ctrl+D` shortcut to open today's daily note from anywhere
   - Dotfiles toggle button in notes toolbar (right-aligned, state persisted in localStorage)
   - Notes settings tab: absolute vault path input with helper text
   - `notesBasePath` setting added to server defaults; propagated via settings provider
-  - Sidebar tab shortcut shifted to `Cmd+0`; tab activation state persisted in localStorage
   - Sidebar tree filters to md-containing folders only (via server `hasMarkdown` flag); hides dotfiles by default
   - Lazy tree initialisation: eager parallel recursive fetch on first tab activation; re-fetches when vault path changes
 - **Task Management (Notion)** — Sidebar Tasks tab to browse, filter, create, and edit Notion tickets without leaving tofucode
@@ -42,13 +33,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Independent file browser** — Files tab on homepage provides a full-featured file browser (browse, search, open, edit, create, rename, delete) outside of any session, defaulting to the home directory and persisting the last visited path in localStorage
 - **Traversal root guard** — File browser enforces a topmost browsable path (`--root` config if set, otherwise `homedir()`); breadcrumb segments above the root are shown as muted static text; up button and path edit are clamped to this boundary; session files tab defaults to the project path but allows traversal up to the root; homepage files tab defaults to the root itself
 - **Server `homePath` in connected message** — Server includes `homePath` (root config path or `homedir()`) in the `connected` WebSocket message; clients use this to set the traversal root without a separate request
+- **PWA cache-bust endpoint** — `/api/sw-reset` endpoint to force-clear stale service worker caches
 
 ### Changed
+- **Keyboard shortcuts remapped** — Sidebar tabs now `Cmd/Ctrl+1–4` (Sessions, Projects, Tasks, Notes); mode tabs `Cmd/Ctrl+5–7` (Chat, Terminal, Files); freed up slots from Slack bot removal
+- **First-page load optimised** — Code splitting with vendor chunks, Brotli pre-compressed serving, and async filesystem imports reduce initial bundle size and time-to-interactive
 - **Files toolbar moved into FilesPanel** — Dotfiles toggle, New File, New Folder, and MD Mode buttons are now part of the `FilesPanel` component rather than injected via slot, eliminating duplicate rendering when the component is reused
 - **Breadcrumb path edit UX** — Tapping the path bar no longer opens edit mode; a pencil icon button toggles edit mode; a check button submits; Escape cancels; edit is clamped to root
 - **Mobile toolbar layout** — On mobile (≤639px) the toolbar buttons wrap to their own row above the path bar, right-aligned
 
 ### Fixed
+- **Notes view: TinyMDE markdown formatting not applied on page refresh** — TinyMDE syntax theme CSS was only loaded via `ChatView.vue`; moved into `FileEditor.vue` so it loads regardless of entry route
+- **Notes view: footer path visually showing trailing slash** — added `unicode-bidi: plaintext` to `.footer-path`
+- **Notes view: TinyMDE not reinitialising when switching notes** — added `:key="openedFile.path"` to force clean remount
+- **TinyMDE multi-line selection backspace** — selecting multiple lines and pressing backspace now correctly deletes the selection instead of merging lines
+- **PWA icon display on iOS** — fixed icon not rendering on iOS home screen
+- **PWA cache clear** — `location.replace` fix and fallback `sw-reset` link for stale service worker states
+- **Cmd+K palette showing only recent sessions** — removed artificial caps on search results, now fetches up to 200 sessions
 - **Memo sidebar broken** — `FileEditor` import was inadvertently removed during the 3-tab homepage refactor; memo overlay is now restored
 - **Android back button** — pressing back now closes the memo sidebar, settings modal, and sessions sidebar (mobile only) instead of navigating away; implemented via a new `useBackButton` composable using the history sentinel pattern
 - **Settings modal mobile layout** — now renders full-screen on mobile instead of a floating card
@@ -61,6 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Traversal guard lost after session change — `resetState()` now restores `filesRootPath` to `homePath` instead of clearing it
 - Muted breadcrumb segments were still receiving hover highlight — fixed with `pointer-events: none`
 - Mobile session/project list now uses list view instead of cards (desktop retains card layout)
+
+### Removed
+- **Slack Bot Integration** — Removed built-in Slack bot (Socket Mode listener, classifier, dispatcher, Settings UI tab, sidebar tab); use external Slack MCP tools instead
 
 ## [1.2.1] - 2026-03-08
 

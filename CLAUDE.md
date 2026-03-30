@@ -17,7 +17,9 @@ claude-code-web/
 │   ├── websocket.js     # WebSocket event router
 │   ├── config.js        # Configuration & path utilities
 │   ├── events/          # Event handlers (one file per event)
-│   └── lib/             # Shared utilities
+│   ├── lib/             # Shared utilities
+│   ├── routes/          # Express route handlers (upload, etc.)
+│   └── discord/         # Discord bot (self-contained, see below)
 ├── src/                 # Vue 3 frontend
 │   ├── views/           # Page components
 │   ├── components/      # Reusable components

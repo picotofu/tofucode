@@ -250,12 +250,16 @@ Docker provides OS-level isolation that cannot be bypassed. See the [Docker Guid
 **Global:**
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl/Cmd+K` | Quick session switcher |
+| `Ctrl/Cmd+K` | Quick session switcher / folder browser |
+| `Ctrl/Cmd+P` | File picker |
 | `Ctrl/Cmd+B` | Toggle sidebar |
 | `Ctrl/Cmd+,` | Open settings |
-| `Ctrl/Cmd+1` | Switch to Chat mode |
-| `Ctrl/Cmd+2` | Switch to Terminal mode |
-| `Ctrl/Cmd+3` | Switch to Files mode |
+| `Ctrl/Cmd+1` | Sidebar: Sessions tab |
+| `Ctrl/Cmd+2` | Sidebar: Projects tab |
+| `Ctrl/Cmd+3` | Sidebar: Tasks tab |
+| `Ctrl/Cmd+4` | Sidebar: Notes tab |
+| `Ctrl/Cmd+D` | Jump to today's daily note |
+| `Ctrl/Cmd+M` | Open memo |
 | `Ctrl/Cmd+L` | Scroll to bottom (chat mode) |
 | `Ctrl/Cmd+Enter` | Submit message (chat) / Run command (terminal) |
 | `Ctrl/Cmd+↑` | Navigate to previous conversation turn (chat mode) |
@@ -372,6 +376,7 @@ tofucode includes a built-in task panel (sidebar **Tasks** tab, or press `T`) ba
 
 Independent security assessments are conducted before each release to ensure user safety:
 
+- **[v1.3.0 Security Report](./docs/security_report_v1.3.0.md)** - Notes feature, Notion task integration, file browser enhancements, Discord bot, dependency audit
 - **[v1.2.1 Security Report](./docs/security_report_v1.2.1.md)** - Multer DoS fix, DOMPurify XSS fix, new feature code review (no issues found)
 - **[v1.2.0 Security Report](./docs/security_report_v1.2.0.md)** - Upload path injection fix, symlink escape prevention, error info leaks, draft entry limits
 - **[v1.1.0 Security Report](./docs/security_report_v1.1.0.md)** - WebSocket hardening, security headers, auth improvements, process file permissions
