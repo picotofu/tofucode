@@ -527,6 +527,7 @@ const shortcuts = [
       { keys: ['⌘/^', '5'], description: 'Switch to Chat tab' },
       { keys: ['⌘/^', '6'], description: 'Switch to Terminal tab' },
       { keys: ['⌘/^', '7'], description: 'Switch to Files tab' },
+      { keys: ['⌘/^', '8'], description: 'Switch to Ports tab' },
       { keys: ['⌘/^', 'M'], description: 'Toggle memo' },
       { keys: ['⌘/^', 'N'], description: 'New session from current project' },
       { keys: ['⌘/^', 'J'], description: 'Jump to next session' },

@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Ports tab (⌘8)** — new tab alongside Chat/Terminal/Files showing all listening TCP ports
+  - Clean table view: port, PID, process details (full cmdline + CWD from `/proc`), bind addresses, kill action
+  - Dual-stack bindings (IPv4 + IPv6 on same PID+port) merged into a single row
+  - Kill process by SIGTERM with inline loading state; table refreshes immediately after
+  - Auto-refresh every 5s while tab is active; pauses automatically when navigating away
+  - URL sync (`?mode=ports`), keyboard shortcut documented in Settings → Keyboard Shortcuts
+
+### Added
 - **Notes (Obsidian-like vault)** — Full markdown notes system with sidebar file navigator, mini calendar, daily notes, and fuzzy search
   - New `/notes` route with URL-reflected state (browser navigation works natively)
   - `NotesPanel` sidebar tab: vault file tree with folder expand/collapse, active-note highlight, and recently opened notes (last 5, localStorage)

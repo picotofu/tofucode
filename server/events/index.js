@@ -44,6 +44,7 @@ import {
   handleSaveConfig as notionSaveConfig,
   handleTestConnection as notionTest,
 } from './notion.js';
+import { handlePortsKill, handlePortsList } from './ports.js';
 import { handler as prompt } from './prompt.js';
 import {
   clearHandler as queueClear,
@@ -114,6 +115,8 @@ export const handlers = {
   'files:delete': handleFilesDelete,
   'files:move': handleFilesMove,
   'files:search': handleFilesSearch,
+  'ports:list': handlePortsList,
+  'ports:kill': handlePortsKill,
   restart: handleRestart,
   upgrade: handleUpgrade,
   get_git_diff: getGitDiff,

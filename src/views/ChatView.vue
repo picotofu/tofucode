@@ -17,6 +17,7 @@ import DebugPopover from '../components/DebugPopover.vue';
 import FileEditor from '../components/FileEditor.vue';
 import FilesPanel from '../components/FilesPanel.vue';
 import GitDiffModal from '../components/GitDiffModal.vue';
+import PortsPanel from '../components/PortsPanel.vue';
 import QueueModal from '../components/QueueModal.vue';
 import TerminalOutput from '../components/TerminalOutput.vue';
 import { useBackButton } from '../composables/useBackButton.js';
@@ -110,7 +111,7 @@ function getSessionUrl(session) {
   return `/project/${projectSlug}/session/${session.sessionId}`;
 }
 
-// Mode state: 'chat' | 'terminal' | 'files'
+// Mode state: 'chat' | 'terminal' | 'files' | 'ports'
 const currentMode = ref('chat');
 const terminalSubTab = ref('history'); // 'bookmarks' | 'active' | 'history'
 const bookmarks = ref({ global: [], project: [] });
@@ -377,6 +378,11 @@ function handleKeydown(e) {
       });
       return;
     }
+    if (e.key === '8') {
+      e.preventDefault();
+      currentMode.value = 'ports';
+      return;
+    }
 
     // Ctrl+M or Cmd+M: Toggle memo (if enabled)
     if (e.key === 'm' && settingsContext?.enableMemo?.()) {
@@ -456,7 +462,10 @@ onMounted(() => {
   const query = route.query;
 
   // Restore mode (chat, terminal, files)
-  if (query.mode && ['chat', 'terminal', 'files'].includes(query.mode)) {
+  if (
+    query.mode &&
+    ['chat', 'terminal', 'files', 'ports'].includes(query.mode)
+  ) {
     currentMode.value = query.mode;
   }
 
@@ -1043,7 +1052,10 @@ watch(
   () => route.query,
   (query) => {
     // Handle mode switching from query param
-    if (query.mode && ['chat', 'terminal', 'files'].includes(query.mode)) {
+    if (
+      query.mode &&
+      ['chat', 'terminal', 'files', 'ports'].includes(query.mode)
+    ) {
       currentMode.value = query.mode;
     }
 
@@ -2010,6 +2022,8 @@ watch(
       currentMode.value = 'terminal';
     } else if (query.mode === 'files') {
       currentMode.value = 'files';
+    } else if (query.mode === 'ports') {
+      currentMode.value = 'ports';
     } else {
       currentMode.value = 'chat';
     }
@@ -2150,6 +2164,14 @@ watch(
       :manager="fm"
       :show-reference="true"
       @reference="handleReferenceFromFiles"
+    />
+
+    <!-- Ports Mode -->
+    <PortsPanel
+      v-else-if="currentMode === 'ports'"
+      :send="send"
+      :on-message="onMessage"
+      :connected="connected"
     />
 
     <footer class="footer">
@@ -2502,6 +2524,18 @@ watch(
               <polyline points="13 2 13 9 20 9"/>
             </svg>
             <span class="mode-label">Files</span>
+          </button>
+          <button
+            class="mode-tab"
+            :class="{ active: currentMode === 'ports' }"
+            @click="currentMode = 'ports'"
+            title="Ports mode"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="2"/>
+              <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/>
+            </svg>
+            <span class="mode-label">Ports</span>
           </button>
         </div>
 
