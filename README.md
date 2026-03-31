@@ -371,6 +371,7 @@ tofucode includes a built-in task panel (sidebar **Tasks** tab, or press `T`) ba
 - Sessions stored locally in `~/.claude/projects/`
 - Auth data in `~/.tofucode/.auth.json`
 - Full system access matching Claude Code permissions
+- **Login rate limiting** - Brute-force protection on login and setup endpoints (3 attempts, 15-min lockout by default). Auth page shows attempts remaining and a live countdown on lockout. Lock clears on successful login, window expiry, or server restart. Configurable via `MAX_LOGIN_ATTEMPTS` and `LOGIN_WINDOW_MS`.
 
 ### Security Reports
 

@@ -110,6 +110,11 @@ import {
   validateSession,
 } from './lib/auth.js';
 import {
+  isLoginLocked,
+  recordFailedAttempt,
+  resetLoginAttempts,
+} from './lib/rate-limit.js';
+import {
   getCurrentVersion,
   initVersionChecker,
 } from './lib/version-checker.js';
@@ -215,6 +220,16 @@ app.post('/api/auth/setup', async (req, res) => {
     return res.status(400).json({ error: 'Password already set up' });
   }
 
+  const { locked, retryAfter } = isLoginLocked();
+  if (locked) {
+    res.set('Retry-After', String(retryAfter));
+    return res.status(429).json({
+      error: 'Too many failed attempts. Try again later.',
+      retryAfter,
+      attemptsRemaining: 0,
+    });
+  }
+
   const { password } = req.body;
   if (!password || password.length < 8) {
     return res
@@ -224,6 +239,8 @@ app.post('/api/auth/setup', async (req, res) => {
 
   try {
     const { token, expiresAt } = await setupPassword(password);
+
+    resetLoginAttempts();
 
     res.cookie('session', token, {
       httpOnly: true,
@@ -244,13 +261,28 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(400).json({ error: 'Auth is disabled' });
   }
 
+  const { locked, retryAfter } = isLoginLocked();
+  if (locked) {
+    res.set('Retry-After', String(retryAfter));
+    return res.status(429).json({
+      error: 'Too many failed attempts. Try again later.',
+      retryAfter,
+      attemptsRemaining: 0,
+    });
+  }
+
   const { password } = req.body;
   const userAgent = req.headers['user-agent'] || '';
 
   const result = await login(password, userAgent);
   if (!result) {
-    return res.status(401).json({ error: 'Invalid password' });
+    const { attemptsRemaining } = recordFailedAttempt();
+    return res
+      .status(401)
+      .json({ error: 'Invalid password', attemptsRemaining });
   }
+
+  resetLoginAttempts();
 
   res.cookie('session', result.token, {
     httpOnly: true,

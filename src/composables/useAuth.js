@@ -9,6 +9,12 @@ const authStatus = ref({
 
 const authError = ref(null);
 
+/** How many attempts remain before lockout (null = unknown / not yet attempted) */
+const attemptsRemaining = ref(null);
+
+/** Seconds until lockout clears (null = not locked) */
+const retryAfter = ref(null);
+
 /**
  * Check auth status from server
  */
@@ -49,9 +55,17 @@ export async function setupPassword(password) {
 
     if (!res.ok) {
       authError.value = data.error || 'Setup failed';
+      if (data.attemptsRemaining !== undefined) {
+        attemptsRemaining.value = data.attemptsRemaining;
+      }
+      if (data.retryAfter !== undefined) {
+        retryAfter.value = data.retryAfter;
+      }
       return false;
     }
 
+    attemptsRemaining.value = null;
+    retryAfter.value = null;
     authStatus.value.authenticated = true;
     authStatus.value.needsSetup = false;
     return true;
@@ -78,9 +92,17 @@ export async function login(password) {
 
     if (!res.ok) {
       authError.value = data.error || 'Login failed';
+      if (data.attemptsRemaining !== undefined) {
+        attemptsRemaining.value = data.attemptsRemaining;
+      }
+      if (data.retryAfter !== undefined) {
+        retryAfter.value = data.retryAfter;
+      }
       return false;
     }
 
+    attemptsRemaining.value = null;
+    retryAfter.value = null;
     authStatus.value.authenticated = true;
     return true;
   } catch (_err) {
@@ -106,6 +128,8 @@ export function useAuth() {
   return {
     authStatus,
     authError,
+    attemptsRemaining,
+    retryAfter,
     checkAuthStatus,
     setupPassword,
     login,

@@ -1,12 +1,19 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AppHeader from '../components/AppHeader.vue';
 import { useAuth } from '../composables/useAuth';
 
 const router = useRouter();
-const { authStatus, authError, checkAuthStatus, setupPassword, login } =
-  useAuth();
+const {
+  authStatus,
+  authError,
+  attemptsRemaining,
+  retryAfter,
+  checkAuthStatus,
+  setupPassword,
+  login,
+} = useAuth();
 
 const password = ref('');
 const confirmPassword = ref('');
@@ -17,6 +24,35 @@ const isSetupMode = computed(() => authStatus.value.needsSetup);
 const localError = ref('');
 
 const displayError = computed(() => localError.value || authError.value);
+
+// Countdown timer for lockout
+const countdown = ref(null);
+let countdownTimer = null;
+
+function startCountdown(seconds) {
+  countdown.value = seconds;
+  clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    if (countdown.value <= 1) {
+      countdown.value = null;
+      retryAfter.value = null;
+      clearInterval(countdownTimer);
+    } else {
+      countdown.value -= 1;
+    }
+  }, 1000);
+}
+
+function formatCountdown(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+// Watch for lockout from retryAfter
+const isLocked = computed(
+  () => retryAfter.value !== null && retryAfter.value > 0,
+);
 
 async function handleSubmit() {
   localError.value = '';
@@ -38,6 +74,8 @@ async function handleSubmit() {
 
     if (success) {
       router.push('/');
+    } else if (retryAfter.value) {
+      startCountdown(retryAfter.value);
     }
   } else {
     // Login mode
@@ -52,6 +90,8 @@ async function handleSubmit() {
 
     if (success) {
       router.push('/');
+    } else if (retryAfter.value) {
+      startCountdown(retryAfter.value);
     }
   }
 }
@@ -62,7 +102,17 @@ onMounted(async () => {
   // If already authenticated, redirect to home
   if (authStatus.value.authenticated) {
     router.push('/');
+    return;
   }
+
+  // Resume countdown if the composable is already locked (e.g. page reload while locked)
+  if (retryAfter.value) {
+    startCountdown(retryAfter.value);
+  }
+});
+
+onUnmounted(() => {
+  clearInterval(countdownTimer);
 });
 </script>
 
@@ -87,6 +137,7 @@ onMounted(async () => {
             :placeholder="isSetupMode ? 'Choose a password' : 'Enter password'"
             autocomplete="current-password"
             autofocus
+            :disabled="isLocked"
           />
         </div>
 
@@ -98,15 +149,26 @@ onMounted(async () => {
             v-model="confirmPassword"
             placeholder="Confirm password"
             autocomplete="new-password"
+            :disabled="isLocked"
           />
         </div>
 
-        <div class="error-message" v-if="displayError">
-          {{ displayError }}
+        <div class="lockout-message" v-if="isLocked && countdown !== null">
+          <span class="lockout-icon">🔒</span>
+          Too many failed attempts. Try again in
+          <strong>{{ formatCountdown(countdown) }}</strong>.
         </div>
 
-        <button type="submit" class="submit-btn" :disabled="isSubmitting">
-          <span v-if="isSubmitting">Please wait...</span>
+        <div class="error-message" v-else-if="displayError">
+          <div>{{ displayError }}</div>
+          <div class="attempts-remaining" v-if="attemptsRemaining !== null && attemptsRemaining > 0">
+            {{ attemptsRemaining }} attempt{{ attemptsRemaining === 1 ? '' : 's' }} remaining
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn" :disabled="isSubmitting || isLocked">
+          <span v-if="isLocked">Locked</span>
+          <span v-else-if="isSubmitting">Please wait...</span>
           <span v-else-if="isSetupMode">Create Password</span>
           <span v-else>Login</span>
         </button>
@@ -197,6 +259,11 @@ onMounted(async () => {
   color: var(--text-muted);
 }
 
+.form-group input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .error-message {
   padding: 10px 12px;
   font-size: 13px;
@@ -204,6 +271,31 @@ onMounted(async () => {
   border: 1px solid rgba(239, 68, 68, 0.2);
   border-radius: var(--radius-md);
   color: var(--error-color);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.attempts-remaining {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.lockout-message {
+  padding: 10px 12px;
+  font-size: 13px;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lockout-icon {
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 .submit-btn {

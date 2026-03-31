@@ -63,6 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Muted breadcrumb segments were still receiving hover highlight — fixed with `pointer-events: none`
 - Mobile session/project list now uses list view instead of cards (desktop retains card layout)
 
+### Security
+- **Login rate limiting** — Failed login attempts are now tracked globally; after 3 failures the login and setup endpoints return `429 Too Many Requests` with a `Retry-After` header and a 15-minute lockout window. The auth page shows attempts remaining on each wrong password, and a live countdown timer when locked out. The lock resets automatically when the window expires, on a successful login, or on server restart (SSH access is the owner's intentional escape hatch). Configurable via `MAX_LOGIN_ATTEMPTS` and `LOGIN_WINDOW_MS` env vars.
+
 ### Removed
 - **Slack Bot Integration** — Removed built-in Slack bot (Socket Mode listener, classifier, dispatcher, Settings UI tab, sidebar tab); use external Slack MCP tools instead
 
