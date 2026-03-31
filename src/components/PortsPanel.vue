@@ -104,13 +104,18 @@ onUnmounted(() => {
         :key="`${entry.pid ?? entry.addresses[0]}-${entry.port}`"
         class="ports-row"
       >
-        <span class="port-num">{{ entry.port }}</span>
-        <span class="port-pid">{{ entry.pid ?? '—' }}</span>
+        <span class="port-num desktop-only">{{ entry.port }}</span>
+        <span class="port-pid desktop-only">{{ entry.pid ?? '—' }}</span>
         <span class="port-process">
+          <span class="port-meta mobile-only">
+            <span class="port-meta-port">:{{ entry.port }}</span>
+            <span v-if="entry.pid" class="port-meta-pid"> · pid {{ entry.pid }}</span>
+          </span>
           <span class="port-cmd">{{ entry.cmd ?? entry.process }}</span>
           <span v-if="entry.cwd" class="port-cwd">{{ entry.cwd }}</span>
+          <span class="port-address-inline mobile-only">{{ entry.addresses.join(', ') }}</span>
         </span>
-        <span class="port-address">{{ entry.addresses.join(', ') }}</span>
+        <span class="port-address desktop-only">{{ entry.addresses.join(', ') }}</span>
         <button
           class="kill-btn"
           :class="{ killing: killing.has(entry.pid) }"
@@ -296,5 +301,39 @@ onUnmounted(() => {
 
 .kill-btn.killing svg {
   animation: spin 0.8s linear infinite;
+}
+
+/* ── Responsive ─────────────────────────────────── */
+.mobile-only { display: none; }
+
+@media (max-width: 640px) {
+  .desktop-only { display: none; }
+  .mobile-only { display: block; }
+
+  .ports-row.header { display: none; }
+
+  .ports-row:not(.header) {
+    grid-template-columns: 1fr 32px;
+  }
+
+  .port-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-bottom: 1px;
+  }
+
+  .port-meta-port {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .port-address-inline {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    word-break: break-all;
+    margin-top: 1px;
+  }
 }
 </style>
