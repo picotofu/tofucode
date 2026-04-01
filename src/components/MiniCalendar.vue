@@ -112,7 +112,7 @@ function selectDate(dateStr) {
         :class="{
           blank: cell.blank,
           today: cell.dateStr === todayStr,
-          selected: cell.dateStr === selectedDate,
+          selected: !cell.blank && cell.dateStr === selectedDate,
           'has-note': !cell.blank && existingDates.has(cell.dateStr),
         }"
         @click="!cell.blank && selectDate(cell.dateStr)"
