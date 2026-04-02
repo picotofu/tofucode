@@ -40,7 +40,7 @@ const taskDetailLoading = ref(false);
 const taskSaveStatus = ref(null); // 'saving' | 'saved' | 'error' | null
 const taskStatusOptions = ref([]); // available status names from DB schema
 const taskAssignees = ref([]); // workspace users [{id, name, email}]
-const taskSelfEmail = ref(null); // current user email from config
+const taskSelfId = ref(null); // Notion user ID of the token owner
 const taskComments = ref([]);
 const taskCommentsLoading = ref(false);
 const lastCreatedPageId = ref(null);
@@ -404,7 +404,7 @@ function handleGlobalMessage(msg) {
     case 'tasks:assignees_result':
       if (msg.success) {
         taskAssignees.value = msg.users || [];
-        taskSelfEmail.value = msg.selfEmail || null;
+        taskSelfId.value = msg.selfId || null;
       }
       break;
 
@@ -612,11 +612,7 @@ function clearTaskDetail() {
 function createTask(title, assigneeId) {
   let resolvedAssigneeId = null;
   if (assigneeId === '__self__') {
-    // Resolve to the actual Notion user ID by matching selfEmail in taskAssignees
-    const selfUser = taskSelfEmail.value
-      ? taskAssignees.value.find((u) => u.email === taskSelfEmail.value)
-      : null;
-    resolvedAssigneeId = selfUser?.id ?? null;
+    resolvedAssigneeId = taskSelfId.value ?? null;
   } else if (assigneeId) {
     resolvedAssigneeId = assigneeId;
   }
@@ -696,7 +692,7 @@ export function useWebSocket() {
     taskSaveStatus: readonly(taskSaveStatus),
     taskStatusOptions: readonly(taskStatusOptions),
     taskAssignees: readonly(taskAssignees),
-    taskSelfEmail: readonly(taskSelfEmail),
+    taskSelfId: readonly(taskSelfId),
     taskComments: readonly(taskComments),
     taskCommentsLoading: readonly(taskCommentsLoading),
     lastCreatedPageId: readonly(lastCreatedPageId),

@@ -313,10 +313,11 @@ export async function handleGetAssignees(ws) {
     const ctx = await resolveContext(ws, 'tasks:assignees_result');
     if (!ctx) return;
 
-    const { provider, config, databaseUrl, assigneeField } = ctx;
-    const [dbUsers, workspaceUsers] = await Promise.all([
+    const { provider, databaseUrl, assigneeField } = ctx;
+    const [dbUsers, workspaceUsers, selfId] = await Promise.all([
       provider.listAssigneesFromDb(databaseUrl, assigneeField),
       provider.listWorkspaceUsers(),
+      provider.getSelfId(),
     ]);
     // DB assignees first (already in use), then remaining workspace users
     const seen = new Set(dbUsers.map((u) => u.id));
@@ -328,7 +329,7 @@ export async function handleGetAssignees(ws) {
       type: 'tasks:assignees_result',
       success: true,
       users,
-      selfEmail: config.userEmail || null,
+      selfId: selfId || null,
     });
   } catch (err) {
     logger.error('[Tasks WS] Get assignees error:', err);

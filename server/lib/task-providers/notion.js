@@ -1104,6 +1104,20 @@ export function createNotionProvider(token) {
     },
 
     /**
+     * Get the Notion user ID of the token owner (integration user).
+     * @returns {Promise<string|null>}
+     */
+    async getSelfId() {
+      try {
+        const me = await api.getMe();
+        return me.id ?? null;
+      } catch (err) {
+        logger.warn('[Notion] getSelfId error:', err.message);
+        return null;
+      }
+    },
+
+    /**
      * Fetch comments on a Notion page.
      * @param {string} pageId
      * @returns {Promise<Array<{id, createdTime, createdBy, content}>>}

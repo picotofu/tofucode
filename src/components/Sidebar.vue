@@ -37,7 +37,7 @@ const {
   tasksFilter,
   taskStatusOptions,
   taskAssignees,
-  taskSelfEmail,
+  taskSelfId,
   lastCreatedPageId,
   getProjects,
   getRecentSessionsImmediate,
@@ -353,7 +353,7 @@ onUnmounted(() => {
           :tasks-filter="tasksFilter"
           :task-status-options="taskStatusOptions"
           :task-assignees="taskAssignees"
-          :task-self-email="taskSelfEmail"
+          :task-self-id="taskSelfId"
           @refresh="handleRefreshTasks"
           @load-more="loadMoreTasks"
           @select-task="handleSelectTask"

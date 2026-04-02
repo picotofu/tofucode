@@ -18,7 +18,7 @@ const props = defineProps({
   },
   taskStatusOptions: { type: Array, default: () => [] },
   taskAssignees: { type: Array, default: () => [] },
-  taskSelfEmail: { type: String, default: null },
+  taskSelfId: { type: String, default: null },
 });
 
 const emit = defineEmits([
@@ -152,10 +152,9 @@ function groupByAssigneeOnly(tasks) {
     items,
   }));
 
-  // Resolve "me" name from taskAssignees using selfEmail
-  const myName = props.taskSelfEmail
-    ? (props.taskAssignees.find((u) => u.email === props.taskSelfEmail)?.name ??
-      null)
+  // Resolve "me" name from taskAssignees using selfId
+  const myName = props.taskSelfId
+    ? (props.taskAssignees.find((u) => u.id === props.taskSelfId)?.name ?? null)
     : null;
 
   return groups.sort((a, b) => {
