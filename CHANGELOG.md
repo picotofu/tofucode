@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Model tint on input area** — footer/input area gets a subtle background tint per model: sky blue for Haiku, no tint for Sonnet (default), amber for Opus; active H/S/O tab highlight follows the same colour
+- **Model selection persisted per session** — switching sessions restores the model that was active in that session; falls back to last global model, then Sonnet as default
+
+### Changed
+- **Permission modes reworked** — modes are now properly distinct end-to-end:
+  - Default (shield): sends `permissionMode: 'default'` to SDK — will block on permission requests; errors show an inline red-tinted hint to switch mode
+  - Plan (green border): read-only, no writes or bash — unchanged
+  - Accept Edits (yellow border): auto-approves file edits, blocks bash — was previously mislabelled as "bypass"
+  - Bypass (orange border): full `bypassPermissions` + `dangerouslySkipPermissions` — previously "skip"
+- **Inline permission error hint** — errors in Default or Accept Edits mode render with a stronger red tint and a hint message explaining the block and suggesting a mode switch
+
+### Added
 - **Ports tab (⌘8)** — new tab alongside Chat/Terminal/Files showing all listening TCP ports
   - Clean table view: port, PID, process details (full cmdline + CWD from `/proc`), bind addresses, kill action
   - Dual-stack bindings (IPv4 + IPv6 on same PID+port) merged into a single row

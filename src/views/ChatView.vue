@@ -866,12 +866,16 @@ watch(permissionMode, (newMode) => {
   }
 });
 
-// Save permission mode and update URL when new session gets its ID
+// Save permission mode and model when new session gets its ID
 watch(currentSession, (newSessionId) => {
   if (newSessionId && isNewSession.value) {
     localStorage.setItem(
       `permissionMode:${newSessionId}`,
       permissionMode.value,
+    );
+    localStorage.setItem(
+      `modelSelection:${newSessionId}`,
+      modelSelection.value,
     );
     // Update URL from /new to actual session ID without page refresh
     router.replace({
@@ -881,11 +885,12 @@ watch(currentSession, (newSessionId) => {
   }
 });
 
-// Load permission mode when session changes
+// Load permission mode and model when session changes
 watch(
   sessionParam,
   (newSession, oldSession) => {
     loadPermissionMode();
+    loadModelSelection();
 
     // Save input from old session before switching
     // Note: chatInputStorageKey already reflects newSession, so we build the old key manually
@@ -950,10 +955,26 @@ watch(contextReady, (ready) => {
   }
 });
 
-// Model selection - persisted globally (not per-session)
+// Model selection - persisted per-session (falls back to global default)
 const MODEL_STORAGE_KEY = 'claude-web:model';
 
+const modelStorageKey = computed(() => {
+  if (sessionParam.value && sessionParam.value !== 'new') {
+    return `modelSelection:${sessionParam.value}`;
+  }
+  return null;
+});
+
 function loadModelSelection() {
+  // First check per-session storage
+  if (modelStorageKey.value) {
+    const stored = localStorage.getItem(modelStorageKey.value);
+    if (stored && ['sonnet', 'opus', 'haiku'].includes(stored)) {
+      modelSelection.value = stored;
+      return;
+    }
+  }
+  // Fall back to global last-used model
   const stored = localStorage.getItem(MODEL_STORAGE_KEY);
   if (stored && ['sonnet', 'opus', 'haiku'].includes(stored)) {
     modelSelection.value = stored;
@@ -961,6 +982,11 @@ function loadModelSelection() {
 }
 
 watch(modelSelection, (newModel) => {
+  // Save per-session
+  if (modelStorageKey.value) {
+    localStorage.setItem(modelStorageKey.value, newModel);
+  }
+  // Also update global fallback
   localStorage.setItem(MODEL_STORAGE_KEY, newModel);
 });
 
