@@ -261,6 +261,8 @@ Docker provides OS-level isolation that cannot be bypassed. See the [Docker Guid
 | `Ctrl/Cmd+D` | Jump to today's daily note |
 | `Ctrl/Cmd+M` | Open memo |
 | `Ctrl/Cmd+L` | Scroll to bottom (chat mode) |
+| `Ctrl/Cmd+[` | Cycle model (Haiku → Sonnet → Opus) |
+| `Ctrl/Cmd+]` | Cycle permission mode (Default → Plan → Accept Edits → Bypass) |
 | `Ctrl/Cmd+Enter` | Submit message (chat) / Run command (terminal) |
 | `Ctrl/Cmd+↑` | Navigate to previous conversation turn (chat mode) |
 | `Ctrl/Cmd+↓` | Navigate to next conversation turn (chat mode) |

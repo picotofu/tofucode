@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Model tint on input area** — footer/input area gets a subtle background tint per model: sky blue for Haiku, no tint for Sonnet (default), amber for Opus; active H/S/O tab highlight follows the same colour
 - **Model selection persisted per session** — switching sessions restores the model that was active in that session; falls back to last global model, then Sonnet as default
+- **Keyboard shortcuts** — `Cmd+[` cycles model (Haiku → Sonnet → Opus), `Cmd+]` cycles permission mode (Default → Plan → Accept Edits → Bypass)
 
 ### Changed
 - **Permission modes reworked** — modes are now properly distinct end-to-end:

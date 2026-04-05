@@ -450,6 +450,24 @@ function handleKeydown(e) {
       }
       return;
     }
+
+    // Cmd+[: Cycle model (haiku → sonnet → opus → haiku)
+    if (e.key === '[') {
+      e.preventDefault();
+      const models = ['haiku', 'sonnet', 'opus'];
+      const idx = models.indexOf(modelSelection.value);
+      modelSelection.value = models[(idx + 1) % models.length];
+      return;
+    }
+
+    // Cmd+]: Cycle permission mode (default → plan → bypass → skip → default)
+    if (e.key === ']') {
+      e.preventDefault();
+      const modes = ['default', 'plan', 'bypass', 'skip'];
+      const idx = modes.indexOf(permissionMode.value);
+      permissionMode.value = modes[(idx + 1) % modes.length];
+      return;
+    }
   }
 }
 

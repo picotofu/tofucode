@@ -532,6 +532,15 @@ const shortcuts = [
       { keys: ['⌘/^', 'N'], description: 'New session from current project' },
       { keys: ['⌘/^', 'J'], description: 'Jump to next session' },
       { keys: ['⌘/^', 'L'], description: 'Scroll to bottom (clear view)' },
+      {
+        keys: ['⌘/^', '['],
+        description: 'Cycle model (Haiku → Sonnet → Opus)',
+      },
+      {
+        keys: ['⌘/^', ']'],
+        description:
+          'Cycle permission mode (Default → Plan → Accept Edits → Bypass)',
+      },
       { keys: ['⌘/^', '↑'], description: 'Navigate to previous turn' },
       { keys: ['⌘/^', '↓'], description: 'Navigate to next turn' },
       { keys: ['Escape'], description: 'Close modals / blur input' },
