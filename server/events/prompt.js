@@ -147,6 +147,10 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
   } else if (options.permissionMode === 'bypassPermissions') {
     permissionMode = 'bypassPermissions';
     allowDangerouslySkipPermissions = true;
+  } else if (options.permissionMode === 'acceptEdits') {
+    permissionMode = 'acceptEdits';
+  } else if (options.permissionMode === 'default') {
+    permissionMode = 'default';
   } else if (options.permissionMode) {
     permissionMode = options.permissionMode;
   }
@@ -236,7 +240,9 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
     content: prompt,
     timestamp: new Date().toISOString(),
     sessionId: taskSessionId,
-    permissionMode: options.permissionMode || 'default',
+    permissionMode: options.dangerouslySkipPermissions
+      ? 'skip'
+      : options.permissionMode || 'default',
     dangerouslySkipPermissions: options.dangerouslySkipPermissions || false,
     model: options.model || null, // Track which model was used for this message
   };
@@ -311,6 +317,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
       type: 'error',
       message: userMessage,
       originalError: error.message, // Keep original for debugging
+      permissionMode: queryOptions.permissionMode, // Include mode for frontend hint
       timestamp: new Date().toISOString(),
       sessionId: taskSessionId,
     };
@@ -628,6 +635,7 @@ async function executePrompt(ws, projectSlug, sessionId, prompt, options = {}) {
       type: 'error',
       message: userMessage,
       originalError: error.message, // Keep original for debugging
+      permissionMode: queryOptions.permissionMode, // Include mode for frontend hint
       timestamp: new Date().toISOString(),
       sessionId: taskSessionId,
     };

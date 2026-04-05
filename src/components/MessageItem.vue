@@ -65,6 +65,22 @@ const userPermissionMode = computed(() => {
   return props.message.permissionMode || 'default';
 });
 
+// Permission hint for error messages (shown when blocked in restrictive modes)
+const isPermissionError = computed(() => {
+  if (props.message.type !== 'error') return false;
+  const mode = props.message.permissionMode;
+  return mode === 'default' || mode === 'acceptEdits';
+});
+
+const permissionErrorHint = computed(() => {
+  if (!isPermissionError.value) return '';
+  const mode = props.message.permissionMode;
+  if (mode === 'default') {
+    return 'you are in default mode - switch to accept edits or bypass to allow this';
+  }
+  return 'you are in accept edits mode - switch to bypass to allow bash commands';
+});
+
 // Model used for assistant messages (text and tool_use)
 const assistantModel = computed(() => {
   if (props.message.type !== 'text' && props.message.type !== 'tool_use')
@@ -95,7 +111,7 @@ const permissionIcon = computed(() => {
       <polyline points="10 9 9 9 8 9"/>
     </svg>`;
   }
-  if (mode === 'bypassPermissions') {
+  if (mode === 'acceptEdits' || mode === 'bypassPermissions') {
     return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
       <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
@@ -341,9 +357,12 @@ function togglePlanExpand() {
     </div>
 
     <!-- Error -->
-    <div v-else-if="messageType === 'error'" class="error-message">
+    <div v-else-if="messageType === 'error'" class="error-message" :class="{ 'permission-error': isPermissionError }">
       <span class="error-icon">⚠</span>
-      <span class="error-text">{{ displayContent }}</span>
+      <div class="error-body">
+        <span class="error-text">{{ displayContent }}</span>
+        <span v-if="permissionErrorHint" class="error-hint">{{ permissionErrorHint }}</span>
+      </div>
     </div>
   </div>
 </template>
@@ -397,8 +416,9 @@ function togglePlanExpand() {
   border-right-color: var(--success-color); /* green */
 }
 
+.user-message.permission-acceptEdits,
 .user-message.permission-bypassPermissions {
-  border-right-color: var(--warning-color); /* yellow */
+  border-right-color: #eab308; /* yellow - accept edits */
 }
 
 .user-message.permission-skip {
@@ -988,12 +1008,29 @@ function togglePlanExpand() {
   color: var(--error-color);
 }
 
+.error-message.permission-error {
+  background: rgba(239, 68, 68, 0.15);
+  border-left: 3px solid var(--error-color);
+}
+
 .error-icon {
   flex-shrink: 0;
+}
+
+.error-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
 .error-text {
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.error-hint {
+  font-size: 0.85em;
+  opacity: 0.8;
 }
 </style>

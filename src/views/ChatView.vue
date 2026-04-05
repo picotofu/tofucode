@@ -1165,9 +1165,12 @@ function handleSubmit() {
   if (permissionMode.value === 'skip') {
     options.dangerouslySkipPermissions = true;
   } else if (permissionMode.value === 'bypass') {
-    options.permissionMode = 'bypassPermissions';
+    options.permissionMode = 'acceptEdits';
   } else if (permissionMode.value === 'plan') {
     options.permissionMode = 'plan';
+  } else {
+    // Default mode: explicitly send 'default' so backend doesn't fall through to bypassPermissions
+    options.permissionMode = 'default';
   }
 
   sendPrompt(prompt, options);
@@ -2174,7 +2177,7 @@ watch(
       :connected="connected"
     />
 
-    <footer class="footer">
+    <footer class="footer" :class="'model-' + modelSelection">
       <!-- Content navigation bar -->
       <div v-if="showContentNav" class="content-nav">
         <!-- Turn/command navigator (right-aligned) -->
@@ -2343,7 +2346,7 @@ watch(
               class="permission-tab bypass"
               :class="{ active: permissionMode === 'bypass' }"
               @click="permissionMode = 'bypass'"
-              title="Bypass Permissions - Auto-approve safe operations"
+              title="Accept Edits - Auto-approve file edits, block bash"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -2354,7 +2357,7 @@ watch(
               class="permission-tab skip"
               :class="{ active: permissionMode === 'skip' }"
               @click="permissionMode = 'skip'"
-              title="Skip Permissions - No permission checks (dangerous)"
+              title="Bypass - No permission checks (dangerous)"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
@@ -3064,6 +3067,20 @@ watch(
 .footer {
   padding: 12px 16px;
   border-top: 1px solid var(--border-color);
+  transition: background-color 0.2s;
+}
+
+/* Model tint on footer/input area */
+.footer.model-haiku {
+  background-color: rgba(56, 189, 248, 0.12);
+}
+
+.footer.model-sonnet {
+  /* No tint - sonnet is the default */
+}
+
+.footer.model-opus {
+  background-color: rgba(245, 158, 11, 0.12);
 }
 
 /* Content navigation bar (turn/command nav) */
@@ -3283,8 +3300,19 @@ watch(
 }
 
 .model-tab.active {
-  color: var(--accent-color);
-  background: rgba(147, 51, 234, 0.15);
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+/* Active model tab colours follow model tint */
+.footer.model-haiku .model-tab.active {
+  color: rgb(56, 189, 248);
+  background: rgba(56, 189, 248, 0.18);
+}
+
+.footer.model-opus .model-tab.active {
+  color: rgb(245, 158, 11);
+  background: rgba(245, 158, 11, 0.18);
 }
 
 .permission-tabs {
@@ -3325,18 +3353,18 @@ watch(
   background: rgba(34, 197, 94, 0.15);
 }
 
-/* Bypass mode - yellow/warning */
+/* Accept edits mode - yellow */
 .permission-tab.bypass:hover {
-  color: var(--warning-color);
-  background: rgba(245, 158, 11, 0.1);
+  color: #eab308;
+  background: rgba(234, 179, 8, 0.1);
 }
 
 .permission-tab.bypass.active {
-  color: var(--warning-color);
-  background: rgba(245, 158, 11, 0.15);
+  color: #eab308;
+  background: rgba(234, 179, 8, 0.15);
 }
 
-/* Skip mode - orange/danger */
+/* Bypass mode - orange/danger */
 .permission-tab.skip:hover {
   color: #f97316;
   background: rgba(249, 115, 22, 0.1);
@@ -3649,7 +3677,7 @@ watch(
 }
 
 .input-form.permission-bypass {
-  border-color: var(--warning-color);
+  border-color: #eab308; /* yellow - accept edits */
 }
 
 .input-form.permission-skip {
@@ -3696,7 +3724,7 @@ watch(
 }
 
 .input-form.permission-bypass .chat-prompt {
-  color: var(--warning-color);
+  color: #eab308; /* yellow - accept edits */
 }
 
 .input-form.permission-skip .chat-prompt {
