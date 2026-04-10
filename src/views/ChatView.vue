@@ -3625,12 +3625,6 @@ watch(
     overflow: hidden;
   }
 
-  .recent-session-item {
-    flex: 1;
-    min-width: 0;
-    max-width: none;
-  }
-
   .recent-session-item:nth-child(n+2) {
     display: none;
   }
