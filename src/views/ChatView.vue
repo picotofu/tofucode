@@ -2525,17 +2525,9 @@ watch(
         </div>
       </form>
 
-      <!-- Mode tabs at bottom: Chat | Terminal | Files -->
+      <!-- Mode tabs teleported to app-level bottom bar -->
+      <Teleport to="#view-footer">
       <div class="mode-tabs">
-        <!-- Hamburger button -->
-        <button class="hamburger-btn" @click="sidebar.toggle" title="Toggle sidebar">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="3" y1="12" x2="21" y2="12"/>
-            <line x1="3" y1="6" x2="21" y2="6"/>
-            <line x1="3" y1="18" x2="21" y2="18"/>
-          </svg>
-        </button>
-
         <div class="mode-tabs-group">
           <button
             class="mode-tab"
@@ -2677,6 +2669,7 @@ watch(
           </span>
         </div>
       </div>
+      </Teleport>
     </footer>
 
     <!-- Git Diff Modal -->
@@ -2779,7 +2772,7 @@ watch(
 .chat-view {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
 }
 
 .messages-container {
@@ -3419,33 +3412,17 @@ watch(
   background: rgba(249, 115, 22, 0.15);
 }
 
-/* Mode tabs (Chat/Terminal toggle) */
+/* Mode tabs (Chat/Terminal toggle) — teleported to #view-footer */
 .mode-tabs {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
+  padding: 0 12px;
+  height: var(--bottom-bar-height);
   width: 100%;
-}
-
-.hamburger-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  background: transparent;
-  color: var(--text-secondary);
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  flex-shrink: 0;
-}
-
-.hamburger-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .memo-btn {

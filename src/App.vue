@@ -7,6 +7,7 @@ import GitCloneModal from './components/GitCloneModal.vue';
 import PwaPrompt from './components/PwaPrompt.vue';
 import SettingsModal from './components/SettingsModal.vue';
 import Sidebar from './components/Sidebar.vue';
+import SidebarFooter from './components/SidebarFooter.vue';
 import { useBackButton } from './composables/useBackButton.js';
 import { useWebSocket } from './composables/useWebSocket';
 
@@ -261,6 +262,13 @@ function handleGlobalKeydown(e) {
       openSettings('shortcuts');
     }
   }
+  // Ctrl/Cmd+1-4: switch sidebar tabs and open sidebar
+  const TAB_KEYS = { 1: 'sessions', 2: 'projects', 3: 'tasks', 4: 'notes' };
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && TAB_KEYS[e.key]) {
+    e.preventDefault();
+    sidebarActiveTab.value = TAB_KEYS[e.key];
+    openSidebar();
+  }
 }
 
 function closePalette() {
@@ -353,6 +361,14 @@ function onDesktopMqChange(e) {
 }
 desktopMq.addEventListener('change', onDesktopMqChange);
 
+// Mobile = <=640px. Tablet (641-1024px) shares hamburger-only behaviour with desktop.
+const mobileMq = window.matchMedia('(max-width: 640px)');
+const isMobile = ref(mobileMq.matches);
+function onMobileMqChange(e) {
+  isMobile.value = e.matches;
+}
+mobileMq.addEventListener('change', onMobileMqChange);
+
 const storedSidebarState = localStorage.getItem('sidebarOpen');
 // On mobile, always start closed. On desktop, use stored state or default to open.
 const sidebarOpen = ref(
@@ -366,6 +382,11 @@ const sidebarOpen = ref(
 function toggleSidebar() {
   sidebarOpen.value = !sidebarOpen.value;
   localStorage.setItem('sidebarOpen', sidebarOpen.value.toString());
+}
+
+function openSidebar() {
+  sidebarOpen.value = true;
+  localStorage.setItem('sidebarOpen', 'true');
 }
 
 function closeSidebar() {
@@ -388,11 +409,39 @@ watch(route, () => {
   }
 });
 
+// Sidebar tab state (lifted from Sidebar.vue for shared access with SidebarFooter)
+const SIDEBAR_TAB_KEY = 'tofucode:sidebar-tab';
+const VALID_TABS = new Set(['sessions', 'projects', 'tasks', 'notes']);
+
+function loadSavedTab() {
+  const saved = localStorage.getItem(SIDEBAR_TAB_KEY);
+  return saved && VALID_TABS.has(saved) ? saved : 'sessions';
+}
+
+const sidebarActiveTab = ref(sidebarOpen.value ? loadSavedTab() : null);
+
+watch(sidebarActiveTab, (tab) => {
+  if (tab) localStorage.setItem(SIDEBAR_TAB_KEY, tab);
+});
+
+// Sync tab state with sidebar open/close
+watch(sidebarOpen, (isOpen) => {
+  if (!isOpen) {
+    sidebarActiveTab.value = null;
+  } else if (!sidebarActiveTab.value) {
+    // Restore last-used tab when sidebar reopens (e.g. via hamburger)
+    sidebarActiveTab.value = loadSavedTab();
+  }
+});
+
 // Provide sidebar state to child components
 provide('sidebar', {
   open: sidebarOpen,
+  isMobile,
   toggle: toggleSidebar,
+  openSidebar,
   close: closeSidebar,
+  activeTab: sidebarActiveTab,
 });
 
 // Provide settings to child components
@@ -421,14 +470,26 @@ onUnmounted(() => {
   disconnect();
   document.removeEventListener('keydown', handleGlobalKeydown);
   desktopMq.removeEventListener('change', onDesktopMqChange);
+  mobileMq.removeEventListener('change', onMobileMqChange);
 });
 </script>
 
 <template>
   <div class="app" :class="{ 'sidebar-open': sidebarOpen }">
-    <Sidebar ref="sidebarRef" :open="sidebarOpen" :notion-enabled="notionConfig?.enabled ?? false" @close="closeSidebar" @open-settings="openSettings" @new-project="openPaletteNewProject" />
+    <Sidebar ref="sidebarRef" :open="sidebarOpen" :active-tab="sidebarActiveTab" :notion-enabled="notionConfig?.enabled ?? false" @close="closeSidebar" @open-settings="openSettings" @new-project="openPaletteNewProject" />
     <div class="app-main">
       <router-view />
+    </div>
+    <div class="bottom-bar">
+      <button class="bottom-bar-hamburger" title="Toggle sidebar (Ctrl+B)" @click="toggleSidebar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <SidebarFooter v-model:active-tab="sidebarActiveTab" class="bottom-bar-tabs" />
+      <div id="view-footer" class="bottom-bar-view"></div>
     </div>
     <CommandPalette
       :show="showPalette"
@@ -482,21 +543,117 @@ onUnmounted(() => {
 
 <style scoped>
 .app {
-  display: flex;
-  min-height: 100vh;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: 1fr auto;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app:not(.sidebar-open) {
+  grid-template-columns: 1fr;
 }
 
 .app-main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Bottom bar: persistent row at bottom spanning full width */
+.bottom-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  flex-shrink: 0;
+}
+
+/* Hamburger: desktop/tablet only, fixed width, leftmost */
+.bottom-bar-hamburger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: var(--bottom-bar-height);
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: color 0.15s;
+}
+
+.bottom-bar-hamburger:hover {
+  color: var(--text-secondary);
+}
+
+/* When sidebar closed, hamburger carries the separator border */
+.app:not(.sidebar-open) .bottom-bar-hamburger {
+  border-right: 1px solid var(--border-color);
+}
+
+/* Tabs: fixed sidebar-width minus hamburger on desktop with sidebar open,
+   hidden on desktop with sidebar closed */
+.bottom-bar-tabs {
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-color);
+}
+
+/* When sidebar is open, tabs + hamburger together = sidebar width */
+.sidebar-open .bottom-bar-tabs {
+  width: calc(var(--sidebar-width) - 44px);
+}
+
+/* When sidebar is closed, tabs are hidden — hamburger stays, view footer fills rest */
+.app:not(.sidebar-open) .bottom-bar-tabs {
+  display: none;
+}
+
+.bottom-bar-view {
   flex: 1;
   min-width: 0;
   display: flex;
-  flex-direction: column;
+  align-items: center;
 }
 
-/* Mobile: sidebar is overlay */
+/* Tablet: overlay sidebar, same row layout as desktop */
+@media (max-width: 1024px) {
+  .app,
+  .app.sidebar-open {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile: stacked bottom bar, no hamburger */
 @media (max-width: 640px) {
-  .app {
-    display: block;
+  .bottom-bar {
+    flex-direction: column-reverse;
+  }
+
+  /* Hide hamburger on mobile */
+  .bottom-bar-hamburger {
+    display: none;
+  }
+
+  /* Tabs: full width row */
+  .bottom-bar-tabs,
+  .sidebar-open .bottom-bar-tabs,
+  .app:not(.sidebar-open) .bottom-bar-tabs {
+    display: flex;
+    width: 100%;
+    border-right: none;
+    border-top: 1px solid var(--border-color);
+  }
+
+  /* View footer: own row above tabs, hidden when empty */
+  .bottom-bar-view {
+    width: 100%;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .bottom-bar-view:empty {
+    display: none;
   }
 }
 </style>

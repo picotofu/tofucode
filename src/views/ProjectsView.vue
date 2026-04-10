@@ -1,13 +1,5 @@
 <script setup>
-import {
-  computed,
-  inject,
-  nextTick,
-  onMounted,
-  onUnmounted,
-  ref,
-  watch,
-} from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AppHeader from '../components/AppHeader.vue';
 import FilesPanel from '../components/FilesPanel.vue';
@@ -16,7 +8,6 @@ import { useWebSocket } from '../composables/useWebSocket';
 import { formatRelativeTime } from '../utils/format.js';
 
 const router = useRouter();
-const sidebar = inject('sidebar');
 
 const {
   connected,
@@ -192,7 +183,7 @@ function cancelCreateFolder() {
 
 <template>
   <div class="projects-view">
-    <AppHeader :show-hamburger="true" @toggle-sidebar="sidebar.toggle" />
+    <AppHeader />
 
     <!-- Sessions tab -->
     <main v-if="activeTab === 'sessions'" class="main">
@@ -471,45 +462,44 @@ function cancelCreateFolder() {
       <FilesPanel v-else :manager="fm" :show-reference="false" />
     </div>
 
-    <!-- Bottom tab nav -->
-    <nav class="bottom-nav">
-      <button
-        class="nav-tab"
-        :class="{ active: activeTab === 'sessions' }"
-        @click="activeTab = 'sessions'"
-      >
-        <!-- Heroicon: clock -->
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9"/>
-          <polyline points="12 7 12 12 15 15"/>
-        </svg>
-        <span>Sessions</span>
-      </button>
-      <button
-        class="nav-tab"
-        :class="{ active: activeTab === 'folders' }"
-        @click="activeTab = 'folders'"
-      >
-        <!-- Heroicon: folder-open -->
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 7a2 2 0 0 1 2-2h3.586a1 1 0 0 1 .707.293L10.414 6.5A1 1 0 0 0 11.121 6.793 1 1 0 0 0 11.5 7H19a2 2 0 0 1 2 2v1H3V7z"/>
-          <path d="M3 10h18l-1.447 7.235A2 2 0 0 1 17.574 19H6.426a2 2 0 0 1-1.979-1.765L3 10z"/>
-        </svg>
-        <span>Folders</span>
-      </button>
-      <button
-        class="nav-tab"
-        :class="{ active: activeTab === 'files' }"
-        @click="activeTab = 'files'"
-      >
-        <!-- Heroicon: document-text -->
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 12h6M9 16h6M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-5-5z"/>
-          <path d="M13 3v5h5"/>
-        </svg>
-        <span>Files</span>
-      </button>
-    </nav>
+    <!-- Bottom tab nav — teleported to app-level bottom bar -->
+    <Teleport to="#view-footer">
+      <nav class="bottom-nav">
+        <button
+          class="nav-tab"
+          :class="{ active: activeTab === 'sessions' }"
+          @click="activeTab = 'sessions'"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/>
+            <polyline points="12 7 12 12 15 15"/>
+          </svg>
+          <span>Sessions</span>
+        </button>
+        <button
+          class="nav-tab"
+          :class="{ active: activeTab === 'folders' }"
+          @click="activeTab = 'folders'"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7a2 2 0 0 1 2-2h3.586a1 1 0 0 1 .707.293L10.414 6.5A1 1 0 0 0 11.121 6.793 1 1 0 0 0 11.5 7H19a2 2 0 0 1 2 2v1H3V7z"/>
+            <path d="M3 10h18l-1.447 7.235A2 2 0 0 1 17.574 19H6.426a2 2 0 0 1-1.979-1.765L3 10z"/>
+          </svg>
+          <span>Folders</span>
+        </button>
+        <button
+          class="nav-tab"
+          :class="{ active: activeTab === 'files' }"
+          @click="activeTab = 'files'"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 12h6M9 16h6M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-5-5z"/>
+            <path d="M13 3v5h5"/>
+          </svg>
+          <span>Files</span>
+        </button>
+      </nav>
+    </Teleport>
   </div>
 </template>
 
@@ -517,7 +507,7 @@ function cancelCreateFolder() {
 .projects-view {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -552,9 +542,10 @@ function cancelCreateFolder() {
 /* ─── Bottom nav ─────────────────────────────────────────────────────────────── */
 .bottom-nav {
   display: flex;
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  height: var(--bottom-bar-height);
 }
 
 .nav-tab {

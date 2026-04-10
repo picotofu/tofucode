@@ -7,7 +7,6 @@ import { useWebSocket } from '../composables/useWebSocket';
 
 const route = useRoute();
 const settingsContext = inject('settings');
-const sidebar = inject('sidebar');
 const { send, onMessage, connected, recentSessions, sessionStatuses } =
   useWebSocket();
 
@@ -261,93 +260,86 @@ const configured = computed(() => !!notesBasePath.value);
       </div>
     </div>
 
-    <!-- Bottom footer bar -->
-    <div class="notes-footer-bar">
-      <!-- Hamburger: toggle sidebar -->
-      <button class="footer-btn" title="Toggle sidebar" @click="sidebar?.toggle()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="3" y1="6" x2="21" y2="6"/>
-          <line x1="3" y1="12" x2="21" y2="12"/>
-          <line x1="3" y1="18" x2="21" y2="18"/>
-        </svg>
-      </button>
+    <!-- Footer bar — teleported to app-level bottom bar -->
+    <Teleport to="#view-footer">
+      <div class="notes-footer-bar">
+        <!-- File path (truncated from left so filename is always visible) -->
+        <span v-if="openedFile" class="footer-path" :title="displayPath">{{ displayPath }}</span>
+        <span v-else class="footer-path footer-path--empty">Notes</span>
 
-      <!-- File path (truncated from left so filename is always visible) -->
-      <span v-if="openedFile" class="footer-path" :title="displayPath">{{ displayPath }}</span>
-      <span v-else class="footer-path footer-path--empty">Notes</span>
+        <!-- Dirty indicator -->
+        <span v-if="fileEditorRef?.isDirty" class="footer-dirty" title="Unsaved changes">*</span>
 
-      <!-- Dirty indicator -->
-      <span v-if="fileEditorRef?.isDirty" class="footer-dirty" title="Unsaved changes">*</span>
+        <!-- Recent sessions inline -->
+        <div v-if="displayedRecentSessions.length > 0" class="recent-sessions-group desktop-only">
+          <a
+            v-for="session in displayedRecentSessions"
+            :key="session.sessionId"
+            :href="getSessionUrl(session)"
+            class="recent-session-item"
+            :title="getSessionDisplayTitle(session)"
+          >
+            <span v-if="sessionStatuses.get(session.sessionId)" class="recent-session-status" :class="sessionStatuses.get(session.sessionId).status">
+              <svg v-if="sessionStatuses.get(session.sessionId).status === 'running'" width="10" height="10" viewBox="0 0 24 24" class="status-spinner"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round"/></svg>
+              <svg v-else-if="sessionStatuses.get(session.sessionId).status === 'completed'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <svg v-else-if="sessionStatuses.get(session.sessionId).status === 'error'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </span>
+            <span class="recent-session-text">{{ getSessionDisplayTitle(session) }}</span>
+          </a>
+        </div>
 
-      <!-- Desktop: recent sessions inline (hidden on mobile) -->
-      <div v-if="displayedRecentSessions.length > 0" class="recent-sessions-group desktop-only">
-        <a
-          v-for="session in displayedRecentSessions"
-          :key="session.sessionId"
-          :href="getSessionUrl(session)"
-          class="recent-session-item"
-          :title="getSessionDisplayTitle(session)"
+        <!-- Stats — hidden on mobile -->
+        <span v-if="openedFile && !openedFile.loading" class="footer-stats">
+          <span class="stat-item" :title="`File size: ${fileSize}`">{{ fileSize }}</span>
+          <span class="stat-item" :title="`Total lines: ${totalLines}`">≡ {{ totalLines }}</span>
+          <span class="stat-item" :title="`Total characters: ${totalChars}`">∑ {{ totalChars }}</span>
+        </span>
+
+        <!-- TOC toggle -->
+        <button
+          v-if="openedFile && fileEditorRef?.hasToc"
+          class="footer-btn"
+          :class="{ active: fileEditorRef?.tocVisible }"
+          title="Toggle table of contents"
+          @click="fileEditorRef?.toggleToc()"
         >
-          <span v-if="sessionStatuses.get(session.sessionId)" class="recent-session-status" :class="sessionStatuses.get(session.sessionId).status">
-            <svg v-if="sessionStatuses.get(session.sessionId).status === 'running'" width="10" height="10" viewBox="0 0 24 24" class="status-spinner"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round"/></svg>
-            <svg v-else-if="sessionStatuses.get(session.sessionId).status === 'completed'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            <svg v-else-if="sessionStatuses.get(session.sessionId).status === 'error'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </span>
-          <span class="recent-session-text">{{ getSessionDisplayTitle(session) }}</span>
-        </a>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="15" y2="12"/>
+            <line x1="3" y1="18" x2="18" y2="18"/>
+          </svg>
+        </button>
+
+        <!-- Download -->
+        <button
+          v-if="openedFile && !openedFile.loading && openedFile.content"
+          class="footer-btn"
+          title="Download"
+          @click="handleFileDownload"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
+
+        <!-- Save -->
+        <button
+          v-if="openedFile"
+          class="footer-btn"
+          :disabled="!fileEditorRef?.isDirty || fileEditorRef?.isSaving"
+          title="Save (Cmd+S)"
+          @click="fileEditorRef?.save()"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+        </button>
       </div>
-
-      <!-- Stats — hidden on mobile -->
-      <span v-if="openedFile && !openedFile.loading" class="footer-stats">
-        <span class="stat-item" :title="`File size: ${fileSize}`">{{ fileSize }}</span>
-        <span class="stat-item" :title="`Total lines: ${totalLines}`">≡ {{ totalLines }}</span>
-        <span class="stat-item" :title="`Total characters: ${totalChars}`">∑ {{ totalChars }}</span>
-      </span>
-
-      <!-- TOC toggle -->
-      <button
-        v-if="openedFile && fileEditorRef?.hasToc"
-        class="footer-btn"
-        :class="{ active: fileEditorRef?.tocVisible }"
-        title="Toggle table of contents"
-        @click="fileEditorRef?.toggleToc()"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="3" y1="6" x2="21" y2="6"/>
-          <line x1="3" y1="12" x2="15" y2="12"/>
-          <line x1="3" y1="18" x2="18" y2="18"/>
-        </svg>
-      </button>
-
-      <!-- Download -->
-      <button
-        v-if="openedFile && !openedFile.loading && openedFile.content"
-        class="footer-btn"
-        title="Download"
-        @click="handleFileDownload"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-      </button>
-
-      <!-- Save -->
-      <button
-        v-if="openedFile"
-        class="footer-btn"
-        :disabled="!fileEditorRef?.isDirty || fileEditorRef?.isSaving"
-        title="Save (Cmd+S)"
-        @click="fileEditorRef?.save()"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-          <polyline points="17 21 17 13 7 13 7 21"/>
-          <polyline points="7 3 7 8 15 8"/>
-        </svg>
-      </button>
-    </div>
+    </Teleport>
   </div>
 </template>
 
@@ -355,7 +347,7 @@ const configured = computed(() => !!notesBasePath.value);
 .notes-view {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -371,16 +363,16 @@ const configured = computed(() => !!notesBasePath.value);
   min-height: 0;
 }
 
-/* Bottom footer bar */
+/* Bottom footer bar — teleported to #view-footer */
 .notes-footer-bar {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 0 4px;
-  height: 44px;
-  flex-shrink: 0;
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-primary);
+  padding: 0 8px;
+  height: var(--bottom-bar-height);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .footer-btn {

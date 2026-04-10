@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useWebSocket } from '../composables/useWebSocket';
 import { formatRelativeTime } from '../utils/format.js';
@@ -10,6 +10,10 @@ const props = defineProps({
   open: {
     type: Boolean,
     default: true,
+  },
+  activeTab: {
+    type: String,
+    default: null,
   },
   notionEnabled: {
     type: Boolean,
@@ -52,6 +56,9 @@ const {
   onMessage,
   openCloneDialog,
 } = useWebSocket();
+
+// Resolved active tab — falls back to 'sessions' when null (sidebar closed state)
+const resolvedTab = computed(() => props.activeTab ?? 'sessions');
 
 // Project sort state (default: recent first; true = A-Z)
 const sortAZ = ref(false);
@@ -101,25 +108,11 @@ function handleDismissUpdate(e) {
   }
 }
 
-const SIDEBAR_TAB_KEY = 'tofucode:sidebar-tab';
-const VALID_TABS = new Set(['sessions', 'projects', 'tasks', 'notes']);
-
-function loadSavedTab() {
-  const saved = localStorage.getItem(SIDEBAR_TAB_KEY);
-  return saved && VALID_TABS.has(saved) ? saved : 'sessions';
-}
-
-const activeTab = ref(loadSavedTab());
-
-watch(activeTab, (tab) => {
-  localStorage.setItem(SIDEBAR_TAB_KEY, tab);
-});
-
 // Fetch tasks + status options + assignees once on first tab open
 const tasksFetched = ref(false);
 
 watch(
-  activeTab,
+  () => props.activeTab,
   (tab) => {
     if (tab === 'tasks' && !tasksFetched.value) {
       getTasks();
@@ -134,11 +127,14 @@ watch(
 // Initialize notes panel on first tab open
 const notesPanelRef = ref(null);
 
-watch(activeTab, (tab) => {
-  if (tab === 'notes') {
-    notesPanelRef.value?.initNotes();
-  }
-});
+watch(
+  () => props.activeTab,
+  (tab) => {
+    if (tab === 'notes') {
+      notesPanelRef.value?.initNotes();
+    }
+  },
+);
 
 function openTodayNote() {
   notesPanelRef.value?.openTodayNote();
@@ -209,39 +205,17 @@ function handleOverlayClick() {
   emit('close');
 }
 
-// Cmd/Ctrl+1–4: switch sidebar tabs (sessions, projects, tasks, notes)
-const TAB_KEYS = {
-  1: 'sessions',
-  2: 'projects',
-  3: 'tasks',
-  4: 'notes',
-};
-
-function handleKeydown(e) {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
-  const tab = TAB_KEYS[e.key];
-  if (tab) {
-    e.preventDefault();
-    activeTab.value = tab;
-  }
-}
-
 onMounted(() => {
   fetchData();
-  document.addEventListener('keydown', handleKeydown);
-});
-
-onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeydown);
 });
 </script>
 
 <template>
   <aside class="sidebar" :class="{ open }">
-    <div class="sidebar-content" :class="{ 'sidebar-content-tasks': activeTab === 'tasks' && notionEnabled, 'sidebar-content-notes': activeTab === 'notes' }">
+    <div class="sidebar-content" :class="{ 'sidebar-content-tasks': resolvedTab === 'tasks' && notionEnabled, 'sidebar-content-notes': resolvedTab === 'notes' }">
       <!-- Recent Sessions Tab -->
       <!-- Skeleton while sessions are loading -->
-      <ul v-if="activeTab === 'sessions' && !sessionsReady" class="sidebar-list">
+      <ul v-if="resolvedTab === 'sessions' && !sessionsReady" class="sidebar-list">
         <li v-for="i in 4" :key="i" class="sidebar-item sidebar-skeleton-item">
           <div class="sidebar-link">
             <div class="skeleton-icon"></div>
@@ -253,7 +227,7 @@ onUnmounted(() => {
         </li>
       </ul>
       <!-- Actual sessions list -->
-      <ul v-else-if="activeTab === 'sessions'" class="sidebar-list">
+      <ul v-else-if="resolvedTab === 'sessions'" class="sidebar-list">
         <li
           v-for="session in recentSessions"
           :key="session.sessionId"
@@ -337,7 +311,7 @@ onUnmounted(() => {
       </ul>
 
       <!-- Tasks Tab -->
-      <template v-else-if="activeTab === 'tasks'">
+      <template v-else-if="resolvedTab === 'tasks'">
         <div v-if="!notionEnabled" class="sidebar-list">
           <div class="sidebar-empty">
             Notion is not enabled. Configure it in
@@ -365,13 +339,13 @@ onUnmounted(() => {
 
       <!-- Notes Tab -->
       <NotesPanel
-        v-else-if="activeTab === 'notes'"
+        v-else-if="resolvedTab === 'notes'"
         ref="notesPanelRef"
         @open-settings="(tab) => $emit('open-settings', tab)"
       />
 
       <!-- Projects Tab -->
-      <ul v-else-if="activeTab === 'projects'" class="sidebar-list">
+      <ul v-else-if="resolvedTab === 'projects'" class="sidebar-list">
         <li
           v-for="project in sortedProjects"
           :key="project.slug"
@@ -411,7 +385,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Projects toolbar (pinned, only in projects tab) -->
-    <div v-if="activeTab === 'projects'" class="sidebar-project-toolbar">
+    <div v-if="resolvedTab === 'projects'" class="sidebar-project-toolbar">
       <!-- New Project -->
       <button class="project-toolbar-btn" title="New Project" @click="$emit('new-project')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -444,58 +418,6 @@ onUnmounted(() => {
         </svg>
       </button>
     </div>
-
-    <nav class="sidebar-tabs">
-      <!-- Sessions tab -->
-      <button
-        class="sidebar-tab"
-        :class="{ active: activeTab === 'sessions' }"
-        @click="activeTab = 'sessions'"
-        title="Sessions"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-      </button>
-      <!-- Projects tab -->
-      <button
-        class="sidebar-tab"
-        :class="{ active: activeTab === 'projects' }"
-        @click="activeTab = 'projects'"
-        title="Projects"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-        </svg>
-      </button>
-      <!-- Tasks tab -->
-      <button
-        class="sidebar-tab"
-        :class="{ active: activeTab === 'tasks' }"
-        @click="activeTab = 'tasks'"
-        title="Tasks"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 11l3 3L22 4"/>
-          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-        </svg>
-      </button>
-      <!-- Notes tab -->
-      <button
-        class="sidebar-tab"
-        :class="{ active: activeTab === 'notes' }"
-        @click="activeTab = 'notes'"
-        title="Notes"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
-          <polyline points="10 9 9 9 8 9"/>
-        </svg>
-      </button>
-    </nav>
 
     <div class="sidebar-header">
       <router-link :to="{ name: 'projects' }" class="sidebar-title">
@@ -538,17 +460,6 @@ onUnmounted(() => {
         </svg>
       </button>
 
-      <!-- Close button (mobile only) -->
-      <button
-        class="sidebar-icon-btn sidebar-close-btn"
-        @click="$emit('close')"
-        title="Close sidebar"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
     </div>
   </aside>
 
@@ -564,8 +475,8 @@ onUnmounted(() => {
 .sidebar {
   display: none;
   flex-direction: column;
-  width: var(--sidebar-width, 260px);
-  height: 100vh;
+  width: var(--sidebar-width);
+  height: 100%;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   overflow: hidden;
@@ -698,41 +609,6 @@ onUnmounted(() => {
   color: var(--text-primary);
   border-color: var(--text-muted);
 }
-
-.sidebar-tabs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 8px 16px;
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
-}
-
-.sidebar-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: transparent;
-  border-radius: var(--radius-sm);
-  transition: color 0.15s, background 0.15s;
-  flex: 1;
-  justify-content: center;
-  position: relative;
-}
-
-.sidebar-tab:hover {
-  color: var(--text-secondary);
-}
-
-.sidebar-tab.active {
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-}
-
 
 .sidebar-content {
   flex: 1;
@@ -1042,10 +918,6 @@ onUnmounted(() => {
   display: none;
 }
 
-/* Close button hidden on desktop */
-.sidebar-close-btn {
-  display: none;
-}
 
 /* Tablet styles - sidebar as overlay at desktop width */
 @media (min-width: 641px) and (max-width: 1024px) {
@@ -1053,18 +925,17 @@ onUnmounted(() => {
     position: fixed;
     left: 0;
     top: 0;
+    bottom: var(--bottom-bar-height);
+    height: auto;
     z-index: 200;
-    width: var(--sidebar-width, 260px);
-  }
-
-  .sidebar-close-btn {
-    display: inline-flex;
+    width: var(--sidebar-width);
   }
 
   .sidebar-overlay {
     display: block;
     position: fixed;
     inset: 0;
+    bottom: var(--bottom-bar-height);
     background: rgba(0, 0, 0, 0.5);
     z-index: 199;
   }
@@ -1076,18 +947,17 @@ onUnmounted(() => {
     position: fixed;
     left: 0;
     top: 0;
+    bottom: var(--bottom-bar-height);
+    height: auto;
     z-index: 200;
     width: 100vw;
-  }
-
-  .sidebar-close-btn {
-    display: inline-flex;
   }
 
   .sidebar-overlay {
     display: block;
     position: fixed;
     inset: 0;
+    bottom: var(--bottom-bar-height);
     background: rgba(0, 0, 0, 0.5);
     z-index: 199;
   }

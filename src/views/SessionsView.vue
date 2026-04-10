@@ -1,5 +1,5 @@
 <script setup>
-import { computed, inject, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppHeader from '../components/AppHeader.vue';
 import { useWebSocket } from '../composables/useWebSocket';
@@ -16,9 +16,6 @@ const {
   setSessionTitle,
   deleteSession,
 } = useWebSocket();
-
-// Get sidebar from App.vue
-const sidebar = inject('sidebar');
 
 // Session title editing
 const editingSessionId = ref(null);
@@ -107,10 +104,8 @@ function handleDeleteSession(sessionId, event) {
 <template>
   <div class="sessions-view">
     <AppHeader
-      :show-hamburger="true"
       :title="projectInfo.name"
       :subtitle="projectInfo.path"
-      @toggle-sidebar="sidebar.toggle"
     />
 
     <main class="main">
@@ -217,7 +212,7 @@ function handleDeleteSession(sessionId, event) {
 .sessions-view {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   overflow-y: auto;
 }
 
