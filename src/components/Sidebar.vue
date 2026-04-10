@@ -111,18 +111,17 @@ function handleDismissUpdate(e) {
 // Fetch tasks + status options + assignees once on first tab open
 const tasksFetched = ref(false);
 
-watch(
-  () => props.activeTab,
-  (tab) => {
-    if (tab === 'tasks' && !tasksFetched.value) {
-      getTasks();
-      getTaskStatusOptions();
-      getTaskAssignees();
-      tasksFetched.value = true;
-    }
-  },
-  { immediate: true },
-);
+function fetchTasksIfNeeded() {
+  if (resolvedTab.value === 'tasks' && !tasksFetched.value && connected.value) {
+    getTasks();
+    getTaskStatusOptions();
+    getTaskAssignees();
+    tasksFetched.value = true;
+  }
+}
+
+watch(() => props.activeTab, fetchTasksIfNeeded, { immediate: true });
+watch(connected, fetchTasksIfNeeded);
 
 // Initialize notes panel on first tab open
 const notesPanelRef = ref(null);
