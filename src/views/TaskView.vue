@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import AssigneeDropdown from '../components/AssigneeDropdown.vue';
 import { useWebSocket } from '../composables/useWebSocket';
 import { formatRelativeTime } from '../utils/format.js';
+import { notionColorStyle } from '../utils/notion-colors.js';
 
 const route = useRoute();
 
@@ -70,6 +71,12 @@ watch(taskDetail, (detail) => {
         if (info.type === 'people') {
           const arr = Array.isArray(info.value) ? info.value : [];
           fields[fieldName] = arr[0]?.id ?? '';
+        } else if (info.type === 'multi_select') {
+          // Normalize to string names — color info is sourced from fieldOptions at render time
+          const arr = Array.isArray(info.value) ? info.value : [];
+          fields[fieldName] = arr.map((l) =>
+            typeof l === 'string' ? l : l.name,
+          );
         } else {
           fields[fieldName] = info.value;
         }
@@ -116,10 +123,27 @@ function saveField(fieldName, fieldType, value, immediate = false) {
 
 function onFieldChange(fieldName, fieldType, value) {
   editFields.value[fieldName] = value;
-  const immediate = ['select', 'status', 'checkbox', 'date', 'people'].includes(
-    fieldType,
-  );
+  const immediate = [
+    'select',
+    'status',
+    'checkbox',
+    'date',
+    'people',
+    'multi_select',
+  ].includes(fieldType);
   saveField(fieldName, fieldType, value, immediate);
+}
+
+function toggleLabel(fieldName, labelName) {
+  const current = editFields.value[fieldName] ?? [];
+  const updated = current.includes(labelName)
+    ? current.filter((n) => n !== labelName)
+    : [...current, labelName];
+  onFieldChange(fieldName, 'multi_select', updated);
+}
+
+function labelStyle(color) {
+  return notionColorStyle(color);
 }
 
 // Auto-managed types — skip rendering (read-only system fields)
@@ -148,14 +172,6 @@ const renderableFields = computed(() => {
 // Get options for a select/status/multi_select field
 function getFieldOptions(fieldName) {
   return taskDetail.value?.fieldOptions?.[fieldName] ?? [];
-}
-
-// Get the display tags for a multi_select field
-function getMultiSelectDisplay(fieldName) {
-  const val = taskDetail.value?.properties?.[fieldName]?.value;
-  if (!val) return [];
-  if (Array.isArray(val)) return val;
-  return [];
 }
 
 function statusClass(status) {
@@ -284,15 +300,21 @@ function onCommentKeydown(e) {
               />
             </template>
 
-            <!-- multi_select — read-only tags -->
+            <!-- multi_select — toggleable label pills -->
             <template v-else-if="field.type === 'multi_select'">
               <div class="task-field-tags">
-                <span
-                  v-for="tag in getMultiSelectDisplay(field.field)"
-                  :key="tag"
-                  class="task-tag"
-                >{{ tag }}</span>
-                <span v-if="getMultiSelectDisplay(field.field).length === 0" class="task-field-empty">—</span>
+                <template v-if="getFieldOptions(field.field).length > 0">
+                  <button
+                    v-for="opt in getFieldOptions(field.field)"
+                    :key="opt.name"
+                    type="button"
+                    class="task-label-pill"
+                    :class="{ 'task-label-pill--active': (editFields[field.field] ?? []).includes(opt.name) }"
+                    :style="labelStyle(opt.color)"
+                    @click="toggleLabel(field.field, opt.name)"
+                  >{{ opt.name }}</button>
+                </template>
+                <span v-else class="task-field-empty">—</span>
               </div>
             </template>
 
@@ -624,6 +646,29 @@ function onCommentKeydown(e) {
   border-radius: 10px;
   color: var(--text-secondary);
   white-space: nowrap;
+}
+
+.task-label-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 10px;
+  border: 1px solid;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: opacity 0.15s, box-shadow 0.15s;
+}
+
+.task-label-pill:hover {
+  opacity: 0.7;
+}
+
+.task-label-pill--active {
+  opacity: 1;
+  box-shadow: 0 0 0 1px currentColor;
 }
 
 .task-field-empty {

@@ -49,6 +49,9 @@ async function resolveContext(ws, errorType) {
   const statusMapping = config.fieldMappings?.find(
     (m) => m.type === 'status' || m.type === 'select',
   );
+  const labelMapping = config.fieldMappings?.find(
+    (m) => m.type === 'multi_select',
+  );
 
   return {
     provider,
@@ -56,6 +59,7 @@ async function resolveContext(ws, errorType) {
     databaseUrl,
     assigneeField: assigneeMapping?.field ?? null,
     statusField: statusMapping?.field ?? null,
+    labelField: labelMapping?.field ?? null,
   };
 }
 
@@ -69,7 +73,14 @@ export async function handleListTasks(ws, message) {
     const ctx = await resolveContext(ws, 'tasks:list_result');
     if (!ctx) return;
 
-    const { provider, config, databaseUrl, assigneeField, statusField } = ctx;
+    const {
+      provider,
+      config,
+      databaseUrl,
+      assigneeField,
+      statusField,
+      labelField,
+    } = ctx;
     const limit = message.limit ?? 20;
     const cursor = message.cursor ?? undefined;
     const filterByStatus = message.filterByStatus ?? undefined;
@@ -97,6 +108,7 @@ export async function handleListTasks(ws, message) {
       filterByUserId: filterByUserId ?? undefined,
       assigneeField: assigneeField ?? undefined,
       statusField: statusField ?? undefined,
+      labelField: labelField ?? undefined,
       filterByStatus,
       titleSearch,
     });

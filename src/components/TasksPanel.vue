@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { formatRelativeTime } from '../utils/format.js';
+import { notionColorStyle } from '../utils/notion-colors.js';
 import AssigneeDropdown from './AssigneeDropdown.vue';
 
 const props = defineProps({
@@ -214,6 +215,11 @@ function statusClass(status) {
     return 'status-error';
   return 'status-muted';
 }
+
+function labelStyle(label) {
+  const s = notionColorStyle(label.color);
+  return { background: s.background, color: s.color, borderColor: s.border };
+}
 </script>
 
 <template>
@@ -335,6 +341,12 @@ function statusClass(status) {
                       <p class="tasks-item-title">{{ task.title }}</p>
                       <p class="tasks-item-meta">
                         <span v-if="task.ticketId" class="tasks-item-ticket-id">{{ task.ticketId }}</span>
+                        <span
+                          v-for="label in task.labels"
+                          :key="label.name"
+                          class="tasks-item-label"
+                          :style="labelStyle(label)"
+                        >{{ label.name }}</span>
                         <span v-if="task.lastEditedAt">{{ formatRelativeTime(task.lastEditedAt) }}</span>
                       </p>
                     </div>
@@ -359,6 +371,12 @@ function statusClass(status) {
                       <span v-if="task.ticketId" class="tasks-item-ticket-id">{{ task.ticketId }}</span>
                       <!-- Show status badge when grouped by assignee (not grouped by status) -->
                       <span v-if="groupByAssignee && !groupByStatus && task.status" class="status-badge" :class="statusClass(task.status)">{{ task.status }}</span>
+                      <span
+                        v-for="label in task.labels"
+                        :key="label.name"
+                        class="tasks-item-label"
+                        :style="labelStyle(label)"
+                      >{{ label.name }}</span>
                       <span v-if="task.lastEditedAt">{{ formatRelativeTime(task.lastEditedAt) }}</span>
                     </p>
                   </div>
@@ -386,6 +404,12 @@ function statusClass(status) {
                 <p class="tasks-item-meta">
                   <span v-if="task.ticketId" class="tasks-item-ticket-id">{{ task.ticketId }}</span>
                   <span v-if="!localStatus && task.status" class="status-badge" :class="statusClass(task.status)">{{ task.status }}</span>
+                  <span
+                    v-for="label in task.labels"
+                    :key="label.name"
+                    class="tasks-item-label"
+                    :style="labelStyle(label)"
+                  >{{ label.name }}</span>
                   <span v-if="task.lastEditedAt">{{ formatRelativeTime(task.lastEditedAt) }}</span>
                 </p>
               </div>
@@ -699,6 +723,17 @@ function statusClass(status) {
 .status-muted {
   background: var(--bg-tertiary);
   color: var(--text-muted);
+}
+
+/* ── Label pills (sidebar) ────────────────────── */
+.tasks-item-label {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1px solid;
+  white-space: nowrap;
 }
 
 /* ── Empty / error ────────────────────────────── */

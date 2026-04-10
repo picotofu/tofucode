@@ -489,6 +489,26 @@ function extractPageStatus(properties, statusField) {
 }
 
 /**
+ * Extract labels from a Notion page properties object.
+ * Returns an array of { name, color } objects for the known labelField.
+ * @param {Object} properties
+ * @param {string|null} [labelField] - Known multi_select field name from fieldMappings
+ * @returns {Array<{name: string, color: string}>}
+ */
+function extractPageLabels(properties, labelField) {
+  if (labelField && properties[labelField]) {
+    const prop = properties[labelField];
+    if (prop.type === 'multi_select' && Array.isArray(prop.multi_select)) {
+      return prop.multi_select.map((o) => ({
+        name: o.name,
+        color: o.color ?? 'default',
+      }));
+    }
+  }
+  return [];
+}
+
+/**
  * Extract assignee names from a Notion page properties object.
  * Uses the known assigneeField name when provided, otherwise scans for the first people property.
  * @param {Object} properties
@@ -630,7 +650,10 @@ function extractAllProperties(properties, fieldMappings) {
         entry.value = prop.status?.name ?? null;
         break;
       case 'multi_select':
-        entry.value = (prop.multi_select ?? []).map((o) => o.name);
+        entry.value = (prop.multi_select ?? []).map((o) => ({
+          name: o.name,
+          color: o.color ?? 'default',
+        }));
         break;
       case 'people':
         entry.value = (prop.people ?? []).map((p) => ({
@@ -680,9 +703,10 @@ function extractFieldOptions(schema, fieldMappings) {
     } else if (prop.type === 'status') {
       result[mapping.field] = (prop.status?.options ?? []).map((o) => o.name);
     } else if (prop.type === 'multi_select') {
-      result[mapping.field] = (prop.multi_select?.options ?? []).map(
-        (o) => o.name,
-      );
+      result[mapping.field] = (prop.multi_select?.options ?? []).map((o) => ({
+        name: o.name,
+        color: o.color ?? 'default',
+      }));
     }
   }
   return result;
@@ -896,6 +920,7 @@ export function createNotionProvider(token) {
       filterByUserId,
       assigneeField,
       statusField,
+      labelField,
       filterByStatus,
       titleSearch,
     }) {
@@ -965,6 +990,7 @@ export function createNotionProvider(token) {
           url: page.url || `https://notion.so/${page.id.replace(/-/g, '')}`,
           status: extractPageStatus(page.properties ?? {}, statusField),
           assignees: extractPageAssignees(page.properties ?? {}, assigneeField),
+          labels: extractPageLabels(page.properties ?? {}, labelField),
           lastEditedAt: page.last_edited_time,
         }));
 
