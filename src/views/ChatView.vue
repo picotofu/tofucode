@@ -3617,7 +3617,7 @@ watch(
   transform: scale(0.98);
 }
 
-/* Mobile: Flex to fill space */
+/* Mobile: Flex to fill space, show only 1 session */
 @media (max-width: 639px) {
   .recent-sessions-group {
     flex: 1;
@@ -3629,6 +3629,10 @@ watch(
     flex: 1;
     min-width: 0;
     max-width: none;
+  }
+
+  .recent-session-item:nth-child(n+2) {
+    display: none;
   }
 }
 
