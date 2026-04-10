@@ -1013,6 +1013,7 @@ async function handleClearCacheAndUpdate() {
                   class="setting-input mapping-input"
                   placeholder="Field name"
                 />
+                <span v-if="mapping.type" class="mapping-type-badge">{{ mapping.type }}</span>
                 <input
                   type="text"
                   v-model="mapping.purpose"
@@ -1675,8 +1676,20 @@ async function handleClearCacheAndUpdate() {
 .mapping-fields {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  grid-template-columns: 1fr auto 2fr;
+  align-items: center;
   gap: 6px;
+}
+
+.mapping-type-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
 }
 
 
