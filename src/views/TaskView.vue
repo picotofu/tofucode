@@ -9,6 +9,7 @@ import { notionColorStyle } from '../utils/notion-colors.js';
 const route = useRoute();
 
 const {
+  connected,
   fetchTaskDetail,
   taskDetail,
   taskDetailLoading,
@@ -42,15 +43,21 @@ const commentTextareaRef = ref(null);
 // Track whether we've populated local state for the current page
 let taskLoaded = false;
 
-onMounted(() => {
-  if (taskStatusOptions.value.length === 0) {
-    getTaskStatusOptions();
+function fetchAll(id) {
+  if (!connected.value) return;
+  if (taskStatusOptions.value.length === 0) getTaskStatusOptions();
+  if (taskAssignees.value.length === 0) getTaskAssignees();
+  fetchTaskDetail(id);
+  getTaskComments(id);
+}
+
+onMounted(() => fetchAll(pageId.value));
+
+// Retry initial fetch if WS wasn't open yet on mount
+watch(connected, (isConnected) => {
+  if (isConnected && !taskLoaded && !taskDetailLoading.value) {
+    fetchAll(pageId.value);
   }
-  if (taskAssignees.value.length === 0) {
-    getTaskAssignees();
-  }
-  fetchTaskDetail(pageId.value);
-  getTaskComments(pageId.value);
 });
 
 onUnmounted(() => {
