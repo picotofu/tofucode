@@ -1154,7 +1154,7 @@ export function createNotionProvider(token) {
         return (res.results ?? []).map((c) => ({
           id: c.id,
           createdTime: c.created_time,
-          createdBy: c.created_by?.name || c.created_by?.id || 'Unknown',
+          createdBy: c.created_by?.id || 'Unknown',
           content: extractPlainText(c.rich_text ?? []),
         }));
       } catch (err) {

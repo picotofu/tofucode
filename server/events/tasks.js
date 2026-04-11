@@ -375,7 +375,18 @@ export async function handleGetComments(ws, message) {
       return;
     }
 
-    const comments = await provider.getComments(pageId);
+    const [comments, workspaceUsers] = await Promise.all([
+      provider.getComments(pageId),
+      provider.listWorkspaceUsers(),
+    ]);
+
+    // Resolve UUIDs to display names using workspace user list
+    const userMap = new Map(workspaceUsers.map((u) => [u.id, u.name]));
+    for (const comment of comments) {
+      if (userMap.has(comment.createdBy)) {
+        comment.createdBy = userMap.get(comment.createdBy);
+      }
+    }
     send(ws, {
       type: 'tasks:comments_result',
       success: true,
