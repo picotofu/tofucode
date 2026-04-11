@@ -565,6 +565,7 @@ onUnmounted(() => {
 /* Bottom bar: persistent row at bottom spanning full width */
 .bottom-bar {
   grid-column: 1 / -1;
+  min-width: 0;
   display: flex;
   align-items: center;
   border-top: 1px solid var(--border-color);
@@ -617,7 +618,7 @@ onUnmounted(() => {
   align-items: center;
 }
 
-/* Tablet: overlay sidebar, same row layout as desktop */
+/* Tablet: overlay sidebar — grid is always single column */
 @media (max-width: 1024px) {
   .app,
   .app.sidebar-open {
