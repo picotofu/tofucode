@@ -446,6 +446,13 @@ function onCommentKeydown(e) {
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
+  width: 100%;
+}
+
+.task-scroll input,
+.task-scroll textarea,
+.task-scroll select {
+  box-sizing: border-box;
   max-width: 100%;
 }
 
@@ -514,6 +521,8 @@ function onCommentKeydown(e) {
   color: var(--text-primary);
   margin: 0 0 6px;
   line-height: 1.3;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .task-meta {
@@ -550,6 +559,8 @@ function onCommentKeydown(e) {
   align-items: center;
   gap: 12px;
   min-height: 32px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .task-field-label {
