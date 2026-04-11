@@ -436,6 +436,7 @@ function onCommentKeydown(e) {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
   background: var(--bg-primary);
   overflow: hidden;
 }
@@ -513,6 +514,8 @@ function onCommentKeydown(e) {
 /* ── Title section ───────────────────────────── */
 .task-title-section {
   padding: 20px 20px 12px;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .task-title {
@@ -552,6 +555,8 @@ function onCommentKeydown(e) {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .task-field-row {
@@ -716,6 +721,8 @@ function onCommentKeydown(e) {
 /* ── Body section ────────────────────────────── */
 .task-body-section {
   padding: 16px 20px;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .task-body-editor {
@@ -746,6 +753,8 @@ function onCommentKeydown(e) {
 /* ── Comments section ────────────────────────── */
 .task-comments-section {
   padding: 16px 20px 24px;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .task-comments-loading {
