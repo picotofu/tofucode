@@ -149,8 +149,22 @@ function toggleLabel(fieldName, labelName) {
   onFieldChange(fieldName, 'multi_select', updated);
 }
 
+function toggleSelect(fieldName, fieldType, optName) {
+  const current = editFields.value[fieldName] ?? '';
+  const updated = current === optName ? '' : optName;
+  onFieldChange(fieldName, fieldType, updated);
+}
+
 function labelStyle(color) {
   return notionColorStyle(color);
+}
+
+function optName(opt) {
+  return typeof opt === 'string' ? opt : opt.name;
+}
+
+function optColor(opt) {
+  return typeof opt === 'string' ? null : (opt.color ?? null);
 }
 
 // Auto-managed types — skip rendering (read-only system fields)
@@ -179,22 +193,6 @@ const renderableFields = computed(() => {
 // Get options for a select/status/multi_select field
 function getFieldOptions(fieldName) {
   return taskDetail.value?.fieldOptions?.[fieldName] ?? [];
-}
-
-function statusClass(status) {
-  if (!status) return 'status-muted';
-  const lower = status.toLowerCase();
-  if (lower.includes('done') || lower.includes('complete'))
-    return 'status-success';
-  if (
-    lower.includes('progress') ||
-    lower.includes('active') ||
-    lower.includes('review')
-  )
-    return 'status-warning';
-  if (lower.includes('blocked') || lower.includes('cancel'))
-    return 'status-error';
-  return 'status-muted';
 }
 
 const saveLabel = computed(() => {
@@ -254,17 +252,22 @@ function onCommentKeydown(e) {
           <div v-for="field in renderableFields" :key="field.field" class="task-field-row">
             <label class="task-field-label">{{ field.field }}</label>
 
-            <!-- select / status -->
+            <!-- select / status — pill selection -->
             <template v-if="field.type === 'select' || field.type === 'status'">
-              <select
-                class="task-field-select"
-                :class="field.type === 'status' ? statusClass(editFields[field.field]) : ''"
-                :value="editFields[field.field] ?? ''"
-                @change="onFieldChange(field.field, field.type, $event.target.value)"
-              >
-                <option value="">—</option>
-                <option v-for="opt in getFieldOptions(field.field)" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
+              <div class="task-field-tags">
+                <template v-if="getFieldOptions(field.field).length > 0">
+                  <button
+                    v-for="opt in getFieldOptions(field.field)"
+                    :key="optName(opt)"
+                    type="button"
+                    class="task-label-pill"
+                    :class="{ 'task-label-pill--active': editFields[field.field] === optName(opt) }"
+                    :style="editFields[field.field] === optName(opt) ? labelStyle(optColor(opt)) : null"
+                    @click="toggleSelect(field.field, field.type, optName(opt))"
+                  >{{ optName(opt) }}</button>
+                </template>
+                <span v-else class="task-field-empty">—</span>
+              </div>
             </template>
 
             <!-- checkbox -->
@@ -317,7 +320,7 @@ function onCommentKeydown(e) {
                     type="button"
                     class="task-label-pill"
                     :class="{ 'task-label-pill--active': (editFields[field.field] ?? []).includes(opt.name) }"
-                    :style="labelStyle(opt.color)"
+                    :style="(editFields[field.field] ?? []).includes(opt.name) ? labelStyle(opt.color) : null"
                     @click="toggleLabel(field.field, opt.name)"
                   >{{ opt.name }}</button>
                 </template>
@@ -451,8 +454,7 @@ function onCommentKeydown(e) {
 }
 
 .task-scroll input,
-.task-scroll textarea,
-.task-scroll select {
+.task-scroll textarea {
   box-sizing: border-box;
   max-width: 100%;
 }
@@ -603,48 +605,6 @@ function onCommentKeydown(e) {
   max-width: 200px;
 }
 
-.task-field-select {
-  flex: 1;
-  min-width: 0;
-  padding: 4px 6px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  outline: none;
-  appearance: auto;
-  max-width: 200px;
-}
-
-.task-field-select:focus {
-  border-color: var(--text-muted);
-}
-
-/* Coloured status selects */
-.task-field-select.status-success {
-  background: rgba(34, 197, 94, 0.12);
-  color: var(--success-color);
-  border-color: rgba(34, 197, 94, 0.3);
-}
-
-.task-field-select.status-warning {
-  background: rgba(245, 158, 11, 0.12);
-  color: var(--warning-color);
-  border-color: rgba(245, 158, 11, 0.3);
-}
-
-.task-field-select.status-error {
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--error-color);
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-.task-field-select.status-muted {
-  color: var(--text-muted);
-}
-
 .task-field-checkbox {
   width: 16px;
   height: 16px;
@@ -680,19 +640,20 @@ function onCommentKeydown(e) {
   font-size: 11px;
   font-weight: 500;
   border-radius: 10px;
-  border: 1px solid;
+  border: 1px solid var(--border-color);
   white-space: nowrap;
   cursor: pointer;
-  opacity: 0.35;
-  transition: opacity 0.15s, box-shadow 0.15s;
+  background: transparent;
+  color: var(--text-muted);
+  transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
 .task-label-pill:hover {
-  opacity: 0.7;
+  border-color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .task-label-pill--active {
-  opacity: 1;
   box-shadow: 0 0 0 1px currentColor;
 }
 

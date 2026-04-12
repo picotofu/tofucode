@@ -691,7 +691,7 @@ function extractAllProperties(properties, fieldMappings) {
  * Extract dropdown options for select/status/multi_select fields from a DB schema.
  * @param {Object} schema - Notion database properties schema
  * @param {Array<{field: string, type: string}>} fieldMappings
- * @returns {Object} Map of fieldName → string[]
+ * @returns {Object} Map of fieldName → Array<{name: string, color: string}>
  */
 function extractFieldOptions(schema, fieldMappings) {
   const result = {};
@@ -699,9 +699,15 @@ function extractFieldOptions(schema, fieldMappings) {
     const prop = schema[mapping.field];
     if (!prop) continue;
     if (prop.type === 'select') {
-      result[mapping.field] = (prop.select?.options ?? []).map((o) => o.name);
+      result[mapping.field] = (prop.select?.options ?? []).map((o) => ({
+        name: o.name,
+        color: o.color ?? 'default',
+      }));
     } else if (prop.type === 'status') {
-      result[mapping.field] = (prop.status?.options ?? []).map((o) => o.name);
+      result[mapping.field] = (prop.status?.options ?? []).map((o) => ({
+        name: o.name,
+        color: o.color ?? 'default',
+      }));
     } else if (prop.type === 'multi_select') {
       result[mapping.field] = (prop.multi_select?.options ?? []).map((o) => ({
         name: o.name,
