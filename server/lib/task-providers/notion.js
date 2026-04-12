@@ -480,9 +480,12 @@ function extractPageStatus(properties, statusField) {
     if (prop.type === 'select') return prop.select?.name;
   }
 
-  // Fallback: scan for first status/select with a non-null value
-  for (const prop of Object.values(properties)) {
+  // Fallback: prefer 'status' type across all props before falling back to 'select'
+  const propValues = Object.values(properties);
+  for (const prop of propValues) {
     if (prop.type === 'status' && prop.status?.name) return prop.status.name;
+  }
+  for (const prop of propValues) {
     if (prop.type === 'select' && prop.select?.name) return prop.select.name;
   }
   return undefined;

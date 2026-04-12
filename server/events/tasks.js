@@ -46,9 +46,9 @@ async function resolveContext(ws, errorType) {
   const assigneeMapping = config.fieldMappings?.find(
     (m) => m.type === 'people',
   );
-  const statusMapping = config.fieldMappings?.find(
-    (m) => m.type === 'status' || m.type === 'select',
-  );
+  const statusMapping =
+    config.fieldMappings?.find((m) => m.type === 'status') ??
+    config.fieldMappings?.find((m) => m.type === 'select');
   const labelMapping = config.fieldMappings?.find(
     (m) => m.type === 'multi_select',
   );
