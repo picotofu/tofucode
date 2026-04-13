@@ -9,7 +9,7 @@ import SettingsModal from './components/SettingsModal.vue';
 import Sidebar from './components/Sidebar.vue';
 import SidebarFooter from './components/SidebarFooter.vue';
 import { useBackButton } from './composables/useBackButton.js';
-import { useWebSocket } from './composables/useWebSocket';
+import { setBoardColumnOrder, useWebSocket } from './composables/useWebSocket';
 
 const {
   connect,
@@ -152,6 +152,7 @@ onMessage((msg) => {
     }
   } else if (msg.type === 'notion:config') {
     notionConfig.value = msg.config;
+    setBoardColumnOrder(msg.config?.boardColumnOrder ?? []);
   } else if (msg.type === 'notion:test_result') {
     notionTestResult.value = msg;
   } else if (msg.type === 'notion:save_result') {
@@ -557,6 +558,7 @@ onUnmounted(() => {
 .app-main {
   min-width: 0;
   min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;

@@ -54,6 +54,8 @@ export async function handleSaveConfig(ws, message) {
       ticketDatabaseUrl:
         incoming.ticketDatabaseUrl ?? existing.ticketDatabaseUrl,
       fieldMappings: incoming.fieldMappings ?? existing.fieldMappings ?? [],
+      boardColumnOrder:
+        incoming.boardColumnOrder ?? existing.boardColumnOrder ?? [],
     };
 
     // Only update token if it looks like a real token (not masked)

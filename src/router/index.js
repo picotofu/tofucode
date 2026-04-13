@@ -29,6 +29,11 @@ const routes = [
     component: () => import('../views/TaskView.vue'),
   },
   {
+    path: '/board',
+    name: 'board',
+    component: () => import('../views/BoardView.vue'),
+  },
+  {
     path: '/notes/:notePath(.*)*',
     name: 'notes',
     component: () => import('../views/NotesView.vue'),

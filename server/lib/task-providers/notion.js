@@ -107,6 +107,17 @@ class NotionAPI {
   }
 
   /**
+   * Update database properties — PATCH /v1/databases/{id}
+   * Used to add new select/multi_select options to the schema (Notion merges, not replaces).
+   * @param {string} id - Database ID
+   * @param {Object} properties - Property updates to merge
+   * @returns {Promise<Object>}
+   */
+  async updateDatabase(id, properties) {
+    return this.call('PATCH', `/databases/${id}`, { properties });
+  }
+
+  /**
    * Create a page in a database — POST /v1/pages
    * @param {string} dbId - Database ID
    * @param {Object} properties - Notion property values
@@ -506,6 +517,11 @@ function extractPageLabels(properties, labelField) {
         name: o.name,
         color: o.color ?? 'default',
       }));
+    }
+    if (prop.type === 'select' && prop.select?.name) {
+      return [
+        { name: prop.select.name, color: prop.select.color ?? 'default' },
+      ];
     }
   }
   return [];
@@ -1001,6 +1017,7 @@ export function createNotionProvider(token) {
           assignees: extractPageAssignees(page.properties ?? {}, assigneeField),
           labels: extractPageLabels(page.properties ?? {}, labelField),
           lastEditedAt: page.last_edited_time,
+          archived: page.archived ?? false,
         }));
 
         return {
@@ -1256,6 +1273,36 @@ export function createNotionProvider(token) {
           return { [fieldName]: { phone_number: value || null } };
         default:
           return null;
+      }
+    },
+
+    /**
+     * Add a new option to a select or multi_select field on the database schema.
+     * Notion's PATCH /databases/{id} merges options — existing ones are preserved.
+     * Note: status fields cannot have options added via API (Notion restriction).
+     * @param {string} databaseUrl
+     * @param {string} fieldName - Property name (e.g. "Labels")
+     * @param {'select'|'multi_select'} fieldType
+     * @param {string} optionName - New option name to add
+     * @returns {Promise<{ success: boolean, error?: string }>}
+     */
+    async addSelectOption(databaseUrl, fieldName, fieldType, optionName) {
+      const dbId = extractDatabaseId(databaseUrl);
+      if (!dbId) return { success: false, error: 'Invalid database URL.' };
+      if (fieldType !== 'select' && fieldType !== 'multi_select') {
+        return {
+          success: false,
+          error: 'Can only add options to select/multi_select fields.',
+        };
+      }
+      try {
+        await api.updateDatabase(dbId, {
+          [fieldName]: { [fieldType]: { options: [{ name: optionName }] } },
+        });
+        return { success: true };
+      } catch (err) {
+        logger.error('[Notion] addSelectOption error:', err.message);
+        return { success: false, error: err.message };
       }
     },
 

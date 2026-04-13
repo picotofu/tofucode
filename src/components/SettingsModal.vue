@@ -295,6 +295,7 @@ const NOTION_DEFAULTS = {
   token: '',
   ticketDatabaseUrl: '',
   fieldMappings: [],
+  boardColumnOrder: [],
 };
 
 const notionLocal = ref(null);
@@ -315,6 +316,8 @@ watch(
         ...NOTION_DEFAULTS,
         ...(cfg || {}),
         fieldMappings: cfg?.fieldMappings ?? NOTION_DEFAULTS.fieldMappings,
+        boardColumnOrder:
+          cfg?.boardColumnOrder ?? NOTION_DEFAULTS.boardColumnOrder,
       };
     }
   },
@@ -384,6 +387,47 @@ function addNotionFieldMapping() {
 function removeNotionFieldMapping(index) {
   if (!notionLocal.value?.fieldMappings) return;
   notionLocal.value.fieldMappings.splice(index, 1);
+}
+
+// --- Board Column Order ---
+const { taskStatusOptions, getTaskStatusOptions } = useWebSocket();
+const columnDragIndex = ref(null);
+
+function columnDragStart(i, e) {
+  columnDragIndex.value = i;
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function columnDrop(targetIndex, e) {
+  e.preventDefault();
+  const from = columnDragIndex.value;
+  columnDragIndex.value = null;
+  if (from === null || from === targetIndex || !notionLocal.value) return;
+  const arr = [...notionLocal.value.boardColumnOrder];
+  const [moved] = arr.splice(from, 1);
+  arr.splice(targetIndex, 0, moved);
+  notionLocal.value.boardColumnOrder = arr;
+}
+
+function removeColumnOrder(i) {
+  if (!notionLocal.value) return;
+  notionLocal.value.boardColumnOrder.splice(i, 1);
+}
+
+function populateColumnOrder() {
+  if (!notionLocal.value) return;
+  if (taskStatusOptions.value.length) {
+    notionLocal.value.boardColumnOrder = [...taskStatusOptions.value];
+  } else {
+    getTaskStatusOptions();
+    // Watch for the options to arrive and then populate
+    const unwatch = watch(taskStatusOptions, (opts) => {
+      if (opts.length && notionLocal.value) {
+        notionLocal.value.boardColumnOrder = [...opts];
+        unwatch();
+      }
+    });
+  }
 }
 
 // --- MCP Settings ---
@@ -1034,6 +1078,49 @@ async function handleClearCacheAndUpdate() {
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
               Add Field
+            </button>
+          </div>
+
+          <hr class="divider" />
+
+          <!-- Board Settings -->
+          <div class="section-heading">Board Settings</div>
+
+          <div class="setting-item">
+            <div class="setting-header">
+              <span class="setting-title">Column Order</span>
+            </div>
+            <p class="setting-description">
+              Drag to reorder status columns on the board view. Uses the default Notion status order if empty.
+            </p>
+            <div v-if="notionLocal.boardColumnOrder?.length" class="column-order-list">
+              <div
+                v-for="(status, i) in notionLocal.boardColumnOrder"
+                :key="status"
+                class="column-order-item"
+                draggable="true"
+                @dragstart="columnDragStart(i, $event)"
+                @dragover.prevent
+                @drop="columnDrop(i, $event)"
+              >
+                <svg class="column-order-drag-handle" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="8" y1="6" x2="16" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="8" y1="18" x2="16" y2="18" />
+                </svg>
+                <span class="column-order-name">{{ status }}</span>
+                <button class="remove-btn" title="Remove" @click="removeColumnOrder(i)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <p v-else class="setting-description column-order-empty">No custom order set — board uses Notion's default status order.</p>
+            <button class="add-mapping-btn" @click="populateColumnOrder">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="1 4 1 10 7 10" /><polyline points="23 20 23 14 17 14" />
+                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
+              </svg>
+              Populate from Notion
             </button>
           </div>
 
@@ -1932,6 +2019,48 @@ async function handleClearCacheAndUpdate() {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
+}
+
+/* ── Column order ─────────────────────────────── */
+.column-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.column-order-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  user-select: none;
+  transition: background 0.1s;
+}
+
+.column-order-item:active {
+  cursor: grabbing;
+}
+
+.column-order-drag-handle {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.column-order-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.column-order-empty {
+  font-style: italic;
+  margin-bottom: 8px;
 }
 
 

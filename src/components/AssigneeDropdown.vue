@@ -170,7 +170,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 
 .asgn-trigger-sm {
   padding: 3px 6px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .asgn-trigger-bare {

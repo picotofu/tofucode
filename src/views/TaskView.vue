@@ -1,12 +1,13 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import AssigneeDropdown from '../components/AssigneeDropdown.vue';
 import { useWebSocket } from '../composables/useWebSocket';
 import { formatRelativeTime } from '../utils/format.js';
 import { notionColorStyle } from '../utils/notion-colors.js';
 
 const route = useRoute();
+const router = useRouter();
 
 const {
   connected,
@@ -24,9 +25,12 @@ const {
   addTaskComment,
   replaceTaskBody,
   updateTaskField,
+  addTaskOption,
+  onMessage,
 } = useWebSocket();
 
 const pageId = computed(() => route.params.pageId);
+const fromBoard = computed(() => route.query.from === 'board');
 
 // Local editable state
 const editBody = ref('');
@@ -42,6 +46,12 @@ const commentTextareaRef = ref(null);
 
 // Track whether we've populated local state for the current page
 let taskLoaded = false;
+
+// Add-label inline input state
+const addLabelField = ref(null); // which multi_select field's "+" was clicked
+const addLabelInput = ref('');
+const addLabelSaving = ref(false);
+const addLabelInputRef = ref(null);
 
 function fetchAll(id) {
   if (!connected.value) return;
@@ -60,9 +70,29 @@ watch(connected, (isConnected) => {
   }
 });
 
+// Listen for add-option results
+const unsubAddOption = onMessage((msg) => {
+  if (msg.type !== 'tasks:add_option_result') return;
+  addLabelSaving.value = false;
+  if (msg.success) {
+    const field = addLabelField.value;
+    if (field) {
+      const current = editFields.value[field] ?? [];
+      if (!current.includes(msg.optionName)) {
+        editFields.value[field] = [...current, msg.optionName];
+      }
+    }
+    addLabelField.value = null;
+    addLabelInput.value = '';
+    // Re-fetch task detail so fieldOptions includes the new option
+    fetchTaskDetail(pageId.value);
+  }
+});
+
 onUnmounted(() => {
   clearTimeout(saveTimer);
   for (const t of Object.values(fieldTimers)) clearTimeout(t);
+  unsubAddOption();
 });
 
 // Populate local edit state when task detail loads
@@ -167,6 +197,14 @@ function optColor(opt) {
   return typeof opt === 'string' ? null : (opt.color ?? null);
 }
 
+function submitNewLabel(fieldName) {
+  const name = addLabelInput.value.trim();
+  if (!name || addLabelSaving.value) return;
+  addLabelSaving.value = true;
+  const currentValues = editFields.value[fieldName] ?? [];
+  addTaskOption(pageId.value, fieldName, 'multi_select', name, currentValues);
+}
+
 // Auto-managed types — skip rendering (read-only system fields)
 const AUTO_MANAGED_TYPES = new Set([
   'created_time',
@@ -237,6 +275,14 @@ function onCommentKeydown(e) {
 
       <!-- Loaded -->
       <template v-else-if="taskDetail">
+        <!-- Back to board -->
+        <button v-if="fromBoard" class="task-back-btn" @click="router.push('/board')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Back to Board
+        </button>
+
         <!-- Title + meta -->
         <div class="task-title-section">
           <h1 class="task-title">{{ taskDetail.title }}</h1>
@@ -313,18 +359,36 @@ function onCommentKeydown(e) {
             <!-- multi_select — toggleable label pills -->
             <template v-else-if="field.type === 'multi_select'">
               <div class="task-field-tags">
-                <template v-if="getFieldOptions(field.field).length > 0">
-                  <button
-                    v-for="opt in getFieldOptions(field.field)"
-                    :key="opt.name"
-                    type="button"
-                    class="task-label-pill"
-                    :class="{ 'task-label-pill--active': (editFields[field.field] ?? []).includes(opt.name) }"
-                    :style="(editFields[field.field] ?? []).includes(opt.name) ? labelStyle(opt.color) : null"
-                    @click="toggleLabel(field.field, opt.name)"
-                  >{{ opt.name }}</button>
+                <button
+                  v-for="opt in getFieldOptions(field.field)"
+                  :key="opt.name"
+                  type="button"
+                  class="task-label-pill"
+                  :class="{ 'task-label-pill--active': (editFields[field.field] ?? []).includes(opt.name) }"
+                  :style="(editFields[field.field] ?? []).includes(opt.name) ? labelStyle(opt.color) : null"
+                  @click="toggleLabel(field.field, opt.name)"
+                >{{ opt.name }}</button>
+
+                <!-- Inline add-label input -->
+                <template v-if="addLabelField === field.field">
+                  <input
+                    ref="addLabelInputRef"
+                    v-model="addLabelInput"
+                    class="task-add-label-input"
+                    placeholder="Label name"
+                    :disabled="addLabelSaving"
+                    @keydown.enter.prevent="submitNewLabel(field.field)"
+                    @keydown.escape="addLabelField = null"
+                    @blur="!addLabelSaving && (addLabelField = null)"
+                  />
                 </template>
-                <span v-else class="task-field-empty">—</span>
+                <button
+                  v-else
+                  type="button"
+                  class="task-label-pill task-label-pill--add"
+                  title="Add new label"
+                  @click="addLabelField = field.field; addLabelInput = ''"
+                >+</button>
               </div>
             </template>
 
@@ -442,6 +506,28 @@ function onCommentKeydown(e) {
   width: 100%;
   background: var(--bg-primary);
   overflow: hidden;
+}
+
+/* ── Back to board button ────────────────────── */
+.task-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 6px;
+  margin: 16px 16px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.task-back-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 /* ── Scroll area ─────────────────────────────── */
@@ -655,6 +741,25 @@ function onCommentKeydown(e) {
 
 .task-label-pill--active {
   box-shadow: 0 0 0 1px currentColor;
+}
+
+.task-label-pill--add {
+  border-style: dashed;
+  font-size: 14px;
+  padding: 1px 7px;
+  line-height: 1;
+}
+
+.task-add-label-input {
+  width: 100px;
+  padding: 2px 8px;
+  font-size: 11px;
+  border: 1px solid var(--text-muted);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  outline: none;
+  font-family: inherit;
 }
 
 .task-field-empty {

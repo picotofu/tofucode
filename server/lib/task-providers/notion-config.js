@@ -5,7 +5,7 @@
  * Config file: ~/.tofucode/notion-config.json
  *
  * Schema:
- *   { enabled, token, ticketDatabaseUrl, userEmail, fieldMappings: [{ field, type, purpose }] }
+ *   { enabled, token, ticketDatabaseUrl, userEmail, fieldMappings: [{ field, type, purpose }], boardColumnOrder: string[] }
  *
  * TODO (adapter): When adding support for additional task management providers
  * (e.g. Jira, Linear), this file should evolve into a generic active-provider
@@ -29,6 +29,7 @@ const DEFAULT_CONFIG = {
   ticketDatabaseUrl: '',
   userEmail: '', // Workspace email to identify self for filtering
   fieldMappings: [], // [{ field: string, type: string, purpose: string }]
+  boardColumnOrder: [], // string[] — custom status column order for the board view
 };
 
 /**

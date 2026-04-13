@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { RouterLink } from 'vue-router';
 import { formatRelativeTime } from '../utils/format.js';
 import { notionColorStyle } from '../utils/notion-colors.js';
 import AssigneeDropdown from './AssigneeDropdown.vue';
@@ -422,8 +423,15 @@ function labelStyle(label) {
       </template>
     </template>
 
-    <!-- Pinned footer: create ticket -->
+    <!-- Pinned footer: board link + create ticket -->
     <div v-if="!tasksError" class="tasks-footer">
+      <RouterLink to="/board" class="tasks-board-link">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+        </svg>
+        Board view
+      </RouterLink>
       <div class="tasks-create-box">
         <!-- Row 1: title input -->
         <input
@@ -445,10 +453,9 @@ function labelStyle(label) {
             :head-options="CREATE_HEAD_OPTIONS"
             :popover-up="true"
             size="sm"
-            :bare="true"
           />
 
-          <!-- Confirm button (borderless) -->
+          <!-- Confirm button -->
           <button
             class="tasks-create-confirm"
             :disabled="!createTitle.trim()"
@@ -728,9 +735,10 @@ function labelStyle(label) {
 /* ── Label pills (sidebar) ────────────────────── */
 .tasks-item-label {
   display: inline-block;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 500;
-  padding: 1px 6px;
+  padding: 0 5px;
+  line-height: 14px;
   border-radius: 8px;
   border: 1px solid;
   white-space: nowrap;
@@ -778,6 +786,27 @@ function labelStyle(label) {
   padding: 8px 10px;
 }
 
+.tasks-board-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.tasks-board-link:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
 .tasks-create-box {
   display: flex;
   flex-direction: column;
@@ -787,7 +816,7 @@ function labelStyle(label) {
 .tasks-create-input {
   width: 100%;
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-primary);
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -822,7 +851,7 @@ function labelStyle(label) {
   padding: 0;
   background: transparent;
   color: var(--text-muted);
-  border: none;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s;

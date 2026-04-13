@@ -11,6 +11,8 @@
  *   - tasks:get_assignees     → get workspace users for assignee dropdown
  *   - tasks:get_comments      → get comments for a ticket
  *   - tasks:add_comment       → add a comment to a ticket
+ *   - tasks:add_option        → add a new select/multi_select option to the DB schema + assign to task
+ *   - tasks:board_list        → list all tasks for the board view (no assignee filter)
  */
 
 import { logger } from '../lib/logger.js';
@@ -49,9 +51,11 @@ async function resolveContext(ws, errorType) {
   const statusMapping =
     config.fieldMappings?.find((m) => m.type === 'status') ??
     config.fieldMappings?.find((m) => m.type === 'select');
-  const labelMapping = config.fieldMappings?.find(
-    (m) => m.type === 'multi_select',
-  );
+  const labelMapping =
+    config.fieldMappings?.find((m) => m.type === 'multi_select') ??
+    config.fieldMappings?.find(
+      (m) => m.type === 'select' && m.field !== statusMapping?.field,
+    );
 
   return {
     provider,
@@ -59,6 +63,7 @@ async function resolveContext(ws, errorType) {
     databaseUrl,
     assigneeField: assigneeMapping?.field ?? null,
     statusField: statusMapping?.field ?? null,
+    statusFieldType: statusMapping?.type ?? null,
     labelField: labelMapping?.field ?? null,
   };
 }
@@ -431,6 +436,130 @@ export async function handleAddComment(ws, message) {
     logger.error('[Tasks WS] Add comment error:', err);
     send(ws, {
       type: 'tasks:add_comment_result',
+      success: false,
+      error: err.message,
+    });
+  }
+}
+
+/**
+ * Add a new option to a select/multi_select field on the DB schema,
+ * then immediately assign it to the task.
+ * @param {import('ws').WebSocket} ws
+ * @param {Object} message - { pageId: string, field: string, fieldType: string, optionName: string, currentValues?: string[] }
+ */
+export async function handleAddOption(ws, message) {
+  try {
+    const ctx = await resolveContext(ws, 'tasks:add_option_result');
+    if (!ctx) return;
+
+    const { provider, databaseUrl } = ctx;
+    const { pageId, field, fieldType, optionName, currentValues } = message;
+
+    if (!field || !fieldType || !optionName?.trim()) {
+      send(ws, {
+        type: 'tasks:add_option_result',
+        success: false,
+        error: 'field, fieldType and optionName are required.',
+      });
+      return;
+    }
+
+    const trimmedName = optionName.trim();
+
+    // 1. Add the new option to the database schema
+    const addResult = await provider.addSelectOption(
+      databaseUrl,
+      field,
+      fieldType,
+      trimmedName,
+    );
+    if (!addResult.success) {
+      send(ws, { type: 'tasks:add_option_result', ...addResult });
+      return;
+    }
+
+    // 2. Assign the new option to the task
+    if (pageId) {
+      let newValue;
+      if (fieldType === 'multi_select') {
+        newValue = [...(currentValues ?? []), trimmedName];
+      } else {
+        newValue = trimmedName;
+      }
+      const propVal = provider.buildPropertyValue(field, fieldType, newValue);
+      if (propVal) {
+        await provider.updateTicket({ pageId, properties: propVal });
+      }
+    }
+
+    send(ws, {
+      type: 'tasks:add_option_result',
+      success: true,
+      optionName: trimmedName,
+    });
+  } catch (err) {
+    logger.error('[Tasks WS] Add option error:', err);
+    send(ws, {
+      type: 'tasks:add_option_result',
+      success: false,
+      error: err.message,
+    });
+  }
+}
+
+/**
+ * List all tasks for the board view (optional self-filter, higher limit).
+ * Also returns the status field name and type so the board knows what to update on drag.
+ * @param {import('ws').WebSocket} ws
+ * @param {Object} message - { limit?: number, filterBySelf?: boolean }
+ */
+export async function handleListBoardTasks(ws, message) {
+  try {
+    const ctx = await resolveContext(ws, 'tasks:board_list_result');
+    if (!ctx) return;
+
+    const {
+      provider,
+      config,
+      databaseUrl,
+      assigneeField,
+      statusField,
+      statusFieldType,
+      labelField,
+    } = ctx;
+    const limit = message.limit ?? 100;
+
+    // Optional self-filter
+    let filterByUserId = null;
+    if (
+      message.filterBySelf &&
+      assigneeField &&
+      config.userEmail &&
+      provider.resolveUserId
+    ) {
+      filterByUserId = await provider.resolveUserId(config.userEmail);
+    }
+
+    const result = await provider.listTickets({
+      databaseUrl,
+      limit,
+      filterByUserId: filterByUserId ?? undefined,
+      assigneeField: assigneeField ?? undefined,
+      statusField: statusField ?? undefined,
+      labelField: labelField ?? undefined,
+    });
+
+    send(ws, {
+      type: 'tasks:board_list_result',
+      ...result,
+      statusField: statusField ?? null,
+      statusFieldType: statusFieldType ?? null,
+    });
+  } catch (err) {
+    logger.error('[Tasks WS] Board list error:', err);
+    send(ws, {
+      type: 'tasks:board_list_result',
       success: false,
       error: err.message,
     });

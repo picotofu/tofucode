@@ -58,6 +58,8 @@ import { handler as selectSession } from './select-session.js';
 import { handler as setSessionTitle } from './set-session-title.js';
 import {
   handleAddComment as tasksAddComment,
+  handleAddOption as tasksAddOption,
+  handleListBoardTasks as tasksBoardList,
   handleCreateTask as tasksCreate,
   handleFetchTask as tasksFetch,
   handleGetAssignees as tasksGetAssignees,
@@ -147,4 +149,6 @@ export const handlers = {
   'tasks:get_assignees': tasksGetAssignees,
   'tasks:get_comments': tasksGetComments,
   'tasks:add_comment': tasksAddComment,
+  'tasks:add_option': tasksAddOption,
+  'tasks:board_list': tasksBoardList,
 };

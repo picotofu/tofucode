@@ -45,6 +45,15 @@ const taskComments = ref([]);
 const taskCommentsLoading = ref(false);
 const lastCreatedPageId = ref(null);
 
+// Board view state
+const boardTasks = ref([]);
+const boardTasksReady = ref(false);
+const boardTasksError = ref(null);
+const boardStatusField = ref(null); // status field name for drag-drop updates
+const boardStatusFieldType = ref(null); // 'status' | 'select'
+const boardColumnOrder = ref([]); // custom column order from notion config
+const boardFilterBySelf = ref(true); // filter board to only show self-assigned tasks (default on)
+
 // LocalStorage key for persistent filter state
 const TASKS_FILTER_KEY = 'tofucode:tasks-filter';
 
@@ -420,6 +429,20 @@ function handleGlobalMessage(msg) {
         getTaskComments(msg.pageId);
       }
       break;
+
+    case 'tasks:board_list_result':
+      boardTasksReady.value = true;
+      if (msg.success) {
+        boardTasks.value = msg.tickets || [];
+        boardTasksError.value = null;
+        if (msg.statusField) boardStatusField.value = msg.statusField;
+        if (msg.statusFieldType)
+          boardStatusFieldType.value = msg.statusFieldType;
+      } else {
+        boardTasks.value = [];
+        boardTasksError.value = msg.error || 'Failed to load board tasks';
+      }
+      break;
   }
   // Call all registered message listeners
   for (const listener of globalMessageListeners) {
@@ -649,6 +672,26 @@ function updateTaskField(pageId, field, fieldType, value) {
   sendGlobal({ type: 'tasks:update', pageId, field, fieldType, value });
 }
 
+function getBoardTasks() {
+  boardTasksReady.value = false;
+  boardTasksError.value = null;
+  sendGlobal({
+    type: 'tasks:board_list',
+    filterBySelf: boardFilterBySelf.value,
+  });
+}
+
+function addTaskOption(pageId, field, fieldType, optionName, currentValues) {
+  sendGlobal({
+    type: 'tasks:add_option',
+    pageId,
+    field,
+    fieldType,
+    optionName,
+    currentValues,
+  });
+}
+
 function disconnectGlobal() {
   if (globalReconnectTimeout) {
     clearTimeout(globalReconnectTimeout);
@@ -736,6 +779,17 @@ export function useWebSocket() {
     getTaskComments,
     addTaskComment,
 
+    // Board view
+    boardTasks: readonly(boardTasks),
+    boardTasksReady: readonly(boardTasksReady),
+    boardTasksError: readonly(boardTasksError),
+    boardStatusField: readonly(boardStatusField),
+    boardStatusFieldType: readonly(boardStatusFieldType),
+    boardColumnOrder: readonly(boardColumnOrder),
+    boardFilterBySelf,
+    getBoardTasks,
+    addTaskOption,
+
     // Direct send
     send: sendGlobal,
     sendAndWait,
@@ -743,6 +797,15 @@ export function useWebSocket() {
     // Message listeners
     onMessage: addGlobalMessageListener,
   };
+}
+
+/**
+ * Set the board column order from the Notion config (called by App.vue on notion:config).
+ * Exported as a standalone function so App.vue can update shared state without an extra WS round-trip.
+ * @param {string[]} order
+ */
+export function setBoardColumnOrder(order) {
+  boardColumnOrder.value = Array.isArray(order) ? order : [];
 }
 
 // ============================================
