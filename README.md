@@ -379,6 +379,7 @@ tofucode includes a built-in task panel (sidebar **Tasks** tab, or press `T`) ba
 
 Independent security assessments are conducted before each release to ensure user safety:
 
+- **[v1.4.0 Security Report](./docs/security_report_v1.4.0.md)** - Kanban board, task delete, label management, board filters, dependency audit
 - **[v1.3.0 Security Report](./docs/security_report_v1.3.0.md)** - Notes feature, Notion task integration, file browser enhancements, Discord bot, dependency audit
 - **[v1.2.1 Security Report](./docs/security_report_v1.2.1.md)** - Multer DoS fix, DOMPurify XSS fix, new feature code review (no issues found)
 - **[v1.2.0 Security Report](./docs/security_report_v1.2.0.md)** - Upload path injection fix, symlink escape prevention, error info leaks, draft entry limits

@@ -7,29 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- **Model tint on input area** — footer/input area gets a subtle background tint per model: sky blue for Haiku, no tint for Sonnet (default), amber for Opus; active H/S/O tab highlight follows the same colour
-- **Model selection persisted per session** — switching sessions restores the model that was active in that session; falls back to last global model, then Sonnet as default
-- **Keyboard shortcuts** — `Cmd+[` cycles model (Haiku → Sonnet → Opus), `Cmd+]` cycles permission mode (Default → Plan → Accept Edits → Bypass)
-
-### Changed
-- **Permission modes reworked** — modes are now properly distinct end-to-end:
-  - Default (shield): sends `permissionMode: 'default'` to SDK — will block on permission requests; errors show an inline red-tinted hint to switch mode
-  - Plan (green border): read-only, no writes or bash — unchanged
-  - Accept Edits (yellow border): auto-approves file edits, blocks bash — was previously mislabelled as "bypass"
-  - Bypass (orange border): full `bypassPermissions` + `dangerouslySkipPermissions` — previously "skip"
-- **Inline permission error hint** — errors in Default or Accept Edits mode render with a stronger red tint and a hint message explaining the block and suggesting a mode switch
+## [1.4.0] - 2026-04-14
 
 ### Added
+- **Kanban board view (`/board`)** — drag-and-drop board grouped by status columns
+  - Column ordering configurable in Settings → Notion tab (drag-to-reorder, persisted to config)
+  - Subtle status-based column background tinting (todo/progress/done/blocked heuristic)
+  - "No status" column shown as first column when tasks lack a status
+  - Done columns auto-hide archived tasks
+  - Cards show ticket ID and inline label pills; sorted by label then ID descending
+  - Drag handle on cards to avoid accidental drags while scrolling
+  - Touch drag-and-drop for Android PWA (floating clone follows finger)
+  - "Go to Board" button in sidebar tasks footer; "Back to Board" button in task detail when navigated from board
+  - Board footer bar: fuzzy search input (flex:1), assignee dropdown ("Me" default, persisted to localStorage), label filter dropdown
+  - Right-click context menu on cards with delete action; card greys out with spinner while pending; error modal on failure
+- **Task delete** — archive (soft-delete) tickets from board or task detail view
+  - Backend: `tasks:delete` WebSocket event, `NotionAPI.archivePage`, `provider.deleteTicket`
+  - Task detail: two-tap delete button in footer (arm → confirm), loading spinner, error modal
+  - Board: context menu delete with optimistic greyed-out card + spinner overlay
+- **Ticket labels in task view** — label pills with Notion colour styling; inline "+" button to create new labels on multi_select fields
+- **Task view pill selection** — replaced status and select dropdowns with toggleable pill buttons for a more compact UI
+- **Ticket label support** — `extractPageLabels` handles both `multi_select` and `select` field types; label field resolution falls back from `multi_select` to `select` (excluding the status field)
+- **Field type badge in settings** — Notion field mappings now show a type badge (status, select, people, etc.)
 - **Ports tab (⌘8)** — new tab alongside Chat/Terminal/Files showing all listening TCP ports
   - Clean table view: port, PID, process details (full cmdline + CWD from `/proc`), bind addresses, kill action
   - Dual-stack bindings (IPv4 + IPv6 on same PID+port) merged into a single row
   - Kill process by SIGTERM with inline loading state; table refreshes immediately after
   - Auto-refresh every 5s while tab is active; pauses automatically when navigating away
   - URL sync (`?mode=ports`), keyboard shortcut documented in Settings → Keyboard Shortcuts
-
-### Added
-- **Notes (Obsidian-like vault)** — Full markdown notes system with sidebar file navigator, mini calendar, daily notes, and fuzzy search
+- **Notes (Obsidian-like vault)** — full markdown notes system with sidebar file navigator, mini calendar, daily notes, and fuzzy search
   - New `/notes` route with URL-reflected state (browser navigation works natively)
   - `NotesPanel` sidebar tab: vault file tree with folder expand/collapse, active-note highlight, and recently opened notes (last 5, localStorage)
   - `MiniCalendar` component: month nav, day-of-week grid, dot indicators for existing daily notes, today/selected highlighting
@@ -50,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Shared `AssigneeDropdown` component used in both sidebar filter, create-ticket form, and TaskView people field
   - Teleported popover with `getBoundingClientRect` positioning to escape `overflow: hidden` ancestor clipping
   - Workspace users merged with DB-derived assignees; includes `email` for self-identification
+- **Model tint on input area** — footer/input area gets a subtle background tint per model: sky blue for Haiku, no tint for Sonnet (default), amber for Opus; active H/S/O tab highlight follows the same colour
+- **Model selection persisted per session** — switching sessions restores the model that was active in that session; falls back to last global model, then Sonnet as default
+- **Keyboard shortcuts** — `Cmd+[` cycles model (Haiku → Sonnet → Opus), `Cmd+]` cycles permission mode (Default → Plan → Accept Edits → Bypass)
 - **3-tab homepage** — Homepage now has a bottom tab nav (Sessions, Folders, Files) with Heroicons; Sessions tab shows recent sessions and recent projects; Folders tab is a directory-only browser for launching sessions; Files tab is a standalone file browser defaulting to the home directory
 - **Independent file browser** — Files tab on homepage provides a full-featured file browser (browse, search, open, edit, create, rename, delete) outside of any session, defaulting to the home directory and persisting the last visited path in localStorage
 - **Traversal root guard** — File browser enforces a topmost browsable path (`--root` config if set, otherwise `homedir()`); breadcrumb segments above the root are shown as muted static text; up button and path edit are clamped to this boundary; session files tab defaults to the project path but allows traversal up to the root; homepage files tab defaults to the root itself
@@ -57,6 +66,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PWA cache-bust endpoint** — `/api/sw-reset` endpoint to force-clear stale service worker caches
 
 ### Changed
+- **Bottom bar revamped** — persistent nav footer with responsive behaviour across all views
+- **Sidebar header moved to top** — cleaner layout hierarchy
+- **Permission modes reworked** — modes are now properly distinct end-to-end:
+  - Default (shield): sends `permissionMode: 'default'` to SDK — will block on permission requests; errors show an inline red-tinted hint to switch mode
+  - Plan (green border): read-only, no writes or bash — unchanged
+  - Accept Edits (yellow border): auto-approves file edits, blocks bash — was previously mislabelled as "bypass"
+  - Bypass (orange border): full `bypassPermissions` + `dangerouslySkipPermissions` — previously "skip"
+- **Inline permission error hint** — errors in Default or Accept Edits mode render with a stronger red tint and a hint message explaining the block and suggesting a mode switch
 - **Keyboard shortcuts remapped** — Sidebar tabs now `Cmd/Ctrl+1–4` (Sessions, Projects, Tasks, Notes); mode tabs `Cmd/Ctrl+5–7` (Chat, Terminal, Files); freed up slots from Slack bot removal
 - **First-page load optimised** — Code splitting with vendor chunks, Brotli pre-compressed serving, and async filesystem imports reduce initial bundle size and time-to-interactive
 - **Files toolbar moved into FilesPanel** — Dotfiles toggle, New File, New Folder, and MD Mode buttons are now part of the `FilesPanel` component rather than injected via slot, eliminating duplicate rendering when the component is reused
@@ -64,6 +81,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Mobile toolbar layout** — On mobile (≤639px) the toolbar buttons wrap to their own row above the path bar, right-aligned
 
 ### Fixed
+- Task detail not loading on page refresh
+- Sidebar tasks not loading on page refresh
+- Comment author UUIDs now resolved to display names
+- Task view horizontal overflow on mobile (multiple fixes)
+- Mobile overflow and tablet sidebar layout
+- Status field resolution now prefers `status` type over `select`
+- Me assignee resolved via Notion `getSelfId` instead of config email
+- Calendar blank cells no longer receive selected class
+- Recent session pill stretching full width on mobile; second session hidden on mobile
 - **Notes view: TinyMDE markdown formatting not applied on page refresh** — TinyMDE syntax theme CSS was only loaded via `ChatView.vue`; moved into `FileEditor.vue` so it loads regardless of entry route
 - **Notes view: footer path visually showing trailing slash** — added `unicode-bidi: plaintext` to `.footer-path`
 - **Notes view: TinyMDE not reinitialising when switching notes** — added `:key="openedFile.path"` to force clean remount
@@ -86,6 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - **Login rate limiting** — Failed login attempts are now tracked globally; after 3 failures the login and setup endpoints return `429 Too Many Requests` with a `Retry-After` header and a 15-minute lockout window. The auth page shows attempts remaining on each wrong password, and a live countdown timer when locked out. The lock resets automatically when the window expires, on a successful login, or on server restart (SSH access is the owner's intentional escape hatch). Configurable via `MAX_LOGIN_ATTEMPTS` and `LOGIN_WINDOW_MS` env vars.
+- See [v1.4.0 Security Report](docs/security_report_v1.4.0.md) for full audit details
 
 ### Removed
 - **Slack Bot Integration** — Removed built-in Slack bot (Socket Mode listener, classifier, dispatcher, Settings UI tab, sidebar tab); use external Slack MCP tools instead
