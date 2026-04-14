@@ -509,10 +509,44 @@ export async function handleAddOption(ws, message) {
 }
 
 /**
- * List all tasks for the board view (optional self-filter, higher limit).
+ * Archive (soft-delete) a ticket
+ * @param {import('ws').WebSocket} ws
+ * @param {Object} message - { pageId: string }
+ */
+export async function handleDeleteTask(ws, message) {
+  try {
+    const ctx = await resolveContext(ws, 'tasks:delete_result');
+    if (!ctx) return;
+
+    const { provider } = ctx;
+    const { pageId } = message;
+
+    if (!pageId) {
+      send(ws, {
+        type: 'tasks:delete_result',
+        success: false,
+        error: 'No pageId provided.',
+      });
+      return;
+    }
+
+    const result = await provider.deleteTicket(pageId);
+    send(ws, { type: 'tasks:delete_result', ...result, pageId });
+  } catch (err) {
+    logger.error('[Tasks WS] Delete task error:', err);
+    send(ws, {
+      type: 'tasks:delete_result',
+      success: false,
+      error: err.message,
+    });
+  }
+}
+
+/**
+ * List all tasks for the board view (optional self-filter or assignee filter, higher limit).
  * Also returns the status field name and type so the board knows what to update on drag.
  * @param {import('ws').WebSocket} ws
- * @param {Object} message - { limit?: number, filterBySelf?: boolean }
+ * @param {Object} message - { limit?: number, filterBySelf?: boolean, filterByAssignee?: string }
  */
 export async function handleListBoardTasks(ws, message) {
   try {
@@ -530,9 +564,11 @@ export async function handleListBoardTasks(ws, message) {
     } = ctx;
     const limit = message.limit ?? 100;
 
-    // Optional self-filter
+    // Resolve filter user ID (same logic as handleListTasks)
     let filterByUserId = null;
-    if (
+    if (message.filterByAssignee && assigneeField) {
+      filterByUserId = message.filterByAssignee;
+    } else if (
       message.filterBySelf &&
       assigneeField &&
       config.userEmail &&

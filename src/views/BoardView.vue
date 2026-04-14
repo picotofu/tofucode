@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import AssigneeDropdown from '../components/AssigneeDropdown.vue';
 import { useWebSocket } from '../composables/useWebSocket';
 import { notionColorStyle } from '../utils/notion-colors.js';
 
@@ -14,11 +15,17 @@ const {
   boardStatusField,
   boardStatusFieldType,
   boardColumnOrder,
-  boardFilterBySelf,
+  boardFilter,
   taskStatusOptions,
+  taskAssignees,
+  taskSelfId,
   getBoardTasks,
+  setBoardFilter,
   getTaskStatusOptions,
+  getTaskAssignees,
   updateTaskField,
+  deleteTask,
+  onMessage,
 } = useWebSocket();
 
 // ── Data loading ─────────────────────────────────────────────────────────────
@@ -33,17 +40,76 @@ watch(connected, (c) => {
 
 function fetchBoard() {
   if (taskStatusOptions.value.length === 0) getTaskStatusOptions();
+  if (taskAssignees.value.length === 0) getTaskAssignees();
   getBoardTasks();
 }
 
-function toggleSelfFilter() {
-  boardFilterBySelf.value = !boardFilterBySelf.value;
-  fetchBoard();
+// ── Delete state ──────────────────────────────────────────────────────────────
+
+// Set of pageIds currently being deleted (shows spinner + greyed card)
+const deletingIds = ref(new Set());
+// Error from a failed delete attempt
+const deleteError = ref(null);
+
+// Listen for delete results
+const unsubDelete = onMessage((msg) => {
+  if (msg.type !== 'tasks:delete_result') return;
+  const newSet = new Set(deletingIds.value);
+  newSet.delete(msg.pageId);
+  deletingIds.value = newSet;
+  contextMenu.value = null;
+  if (!msg.success) {
+    deleteError.value = msg.error || 'Failed to delete task';
+  }
+});
+
+onBeforeUnmount(() => {
+  unsubDelete();
+});
+
+// ── Assignee / label filter ───────────────────────────────────────────────────
+
+// Head options for assignee dropdown: Anyone + Me (if selfId known)
+const assigneeHeadOptions = computed(() => {
+  const opts = [{ value: '', label: 'Anyone' }];
+  if (taskSelfId.value) {
+    opts.push({ value: '__self__', label: 'Me' });
+  }
+  return opts;
+});
+
+// All unique labels across all board tasks
+const allLabels = computed(() => {
+  const seen = new Set();
+  const labels = [];
+  for (const task of boardTasks.value) {
+    for (const label of task.labels ?? []) {
+      if (!seen.has(label.name)) {
+        seen.add(label.name);
+        labels.push(label);
+      }
+    }
+  }
+  return labels.sort((a, b) => a.name.localeCompare(b.name));
+});
+
+// Head options for label dropdown
+const labelHeadOptions = computed(() => [{ value: '', label: 'Any label' }]);
+
+// Local search input — not persisted
+const boardSearch = ref('');
+
+function onAssigneeChange(value) {
+  setBoardFilter({ assignee: value });
+  getBoardTasks();
+}
+
+function onLabelChange(value) {
+  setBoardFilter({ label: value });
 }
 
 // ── Column status tint ────────────────────────────────────────────────────────
 
-// Returns a CSS class name based on the status name for subtle column tinting
 function columnTintClass(status) {
   if (!status) return 'col-tint-none';
   const lower = status.toLowerCase();
@@ -62,7 +128,6 @@ function columnTintClass(status) {
 
 // ── Column computation ────────────────────────────────────────────────────────
 
-// Ordered columns: custom order if set, else Notion group order
 const columns = computed(() => {
   const opts = taskStatusOptions.value;
   if (!opts.length) return [];
@@ -75,13 +140,10 @@ const columns = computed(() => {
   return opts;
 });
 
-// Detect if a status belongs to the "Done" group (heuristic: name contains "done")
 function isDoneStatus(status) {
   return status.toLowerCase().includes('done');
 }
 
-// Sort tasks: by first label name (ascending), then ticket ID descending
-// Tasks with no labels sort after labeled ones
 function sortTasks(tasks) {
   return [...tasks].sort((a, b) => {
     const aLabel = a.labels?.[0]?.name ?? null;
@@ -92,7 +154,6 @@ function sortTasks(tasks) {
       const cmp = aLabel.localeCompare(bLabel);
       if (cmp !== 0) return cmp;
     }
-    // Then by ticket ID descending (numeric suffix if present, else string)
     const aId = a.ticketId ?? '';
     const bId = b.ticketId ?? '';
     const aNum = Number.parseInt(aId.replace(/\D/g, ''), 10);
@@ -102,18 +163,34 @@ function sortTasks(tasks) {
   });
 }
 
-// Build column data for a given status (or null for "no status")
+// Apply label + search filters to a task list
+function applyFilters(taskList) {
+  const labelFilter = boardFilter.value.label;
+  const search = boardSearch.value.trim().toLowerCase();
+  return taskList.filter((t) => {
+    if (labelFilter) {
+      const hasLabel = (t.labels ?? []).some((l) => l.name === labelFilter);
+      if (!hasLabel) return false;
+    }
+    if (search) {
+      const title = (t.title ?? '').toLowerCase();
+      const ticketId = (t.ticketId ?? '').toLowerCase();
+      if (!title.includes(search) && !ticketId.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
 function buildColumnData(status) {
   let tasksInCol = boardTasks.value.filter((t) =>
     status === null ? !t.status : t.status === status,
   );
 
-  // Done columns: hide archived tasks
   if (status !== null && isDoneStatus(status)) {
     tasksInCol = tasksInCol.filter((t) => !t.archived);
   }
 
-  // Sort: label asc, then ticket ID desc
+  tasksInCol = applyFilters(tasksInCol);
   tasksInCol = sortTasks(tasksInCol);
 
   return {
@@ -125,12 +202,10 @@ function buildColumnData(status) {
   };
 }
 
-// Full column list: "No status" first, then status columns
 const columnData = computed(() => {
   if (!boardTasksReady.value) return [];
   const noStatusCol = buildColumnData(null);
   const statusCols = columns.value.map((s) => buildColumnData(s));
-  // Only include "No status" column if it has tasks or there are no status columns yet
   return noStatusCol.count > 0 ? [noStatusCol, ...statusCols] : statusCols;
 });
 
@@ -171,25 +246,20 @@ function onDrop(targetStatus, e) {
   const fieldType = boardStatusFieldType.value;
   if (!field || !fieldType) return;
 
-  // Optimistic update
   task.status = targetStatus;
-  // Persist to Notion
   updateTaskField(task.pageId, field, fieldType, targetStatus);
 }
 
 // ── Touch drag (mobile / Android PWA) ────────────────────────────────────────
-// HTML5 drag-and-drop doesn't fire on touch devices — replicate with touch events.
 
 const touchDragTask = ref(null);
 const touchClone = ref(null);
 
 function onTouchStart(task, e) {
-  // Only track single-finger touch
   if (e.touches.length !== 1) return;
   touchDragTask.value = task;
   dragOverColumn.value = null;
 
-  // Create a visual clone that follows the finger (clone the whole card, not just the handle)
   const card = e.currentTarget.closest('.board-card') ?? e.currentTarget;
   const rect = card.getBoundingClientRect();
   const clone = card.cloneNode(true);
@@ -210,17 +280,15 @@ function onTouchStart(task, e) {
 
 function onTouchMove(e) {
   if (!touchDragTask.value) return;
-  e.preventDefault(); // prevent page scroll while drag is active
+  e.preventDefault();
 
   const touch = e.touches[0];
 
-  // Move clone with finger
   if (touchClone.value) {
     touchClone.value.style.left = `${touch.clientX - 60}px`;
     touchClone.value.style.top = `${touch.clientY - 20}px`;
   }
 
-  // Detect which column is under the finger
   if (touchClone.value) touchClone.value.style.display = 'none';
   const el = document.elementFromPoint(touch.clientX, touch.clientY);
   if (touchClone.value) touchClone.value.style.display = '';
@@ -232,7 +300,6 @@ function onTouchMove(e) {
 function onTouchEnd() {
   if (!touchDragTask.value) return;
 
-  // Remove clone
   if (touchClone.value) {
     document.body.removeChild(touchClone.value);
     touchClone.value = null;
@@ -254,6 +321,36 @@ function onTouchEnd() {
   updateTaskField(task.pageId, field, fieldType, targetStatus);
 }
 
+// ── Context menu (right-click) ────────────────────────────────────────────────
+
+const contextMenu = ref(null); // { x, y, task }
+
+function onCardContextMenu(task, e) {
+  e.preventDefault();
+  contextMenu.value = { x: e.clientX, y: e.clientY, task };
+}
+
+function confirmDelete(task) {
+  const newSet = new Set(deletingIds.value);
+  newSet.add(task.pageId);
+  deletingIds.value = newSet;
+  contextMenu.value = null;
+  deleteTask(task.pageId);
+}
+
+function onDocMouseDown(e) {
+  if (!contextMenu.value) return;
+  const menu = document.querySelector('.board-context-menu');
+  if (menu && !menu.contains(e.target)) {
+    contextMenu.value = null;
+  }
+}
+
+onMounted(() => document.addEventListener('mousedown', onDocMouseDown));
+onBeforeUnmount(() =>
+  document.removeEventListener('mousedown', onDocMouseDown),
+);
+
 // ── Navigation ────────────────────────────────────────────────────────────────
 
 function openTask(pageId) {
@@ -273,18 +370,6 @@ function labelPillStyle(label) {
     <!-- Header -->
     <div class="board-header">
       <h1 class="board-title">Board</h1>
-      <button
-        class="board-filter-btn"
-        :class="{ 'board-filter-btn--active': boardFilterBySelf }"
-        title="Filter: only my tasks"
-        @click="toggleSelfFilter"
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
-        </svg>
-        Me
-      </button>
       <button class="board-refresh-btn" title="Refresh" @click="fetchBoard">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
@@ -338,15 +423,25 @@ function labelPillStyle(label) {
             v-for="task in col.tasks"
             :key="task.pageId"
             class="board-card"
-            :class="{ 'board-card--dragging': draggedTask?.pageId === task.pageId || touchDragTask?.pageId === task.pageId }"
-            @click="openTask(task.pageId)"
+            :class="{
+              'board-card--dragging': draggedTask?.pageId === task.pageId || touchDragTask?.pageId === task.pageId,
+              'board-card--deleting': deletingIds.has(task.pageId),
+            }"
+            @click="!deletingIds.has(task.pageId) && openTask(task.pageId)"
+            @contextmenu="!deletingIds.has(task.pageId) && onCardContextMenu(task, $event)"
           >
+            <!-- Deleting overlay -->
+            <div v-if="deletingIds.has(task.pageId)" class="board-card-deleting-overlay">
+              <svg class="board-card-spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+              </svg>
+            </div>
             <div
               class="board-card-handle"
-              draggable="true"
-              @dragstart="onDragStart(task, $event)"
+              :draggable="!deletingIds.has(task.pageId)"
+              @dragstart="!deletingIds.has(task.pageId) && onDragStart(task, $event)"
               @dragend="onDragEnd"
-              @touchstart.passive="onTouchStart(task, $event)"
+              @touchstart.passive="!deletingIds.has(task.pageId) && onTouchStart(task, $event)"
               @click.stop
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -379,6 +474,73 @@ function labelPillStyle(label) {
         No status columns found. Make sure Notion is configured with a status or select field.
       </div>
     </div>
+
+    <!-- Footer bar -->
+    <Teleport to="#view-footer">
+      <div class="board-footer-bar">
+        <!-- Fuzzy search (grows) -->
+        <input
+          v-model="boardSearch"
+          class="board-footer-search"
+          placeholder="Search…"
+          type="search"
+        />
+        <!-- Assignee filter -->
+        <AssigneeDropdown
+          class="board-footer-dropdown"
+          :model-value="boardFilter.assignee"
+          :assignees="taskAssignees"
+          :head-options="assigneeHeadOptions"
+          :popover-up="true"
+          size="sm"
+          @update:model-value="onAssigneeChange"
+        />
+        <!-- Label filter -->
+        <AssigneeDropdown
+          class="board-footer-dropdown"
+          :model-value="boardFilter.label"
+          :assignees="allLabels.map(l => ({ id: l.name, name: l.name }))"
+          :head-options="labelHeadOptions"
+          :popover-up="true"
+          size="sm"
+          @update:model-value="onLabelChange"
+        />
+      </div>
+    </Teleport>
+
+    <!-- Context menu -->
+    <Teleport to="body">
+      <div
+        v-if="contextMenu"
+        class="board-context-menu"
+        :style="{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }"
+      >
+        <button
+          class="board-context-item board-context-item--danger"
+          type="button"
+          @click="confirmDelete(contextMenu.task)"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M10 11v6M14 11v6" />
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+          </svg>
+          Delete
+        </button>
+      </div>
+    </Teleport>
+
+    <!-- Delete error modal -->
+    <Teleport to="body">
+      <div v-if="deleteError" class="board-error-backdrop" @click.self="deleteError = null">
+        <div class="board-error-modal">
+          <p class="board-error-modal-title">failed to delete task</p>
+          <p class="board-error-modal-body">{{ deleteError }}</p>
+          <button class="board-error-modal-close" type="button" @click="deleteError = null">dismiss</button>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -409,32 +571,6 @@ function labelPillStyle(label) {
   color: var(--text-primary);
   flex: 1;
   margin: 0;
-}
-
-.board-filter-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0 8px;
-  height: 28px;
-  background: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.board-filter-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.board-filter-btn--active {
-  background: var(--bg-tertiary);
-  border-color: var(--text-muted);
-  color: var(--text-primary);
 }
 
 .board-refresh-btn {
@@ -568,6 +704,32 @@ function labelPillStyle(label) {
   opacity: 0.4;
 }
 
+.board-card--deleting {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+  position: relative;
+}
+
+.board-card-deleting-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  pointer-events: none;
+}
+
+@keyframes board-spin {
+  to { transform: rotate(360deg); }
+}
+
+.board-card-spinner {
+  color: var(--text-muted);
+  animation: board-spin 0.8s linear infinite;
+}
+
 .board-card-handle {
   display: flex;
   align-items: center;
@@ -693,5 +855,145 @@ function labelPillStyle(label) {
   border-radius: var(--radius-sm);
   animation: board-shimmer 1.4s ease-in-out infinite;
   animation-delay: 0.1s;
+}
+
+/* ── Footer bar ──────────────────────────────── */
+.board-footer-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  height: var(--bottom-bar-height);
+  flex: 1;
+  min-width: 0;
+}
+
+.board-footer-search {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.board-footer-search:focus {
+  border-color: var(--text-muted);
+}
+
+.board-footer-search::placeholder {
+  color: var(--text-muted);
+}
+
+.board-footer-dropdown {
+  flex-shrink: 0;
+  width: 120px;
+}
+</style>
+
+<!-- Context menu — teleported, must be unscoped -->
+<style>
+.board-context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  padding: 4px;
+  min-width: 140px;
+}
+
+.board-context-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.board-context-item:hover {
+  background: var(--bg-secondary);
+}
+
+.board-context-item--danger {
+  color: var(--error-color, #e05252);
+}
+
+.board-context-item--danger:hover {
+  background: color-mix(in srgb, var(--bg-secondary) 80%, var(--error-color, #e05252) 20%);
+}
+
+/* ── Delete error modal ──────────────────────── */
+.board-error-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.board-error-modal {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  padding: 20px 24px;
+  max-width: 340px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.board-error-modal-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--error-color, #e05252);
+  margin: 0;
+}
+
+.board-error-modal-body {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.board-error-modal-close {
+  align-self: flex-end;
+  margin-top: 4px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.board-error-modal-close:hover {
+  border-color: var(--text-muted);
+  color: var(--text-primary);
 }
 </style>

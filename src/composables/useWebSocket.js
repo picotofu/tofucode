@@ -52,7 +52,27 @@ const boardTasksError = ref(null);
 const boardStatusField = ref(null); // status field name for drag-drop updates
 const boardStatusFieldType = ref(null); // 'status' | 'select'
 const boardColumnOrder = ref([]); // custom column order from notion config
-const boardFilterBySelf = ref(true); // filter board to only show self-assigned tasks (default on)
+
+// LocalStorage key for persistent board filter state
+const BOARD_FILTER_KEY = 'tofucode:board-filter';
+
+function loadBoardFilter() {
+  try {
+    const stored = localStorage.getItem(BOARD_FILTER_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        assignee: parsed.assignee ?? '__self__',
+        label: parsed.label ?? '',
+      };
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return { assignee: '__self__', label: '' };
+}
+
+const boardFilter = ref(loadBoardFilter());
 
 // LocalStorage key for persistent filter state
 const TASKS_FILTER_KEY = 'tofucode:tasks-filter';
@@ -443,6 +463,17 @@ function handleGlobalMessage(msg) {
         boardTasksError.value = msg.error || 'Failed to load board tasks';
       }
       break;
+
+    case 'tasks:delete_result':
+      if (msg.success && msg.pageId) {
+        // Remove from board tasks list if present
+        boardTasks.value = boardTasks.value.filter(
+          (t) => t.pageId !== msg.pageId,
+        );
+        // Remove from sidebar tasks list if present
+        tasks.value = tasks.value.filter((t) => t.pageId !== msg.pageId);
+      }
+      break;
   }
   // Call all registered message listeners
   for (const listener of globalMessageListeners) {
@@ -675,10 +706,27 @@ function updateTaskField(pageId, field, fieldType, value) {
 function getBoardTasks() {
   boardTasksReady.value = false;
   boardTasksError.value = null;
-  sendGlobal({
-    type: 'tasks:board_list',
-    filterBySelf: boardFilterBySelf.value,
-  });
+  const filter = boardFilter.value;
+  const payload = { type: 'tasks:board_list' };
+  if (filter.assignee === '__self__') {
+    payload.filterBySelf = true;
+  } else if (filter.assignee) {
+    payload.filterByAssignee = filter.assignee;
+  }
+  sendGlobal(payload);
+}
+
+function setBoardFilter(partial) {
+  boardFilter.value = { ...boardFilter.value, ...partial };
+  try {
+    localStorage.setItem(BOARD_FILTER_KEY, JSON.stringify(boardFilter.value));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function deleteTask(pageId) {
+  sendGlobal({ type: 'tasks:delete', pageId });
 }
 
 function addTaskOption(pageId, field, fieldType, optionName, currentValues) {
@@ -786,8 +834,10 @@ export function useWebSocket() {
     boardStatusField: readonly(boardStatusField),
     boardStatusFieldType: readonly(boardStatusFieldType),
     boardColumnOrder: readonly(boardColumnOrder),
-    boardFilterBySelf,
+    boardFilter: readonly(boardFilter),
     getBoardTasks,
+    setBoardFilter,
+    deleteTask,
     addTaskOption,
 
     // Direct send

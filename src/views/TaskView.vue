@@ -26,6 +26,7 @@ const {
   replaceTaskBody,
   updateTaskField,
   addTaskOption,
+  deleteTask,
   onMessage,
 } = useWebSocket();
 
@@ -52,6 +53,11 @@ const addLabelField = ref(null); // which multi_select field's "+" was clicked
 const addLabelInput = ref('');
 const addLabelSaving = ref(false);
 const addLabelInputRef = ref(null);
+
+// Delete state
+const deleteConfirmPending = ref(false);
+const deleteLoading = ref(false);
+const deleteError = ref(null);
 
 function fetchAll(id) {
   if (!connected.value) return;
@@ -89,10 +95,45 @@ const unsubAddOption = onMessage((msg) => {
   }
 });
 
+// Listen for delete results — navigate back after successful deletion
+const unsubDelete = onMessage((msg) => {
+  if (msg.type !== 'tasks:delete_result') return;
+  if (msg.pageId !== pageId.value) return;
+  deleteLoading.value = false;
+  deleteConfirmPending.value = false;
+  if (msg.success) {
+    if (fromBoard.value) {
+      router.push('/board');
+    } else {
+      router.back();
+    }
+  } else {
+    deleteError.value = msg.error || 'Failed to delete task';
+  }
+});
+
+function handleDelete() {
+  if (deleteLoading.value) return;
+  if (!deleteConfirmPending.value) {
+    // First click: arm the button
+    deleteConfirmPending.value = true;
+    // Auto-disarm after 3s if not confirmed
+    setTimeout(() => {
+      if (!deleteLoading.value) deleteConfirmPending.value = false;
+    }, 3000);
+    return;
+  }
+  // Second click: confirm delete
+  deleteConfirmPending.value = false;
+  deleteLoading.value = true;
+  deleteTask(pageId.value);
+}
+
 onUnmounted(() => {
   clearTimeout(saveTimer);
   for (const t of Object.values(fieldTimers)) clearTimeout(t);
   unsubAddOption();
+  unsubDelete();
 });
 
 // Populate local edit state when task detail loads
@@ -493,6 +534,43 @@ function onCommentKeydown(e) {
         >
           {{ saveLabel }}
         </span>
+        <!-- Delete button (two-tap confirmation) -->
+        <button
+          v-if="taskDetail && !taskDetail.error"
+          class="task-footer-delete"
+          :class="{
+            'task-footer-delete--armed': deleteConfirmPending,
+            'task-footer-delete--loading': deleteLoading,
+          }"
+          type="button"
+          :disabled="deleteLoading"
+          :title="deleteLoading ? 'Deleting…' : deleteConfirmPending ? 'Click again to confirm deletion' : 'Delete task'"
+          @click="handleDelete"
+        >
+          <!-- Spinner while deleting -->
+          <svg v-if="deleteLoading" class="task-delete-spinner" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+          </svg>
+          <!-- Trash icon when idle -->
+          <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M10 11v6M14 11v6" />
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+          </svg>
+          {{ deleteLoading ? 'Deleting…' : deleteConfirmPending ? 'Confirm?' : '' }}
+        </button>
+      </div>
+    </Teleport>
+
+    <!-- Delete error modal -->
+    <Teleport to="body">
+      <div v-if="deleteError" class="task-delete-backdrop" @click.self="deleteError = null">
+        <div class="task-delete-modal">
+          <p class="task-delete-modal-title">failed to delete task</p>
+          <p class="task-delete-modal-body">{{ deleteError }}</p>
+          <button class="task-delete-modal-close" type="button" @click="deleteError = null">dismiss</button>
+        </div>
       </div>
     </Teleport>
   </div>
@@ -704,19 +782,6 @@ function onCommentKeydown(e) {
   gap: 4px;
   flex: 1;
   min-width: 0;
-}
-
-.task-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 500;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  color: var(--text-secondary);
-  white-space: nowrap;
 }
 
 .task-label-pill {
@@ -991,5 +1056,105 @@ function onCommentKeydown(e) {
 
 .task-save-indicator.save-error {
   color: var(--error-color);
+}
+
+.task-footer-delete {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.task-footer-delete:hover {
+  border-color: var(--error-color, #e05252);
+  color: var(--error-color, #e05252);
+}
+
+.task-footer-delete--armed {
+  border-color: var(--error-color, #e05252);
+  color: var(--error-color, #e05252);
+  background: color-mix(in srgb, transparent 80%, var(--error-color, #e05252) 20%);
+}
+
+.task-footer-delete--loading {
+  border-color: var(--text-muted);
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.7;
+}
+
+@keyframes task-spin {
+  to { transform: rotate(360deg); }
+}
+
+.task-delete-spinner {
+  animation: task-spin 0.8s linear infinite;
+}
+
+/* ── Delete error modal ──────────────────────── */
+.task-delete-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.task-delete-modal {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  padding: 20px 24px;
+  max-width: 340px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-delete-modal-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--error-color, #e05252);
+  margin: 0;
+}
+
+.task-delete-modal-body {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.task-delete-modal-close {
+  align-self: flex-end;
+  margin-top: 4px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.task-delete-modal-close:hover {
+  border-color: var(--text-muted);
+  color: var(--text-primary);
 }
 </style>

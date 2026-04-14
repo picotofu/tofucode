@@ -54,7 +54,7 @@ class NotionAPI {
 
   /**
    * Make a Notion API call
-   * @param {'GET'|'POST'|'PATCH'} method
+   * @param {'GET'|'POST'|'PATCH'|'DELETE'} method
    * @param {string} path - API path (e.g. '/databases/abc123')
    * @param {Object} [body] - Request body for POST/PATCH
    * @returns {Promise<Object>}
@@ -198,6 +198,16 @@ class NotionAPI {
    */
   async deleteBlock(blockId) {
     return this.call('DELETE', `/blocks/${blockId}`);
+  }
+
+  /**
+   * Archive (soft-delete) a page — PATCH /v1/pages/{id}
+   * Notion doesn't expose a hard-delete API; archiving is the equivalent.
+   * @param {string} pageId - Page ID
+   * @returns {Promise<Object>}
+   */
+  async archivePage(pageId) {
+    return this.call('PATCH', `/pages/${pageId}`, { archived: true });
   }
 }
 
@@ -862,6 +872,21 @@ export function createNotionProvider(token) {
         return { success: true };
       } catch (err) {
         logger.error('[Notion] updateTicket error:', err.message);
+        return { success: false, error: err.message };
+      }
+    },
+
+    /**
+     * Archive (soft-delete) a ticket page
+     * @param {string} pageId
+     * @returns {Promise<import('./types.js').TicketResult>}
+     */
+    async deleteTicket(pageId) {
+      try {
+        await api.archivePage(pageId);
+        return { success: true };
+      } catch (err) {
+        logger.error('[Notion] deleteTicket error:', err.message);
         return { success: false, error: err.message };
       }
     },
