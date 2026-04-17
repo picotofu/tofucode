@@ -370,11 +370,11 @@ export async function handleGetAssignees(ws) {
     const ctx = await resolveContext(ws, 'tasks:assignees_result');
     if (!ctx) return;
 
-    const { provider, databaseUrl, assigneeField } = ctx;
+    const { provider, config, databaseUrl, assigneeField } = ctx;
     const [dbUsers, workspaceUsers, selfId] = await Promise.all([
       provider.listAssigneesFromDb(databaseUrl, assigneeField),
       provider.listWorkspaceUsers(),
-      provider.getSelfId(),
+      provider.getSelfId(config.userEmail),
     ]);
     // DB assignees first (already in use), then remaining workspace users
     const seen = new Set(dbUsers.map((u) => u.id));

@@ -1254,13 +1254,23 @@ export function createNotionProvider(token) {
      * Get the Notion user ID of the token owner (integration user).
      * @returns {Promise<string|null>}
      */
-    async getSelfId() {
+    /**
+     * @param {string} [userEmail] - Fallback: match against workspace users by email
+     *   when the token belongs to a bot (integration token) rather than a real person.
+     */
+    async getSelfId(userEmail) {
       try {
         const me = await api.getMe();
-        // Integration tokens return a bot user — bots cannot be assigned to
-        // people fields, so treat them as no self-user.
-        if (me.type !== 'person') return null;
-        return me.id ?? null;
+        if (me.type === 'person') return me.id ?? null;
+        // Integration token → bot user. Try to resolve via configured email.
+        if (userEmail) {
+          const users = await this.listWorkspaceUsers();
+          const match = users.find(
+            (u) => u.email?.toLowerCase() === userEmail.toLowerCase(),
+          );
+          if (match) return match.id;
+        }
+        return null;
       } catch (err) {
         logger.warn('[Notion] getSelfId error:', err.message);
         return null;
