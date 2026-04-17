@@ -294,6 +294,7 @@ const NOTION_DEFAULTS = {
   enabled: false,
   token: '',
   ticketDatabaseUrl: '',
+  userEmail: '',
   fieldMappings: [],
   boardColumnOrder: [],
 };
@@ -1072,6 +1073,22 @@ async function handleClearCacheAndUpdate() {
             <div v-if="notionAnalyseDisplay?.success" class="integration-test-result success">
               {{ notionAnalyseDisplay.fields?.length }} fields detected — mappings populated below.
             </div>
+          </div>
+
+          <!-- User email (used to resolve "Me" as assignee) -->
+          <div class="setting-item">
+            <div class="setting-header">
+              <span class="setting-title">Your Workspace Email</span>
+            </div>
+            <p class="setting-description">
+              Your Notion workspace email. Used to identify you when "Me" is selected as assignee.
+            </p>
+            <input
+              type="email"
+              v-model="notionLocal.userEmail"
+              class="setting-input"
+              placeholder="you@example.com"
+            />
           </div>
 
           <!-- Field Mappings -->

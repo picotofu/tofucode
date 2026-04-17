@@ -53,6 +53,7 @@ export async function handleSaveConfig(ws, message) {
       enabled: incoming.enabled ?? existing.enabled,
       ticketDatabaseUrl:
         incoming.ticketDatabaseUrl ?? existing.ticketDatabaseUrl,
+      userEmail: incoming.userEmail ?? existing.userEmail ?? '',
       fieldMappings: incoming.fieldMappings ?? existing.fieldMappings ?? [],
       boardColumnOrder:
         incoming.boardColumnOrder ?? existing.boardColumnOrder ?? [],

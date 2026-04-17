@@ -119,7 +119,11 @@ function fetchTasksIfNeeded() {
 }
 
 watch(() => props.activeTab, fetchTasksIfNeeded, { immediate: true });
-watch(connected, fetchTasksIfNeeded);
+watch(connected, (isConnected) => {
+  // Reset on disconnect so reconnect triggers a fresh fetch (picks up new selfId, etc.)
+  if (!isConnected) tasksFetched.value = false;
+  fetchTasksIfNeeded();
+});
 
 // Initialize notes panel on first tab open
 const notesPanelRef = ref(null);
