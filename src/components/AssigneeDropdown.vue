@@ -12,6 +12,8 @@ const props = defineProps({
   size: { type: String, default: 'md' },
   // Bare variant: no border on trigger (for use inside bordered containers)
   bare: { type: Boolean, default: false },
+  // Disabled state — prevents opening the dropdown
+  disabled: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -106,7 +108,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
       class="asgn-trigger"
       :class="[size === 'sm' ? 'asgn-trigger-sm' : '', bare ? 'asgn-trigger-bare' : '']"
       type="button"
-      @click="open ? (open = false) : openDropdown()"
+      :disabled="disabled"
+      @click="disabled ? undefined : (open ? (open = false) : openDropdown())"
     >
       <span class="asgn-label">{{ displayLabel }}</span>
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -150,13 +153,13 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
   justify-content: space-between;
   gap: 4px;
   width: 100%;
-  padding: 4px 6px;
+  padding: 8px 12px;
   font-size: 13px;
   font-family: inherit;
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  color: var(--text-secondary);
+  color: var(--text-primary);
   cursor: pointer;
   text-align: left;
   transition: border-color 0.15s;
@@ -168,9 +171,18 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
   border-color: var(--text-muted);
 }
 
+.asgn-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Compact variant — for filter bars and toolbars */
 .asgn-trigger-sm {
-  padding: 3px 6px;
-  font-size: 13px;
+  height: var(--input-sm-height);
+  padding: var(--input-sm-padding);
+  font-size: var(--input-sm-font-size);
+  background: var(--input-sm-bg);
+  color: var(--input-sm-color);
 }
 
 .asgn-trigger-bare {

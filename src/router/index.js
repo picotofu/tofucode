@@ -34,6 +34,11 @@ const routes = [
     component: () => import('../views/BoardView.vue'),
   },
   {
+    path: '/tickets/new',
+    name: 'new-ticket',
+    component: () => import('../views/NewTicketView.vue'),
+  },
+  {
     path: '/notes/:notePath(.*)*',
     name: 'notes',
     component: () => import('../views/NotesView.vue'),

@@ -42,13 +42,11 @@ const {
   taskStatusOptions,
   taskAssignees,
   taskSelfId,
-  lastCreatedPageId,
   getProjects,
   getRecentSessionsImmediate,
   getTasks,
   loadMoreTasks,
   setTasksFilter,
-  createTask,
   getTaskStatusOptions,
   getTaskAssignees,
   dismissUpdate,
@@ -141,24 +139,12 @@ function openTodayNote() {
 
 defineExpose({ openTodayNote });
 
-// Navigate to task view when a new ticket is created
-watch(lastCreatedPageId, (pageId) => {
-  if (pageId) {
-    router.push(`/tasks/${pageId}`);
-  }
-});
-
 function handleSelectTask(pageId) {
   router.push(`/tasks/${pageId}`);
 }
 
 function handleFilterChange(filter) {
   setTasksFilter(filter);
-}
-
-function handleCreateTask(title, assigneeId) {
-  createTask(title, assigneeId);
-  // List will refresh after lastCreatedPageId triggers navigation
 }
 
 function handleRefreshTasks() {
@@ -373,7 +359,6 @@ onMounted(() => {
           @load-more="loadMoreTasks"
           @select-task="handleSelectTask"
           @filter-change="handleFilterChange"
-          @create-task="handleCreateTask"
           @open-settings="$emit('open-settings', 'notion')"
         />
       </template>

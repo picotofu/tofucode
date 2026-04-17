@@ -41,6 +41,7 @@ const taskSaveStatus = ref(null); // 'saving' | 'saved' | 'error' | null
 const taskStatusOptions = ref([]); // available status names from DB schema
 const taskAssignees = ref([]); // workspace users [{id, name, email}]
 const taskSelfId = ref(null); // Notion user ID of the token owner
+const taskLabelOptions = ref([]); // available label options from DB schema
 const taskComments = ref([]);
 const taskCommentsLoading = ref(false);
 const lastCreatedPageId = ref(null);
@@ -413,6 +414,12 @@ function handleGlobalMessage(msg) {
     case 'tasks:create_result':
       if (msg.success && msg.pageId) {
         lastCreatedPageId.value = msg.pageId;
+        // Silently refresh sidebar task list in the background
+        getTasksSilent();
+        // Silently refresh board if it has been loaded at least once
+        if (boardStatusField.value !== null) {
+          getBoardTasksSilent();
+        }
       }
       break;
 
@@ -427,6 +434,12 @@ function handleGlobalMessage(msg) {
     case 'tasks:status_options_result':
       if (msg.success) {
         taskStatusOptions.value = msg.options || [];
+      }
+      break;
+
+    case 'tasks:label_options_result':
+      if (msg.success) {
+        taskLabelOptions.value = msg.options || [];
       }
       break;
 
@@ -628,6 +641,12 @@ function getTasks() {
   sendGlobal(buildTasksListPayload(tasksFilter.value));
 }
 
+// Silent version — refreshes without triggering loading state
+function getTasksSilent() {
+  tasksAppending = false;
+  sendGlobal(buildTasksListPayload(tasksFilter.value));
+}
+
 function loadMoreTasks() {
   if (!tasksNextCursor.value) return;
   tasksAppending = true;
@@ -663,14 +682,19 @@ function clearTaskDetail() {
   taskDetail.value = null;
 }
 
-function createTask(title, assigneeId) {
+function createTask(title, assigneeId, labelValue) {
   let resolvedAssigneeId = null;
   if (assigneeId === '__self__') {
     resolvedAssigneeId = taskSelfId.value ?? null;
   } else if (assigneeId) {
     resolvedAssigneeId = assigneeId;
   }
-  sendGlobal({ type: 'tasks:create', title, assigneeId: resolvedAssigneeId });
+  sendGlobal({
+    type: 'tasks:create',
+    title,
+    assigneeId: resolvedAssigneeId,
+    labelValue: labelValue || undefined,
+  });
 }
 
 function updateTaskStatus(pageId, status) {
@@ -684,6 +708,10 @@ function replaceTaskBody(pageId, body) {
 
 function getTaskStatusOptions() {
   sendGlobal({ type: 'tasks:get_status_options' });
+}
+
+function getLabelOptions() {
+  sendGlobal({ type: 'tasks:get_label_options' });
 }
 
 function getTaskAssignees() {
@@ -706,6 +734,18 @@ function updateTaskField(pageId, field, fieldType, value) {
 function getBoardTasks() {
   boardTasksReady.value = false;
   boardTasksError.value = null;
+  const filter = boardFilter.value;
+  const payload = { type: 'tasks:board_list' };
+  if (filter.assignee === '__self__') {
+    payload.filterBySelf = true;
+  } else if (filter.assignee) {
+    payload.filterByAssignee = filter.assignee;
+  }
+  sendGlobal(payload);
+}
+
+// Silent version — refreshes without triggering loading state
+function getBoardTasksSilent() {
   const filter = boardFilter.value;
   const payload = { type: 'tasks:board_list' };
   if (filter.assignee === '__self__') {
@@ -784,6 +824,7 @@ export function useWebSocket() {
     taskStatusOptions: readonly(taskStatusOptions),
     taskAssignees: readonly(taskAssignees),
     taskSelfId: readonly(taskSelfId),
+    taskLabelOptions: readonly(taskLabelOptions),
     taskComments: readonly(taskComments),
     taskCommentsLoading: readonly(taskCommentsLoading),
     lastCreatedPageId: readonly(lastCreatedPageId),
@@ -823,6 +864,7 @@ export function useWebSocket() {
     updateTaskField,
     replaceTaskBody,
     getTaskStatusOptions,
+    getLabelOptions,
     getTaskAssignees,
     getTaskComments,
     addTaskComment,

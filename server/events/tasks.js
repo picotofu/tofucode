@@ -56,6 +56,11 @@ async function resolveContext(ws, errorType) {
     config.fieldMappings?.find(
       (m) => m.type === 'select' && m.field !== statusMapping?.field,
     );
+  // Archive field: any field with purpose "archive" — excluded from board when value = "archive"
+  // The Archive field in Notion is a formula type, so we match on purpose only (not type)
+  const archiveMapping = config.fieldMappings?.find((m) =>
+    m.purpose?.toLowerCase().includes('archive'),
+  );
 
   return {
     provider,
@@ -65,6 +70,7 @@ async function resolveContext(ws, errorType) {
     statusField: statusMapping?.field ?? null,
     statusFieldType: statusMapping?.type ?? null,
     labelField: labelMapping?.field ?? null,
+    archiveField: archiveMapping?.field ?? null,
   };
 }
 
@@ -174,8 +180,8 @@ export async function handleCreateTask(ws, message) {
     const ctx = await resolveContext(ws, 'tasks:create_result');
     if (!ctx) return;
 
-    const { provider, config, databaseUrl } = ctx;
-    const { title, assigneeId } = message;
+    const { provider, config, databaseUrl, labelField } = ctx;
+    const { title, assigneeId, labelValue } = message;
 
     if (!title || !title.trim()) {
       send(ws, {
@@ -193,6 +199,8 @@ export async function handleCreateTask(ws, message) {
       fieldMappings: config.fieldMappings,
       assigneeId: assigneeId || null,
       assigneeField: ctx.assigneeField,
+      labelValue: labelValue || null,
+      labelField: labelField || null,
     });
     send(ws, { type: 'tasks:create_result', ...result });
   } catch (err) {
@@ -315,6 +323,38 @@ export async function handleGetTaskStatusOptions(ws) {
     logger.error('[Tasks WS] Get status options error:', err);
     send(ws, {
       type: 'tasks:status_options_result',
+      success: false,
+      error: err.message,
+    });
+  }
+}
+
+/**
+ * Get available label/select field options from the database schema
+ * @param {import('ws').WebSocket} ws
+ */
+export async function handleGetLabelOptions(ws) {
+  try {
+    const ctx = await resolveContext(ws, 'tasks:label_options_result');
+    if (!ctx) return;
+
+    const { provider, databaseUrl, labelField } = ctx;
+
+    if (!labelField) {
+      send(ws, {
+        type: 'tasks:label_options_result',
+        success: true,
+        options: [],
+      });
+      return;
+    }
+
+    const result = await provider.getFieldOptions(databaseUrl, labelField);
+    send(ws, { type: 'tasks:label_options_result', ...result });
+  } catch (err) {
+    logger.error('[Tasks WS] Get label options error:', err);
+    send(ws, {
+      type: 'tasks:label_options_result',
       success: false,
       error: err.message,
     });
@@ -561,6 +601,7 @@ export async function handleListBoardTasks(ws, message) {
       statusField,
       statusFieldType,
       labelField,
+      archiveField,
     } = ctx;
     const limit = message.limit ?? 100;
 
@@ -584,6 +625,7 @@ export async function handleListBoardTasks(ws, message) {
       assigneeField: assigneeField ?? undefined,
       statusField: statusField ?? undefined,
       labelField: labelField ?? undefined,
+      archiveField: archiveField ?? undefined,
     });
 
     send(ws, {

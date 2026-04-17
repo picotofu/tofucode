@@ -29,7 +29,6 @@ const emit = defineEmits([
   'select-task',
   'open-settings',
   'filter-change',
-  'create-task',
 ]);
 
 // ── Filter state ───────────────────────────────────────────────────────────
@@ -64,29 +63,9 @@ const FILTER_HEAD_OPTIONS = [
   { value: '', label: 'Anyone' },
 ];
 
-const CREATE_HEAD_OPTIONS = [{ value: '__self__', label: 'Me' }];
-
 function onFilterAssigneeChange(value) {
   localAssignee.value = value;
   emitFilter();
-}
-
-// ── Create form ────────────────────────────────────────────────────────────
-
-const createTitle = ref('');
-const createAssignee = ref('__self__');
-
-function confirmCreate() {
-  const title = createTitle.value.trim();
-  if (!title) return;
-  // Pass assignee info alongside title; parent handles it
-  emit('create-task', title, createAssignee.value);
-  createTitle.value = '';
-  createAssignee.value = '__self__';
-}
-
-function onCreateTitleKeydown(e) {
-  if (e.key === 'Enter') confirmCreate();
 }
 
 // ── Infinite scroll ────────────────────────────────────────────────────────
@@ -248,6 +227,7 @@ function labelStyle(label) {
           <!-- Assignee filter -->
           <AssigneeDropdown
             class="tasks-filter-assignee"
+            size="sm"
             :model-value="localAssignee"
             :assignees="taskAssignees"
             :head-options="FILTER_HEAD_OPTIONS"
@@ -423,7 +403,7 @@ function labelStyle(label) {
       </template>
     </template>
 
-    <!-- Pinned footer: board link + create ticket -->
+    <!-- Pinned footer: board link + new ticket button -->
     <div v-if="!tasksError" class="tasks-footer">
       <RouterLink to="/board" class="tasks-board-link">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -432,42 +412,12 @@ function labelStyle(label) {
         </svg>
         Board view
       </RouterLink>
-      <div class="tasks-create-box">
-        <!-- Row 1: title input -->
-        <input
-          v-model="createTitle"
-          type="text"
-          class="tasks-create-input"
-          placeholder="New ticket title…"
-          maxlength="200"
-          @keydown="onCreateTitleKeydown"
-        />
-
-        <!-- Row 2: assignee dropdown + confirm button -->
-        <div class="tasks-create-bottom">
-          <!-- Assignee picker -->
-          <AssigneeDropdown
-            v-model="createAssignee"
-            class="tasks-create-assignee"
-            :assignees="taskAssignees"
-            :head-options="CREATE_HEAD_OPTIONS"
-            :popover-up="true"
-            size="sm"
-          />
-
-          <!-- Confirm button -->
-          <button
-            class="tasks-create-confirm"
-            :disabled="!createTitle.trim()"
-            title="Add ticket"
-            @click="confirmCreate"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      <RouterLink to="/tickets/new" class="tasks-new-ticket-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        New Ticket
+      </RouterLink>
     </div>
   </div>
 </template>
@@ -520,16 +470,24 @@ function labelStyle(label) {
 .tasks-filter-select {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
-  padding: 4px 6px;
-  background: var(--bg-secondary);
+  height: var(--input-sm-height);
+  padding: var(--input-sm-padding);
+  padding-right: 22px;
+  font-size: var(--input-sm-font-size);
+  font-family: inherit;
+  background-color: var(--input-sm-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23666666' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  color: var(--input-sm-color);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  color: var(--text-secondary);
   cursor: pointer;
-  appearance: auto;
+  appearance: none;
+  transition: border-color 0.15s;
 }
 
+.tasks-filter-select:hover,
 .tasks-filter-select:focus {
   outline: none;
   border-color: var(--text-muted);
@@ -567,11 +525,6 @@ function labelStyle(label) {
 
 /* ── Assignee dropdown sizing ─────────────────── */
 .tasks-filter-assignee {
-  flex: 1;
-  min-width: 0;
-}
-
-.tasks-create-assignee {
   flex: 1;
   min-width: 0;
 }
@@ -779,11 +732,14 @@ function labelStyle(label) {
   flex-shrink: 0;
 }
 
-/* ── Footer (create) ──────────────────────────── */
+/* ── Footer ───────────────────────────────────── */
 .tasks-footer {
   flex-shrink: 0;
   border-top: 1px solid var(--border-color);
   padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .tasks-board-link {
@@ -792,7 +748,6 @@ function labelStyle(label) {
   justify-content: center;
   gap: 6px;
   padding: 5px 8px;
-  margin-bottom: 6px;
   font-size: 12px;
   color: var(--text-muted);
   text-decoration: none;
@@ -807,64 +762,24 @@ function labelStyle(label) {
   border-color: var(--text-muted);
 }
 
-.tasks-create-box {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.tasks-create-input {
-  width: 100%;
-  padding: 6px 8px;
-  font-size: 13px;
-  color: var(--text-primary);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  outline: none;
-  box-sizing: border-box;
-  font-family: inherit;
-  transition: border-color 0.15s;
-}
-
-.tasks-create-input:focus {
-  border-color: var(--text-muted);
-}
-
-.tasks-create-input::placeholder {
-  color: var(--text-muted);
-}
-
-.tasks-create-bottom {
-  display: flex;
-  align-items: center;
-  padding: 0 2px 0 0;
-}
-
-.tasks-create-confirm {
+.tasks-new-ticket-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  background: transparent;
-  color: var(--text-muted);
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-decoration: none;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.15s, border-color 0.15s;
 }
 
-.tasks-create-confirm:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.tasks-create-confirm:not(:disabled):hover {
+.tasks-new-ticket-btn:hover {
   background: var(--bg-tertiary);
-  color: var(--text-primary);
+  border-color: var(--text-muted);
 }
 
 /* ── Skeleton loading ─────────────────────────── */

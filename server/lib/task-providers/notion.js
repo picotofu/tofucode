@@ -811,6 +811,8 @@ export function createNotionProvider(token) {
       fieldMappings: _fieldMappings,
       assigneeId,
       assigneeField,
+      labelValue,
+      labelField,
     }) {
       const dbId = extractDatabaseId(databaseUrl);
       if (!dbId) {
@@ -836,6 +838,19 @@ export function createNotionProvider(token) {
           properties[assigneeField] = {
             people: [{ object: 'user', id: assigneeId }],
           };
+        }
+
+        // Set label if provided and field exists in schema
+        if (labelValue && labelField && schema[labelField]) {
+          const labelPropType = schema[labelField].type;
+          if (labelPropType === 'select') {
+            properties[labelField] = { select: { name: labelValue } };
+          } else if (labelPropType === 'multi_select') {
+            const names = Array.isArray(labelValue) ? labelValue : [labelValue];
+            properties[labelField] = {
+              multi_select: names.map((n) => ({ name: n })),
+            };
+          }
         }
 
         const children = buildBodyChildren(body);
@@ -971,6 +986,7 @@ export function createNotionProvider(token) {
       assigneeField,
       statusField,
       labelField,
+      archiveField,
       filterByStatus,
       titleSearch,
     }) {
@@ -1012,6 +1028,14 @@ export function createNotionProvider(token) {
           }
         }
 
+        // Exclude archived tickets (custom Archive formula field = "archive")
+        if (archiveField) {
+          conditions.push({
+            property: archiveField,
+            formula: { string: { does_not_equal: 'archive' } },
+          });
+        }
+
         // Title fuzzy search (Notion "contains" on title)
         if (titleSearch?.trim()) {
           conditions.push({
@@ -1033,17 +1057,25 @@ export function createNotionProvider(token) {
 
         const res = await api.queryDatabase(dbId, queryBody);
 
-        const tickets = (res.results ?? []).map((page) => ({
-          pageId: page.id,
-          ticketId: extractPageUniqueId(page.properties ?? {}),
-          title: extractPageTitle(page.properties ?? {}),
-          url: page.url || `https://notion.so/${page.id.replace(/-/g, '')}`,
-          status: extractPageStatus(page.properties ?? {}, statusField),
-          assignees: extractPageAssignees(page.properties ?? {}, assigneeField),
-          labels: extractPageLabels(page.properties ?? {}, labelField),
-          lastEditedAt: page.last_edited_time,
-          archived: page.archived ?? false,
-        }));
+        const tickets = (res.results ?? []).map((page) => {
+          const props = page.properties ?? {};
+          const archiveStatus =
+            archiveField && props[archiveField]?.type === 'formula'
+              ? (props[archiveField].formula?.string ?? null)
+              : null;
+          return {
+            pageId: page.id,
+            ticketId: extractPageUniqueId(props),
+            title: extractPageTitle(props),
+            url: page.url || `https://notion.so/${page.id.replace(/-/g, '')}`,
+            status: extractPageStatus(props, statusField),
+            assignees: extractPageAssignees(props, assigneeField),
+            labels: extractPageLabels(props, labelField),
+            lastEditedAt: page.last_edited_time,
+            archived: page.archived ?? false,
+            archiveStatus,
+          };
+        });
 
         return {
           success: true,
@@ -1115,6 +1147,44 @@ export function createNotionProvider(token) {
         return { success: true, options };
       } catch (err) {
         logger.error('[Notion] getStatusOptions error:', err.message);
+        return { success: false, error: err.message };
+      }
+    },
+
+    /**
+     * Get options for any select/multi_select/status field from the database schema.
+     * Returns [{name, color}] suitable for dropdown rendering.
+     * @param {string} databaseUrl
+     * @param {string} fieldName - Property name (e.g. "Label")
+     * @returns {Promise<{ success: boolean, options?: Array<{name: string, color: string}>, error?: string }>}
+     */
+    async getFieldOptions(databaseUrl, fieldName) {
+      const dbId = extractDatabaseId(databaseUrl);
+      if (!dbId) return { success: false, error: 'Invalid database URL.' };
+      try {
+        const db = await api.getDatabase(dbId);
+        const prop = db.properties?.[fieldName];
+        if (!prop) return { success: true, options: [] };
+        let options = [];
+        if (prop.type === 'select') {
+          options = (prop.select?.options ?? []).map((o) => ({
+            name: o.name,
+            color: o.color ?? 'default',
+          }));
+        } else if (prop.type === 'multi_select') {
+          options = (prop.multi_select?.options ?? []).map((o) => ({
+            name: o.name,
+            color: o.color ?? 'default',
+          }));
+        } else if (prop.type === 'status') {
+          options = (prop.status?.options ?? []).map((o) => ({
+            name: o.name,
+            color: o.color ?? 'default',
+          }));
+        }
+        return { success: true, options };
+      } catch (err) {
+        logger.error('[Notion] getFieldOptions error:', err.message);
         return { success: false, error: err.message };
       }
     },

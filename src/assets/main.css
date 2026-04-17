@@ -26,6 +26,13 @@
 
   --sidebar-width: 260px;
   --bottom-bar-height: 44px;
+
+  /* Compact input — shared token for small filter selects and custom dropdowns */
+  --input-sm-height: 26px;
+  --input-sm-padding: 0 6px;
+  --input-sm-font-size: 13px;
+  --input-sm-bg: var(--bg-secondary);
+  --input-sm-color: var(--text-secondary);
 }
 
 * {

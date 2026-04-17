@@ -38,7 +38,7 @@ export function useBackButton(isOpen, close, options = {}) {
   // are open simultaneously, both listeners fire — but only the one whose isOpen is true
   // will act. This relies on at most one overlay being open at a time per consumer.
   function onPopstate() {
-    if (isOpen.value) {
+    if (isOpen.value && sentinelPushed) {
       closedByPopstate = true;
       sentinelPushed = false;
       close();
