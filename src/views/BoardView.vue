@@ -63,8 +63,15 @@ const unsubDelete = onMessage((msg) => {
   }
 });
 
+// Refresh board state after a successful drag-drop status update
+const unsubUpdate = onMessage((msg) => {
+  if (msg.type !== 'tasks:update_result' || !msg.success) return;
+  getBoardTasks();
+});
+
 onBeforeUnmount(() => {
   unsubDelete();
+  unsubUpdate();
 });
 
 // ── Assignee / label filter ───────────────────────────────────────────────────
@@ -186,9 +193,9 @@ function buildColumnData(status) {
     status === null ? !t.status : t.status === status,
   );
 
-  if (status !== null && isDoneStatus(status)) {
-    tasksInCol = tasksInCol.filter((t) => !t.archived);
-  }
+  // Filter out tasks with the custom Archive property set to "archive"
+  // (Notion ruleset auto-sets this after 3 days in Done)
+  tasksInCol = tasksInCol.filter((t) => t.archiveStatus !== 'archive');
 
   tasksInCol = applyFilters(tasksInCol);
   tasksInCol = sortTasks(tasksInCol);

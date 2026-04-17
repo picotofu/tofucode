@@ -700,19 +700,56 @@ async function handleClearCacheAndUpdate() {
     <div class="modal-content" @click.stop>
       <div class="modal-header">
         <h2>Settings</h2>
-        <button class="close-btn" @click="closeModal" title="Close">
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        <div class="modal-header-actions">
+          <div class="header-action-wrap">
+            <button
+              class="header-action-btn"
+              @click="handleClearCacheAndUpdate"
+              :disabled="isUpdatingPWA"
+            >
+              <svg v-if="!isUpdatingPWA" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6"/>
+                <path d="M14 11v6"/>
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>
+              <svg v-else width="15" height="15" viewBox="0 0 24 24" class="spin">
+                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <span class="header-action-label">{{ isUpdatingPWA ? 'clearing...' : 'clear cache' }}</span>
+          </div>
+          <div class="header-action-wrap">
+            <button
+              class="header-action-btn"
+              @click="handleRestart"
+              :disabled="isRestarting"
+            >
+              <svg v-if="!isRestarting" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18.36 6.64A9 9 0 1 1 5.64 6.64"/>
+                <line x1="12" y1="2" x2="12" y2="12"/>
+              </svg>
+              <svg v-else width="15" height="15" viewBox="0 0 24 24" class="spin">
+                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <span class="header-action-label">{{ isRestarting ? 'restarting...' : 'restart' }}</span>
+          </div>
+          <button class="close-btn" @click="closeModal" title="Close">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <!-- Tab bar -->
@@ -1386,6 +1423,63 @@ async function handleClearCacheAndUpdate() {
   color: var(--text-primary);
 }
 
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.header-action-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.header-action-label {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+.header-action-wrap:hover .header-action-label {
+  opacity: 1;
+}
+
+.header-action-btn {
+  padding: 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.header-action-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.header-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .close-btn {
   padding: 4px;
   background: transparent;
@@ -1680,7 +1774,8 @@ async function handleClearCacheAndUpdate() {
   cursor: not-allowed;
 }
 
-.restart-btn .spin {
+.restart-btn .spin,
+.header-action-btn .spin {
   animation: spin 1s linear infinite;
 }
 

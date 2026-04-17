@@ -43,6 +43,7 @@ const {
   connected,
   messages,
   taskStatus,
+  currentProject,
   currentSession,
   sessionTitle,
   projectStatus,
@@ -835,6 +836,23 @@ const modelSelection = ref('sonnet'); // 'sonnet' | 'opus' | 'haiku'
 const projectSlug = computed(() => route.params.project);
 const sessionParam = computed(() => route.params.session);
 
+// Session info panel
+const showSessionInfo = ref(false);
+const sessionFilePath = computed(() => {
+  if (!projectSlug.value || !sessionParam.value || sessionParam.value === 'new')
+    return null;
+  return `~/.claude/projects/${projectSlug.value}/${sessionParam.value}.jsonl`;
+});
+const sessionFolderPath = computed(() => currentProject.value?.path ?? null);
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).catch(() => {});
+}
+
+function toggleSessionInfo() {
+  showSessionInfo.value = !showSessionInfo.value;
+}
+
 // Storage key for permission mode
 const permissionStorageKey = computed(() => {
   if (sessionParam.value && sessionParam.value !== 'new') {
@@ -1050,12 +1068,13 @@ watch(
       }
 
       if (session === 'new') {
-        clearMessages();
-        // Wait for project selection to complete before creating new session
-        nextTick(() => {
-          newSession({
-            dangerouslySkipPermissions: permissionMode.value === 'skip',
-          });
+        // Call newSession() immediately (not deferred) so currentSession is nulled
+        // right away — prevents streaming messages from the previous session passing
+        // the currentSession guard and leaking into the new empty message list.
+        // selectProject() above already sent select_project on the wire; WS messages
+        // on the same connection are ordered, so new_session arrives after it.
+        newSession({
+          dangerouslySkipPermissions: permissionMode.value === 'skip',
         });
       } else if (session) {
         // Check if we're transitioning from 'new' to the actual session ID
@@ -2248,6 +2267,47 @@ watch(
             </svg>
           </button>
         </div>
+        <!-- Session info button -->
+        <div class="session-info-wrap">
+          <button
+            class="content-nav-btn session-info-btn"
+            :class="{ active: showSessionInfo }"
+            @click="toggleSessionInfo"
+            title="Session info"
+          >ℹ</button>
+          <div v-if="showSessionInfo" class="session-info-panel">
+            <div class="session-info-row">
+              <span class="session-info-label">session id</span>
+              <span class="session-info-value">{{ sessionParam }}</span>
+              <button class="session-info-copy" @click="copyText(sessionParam)" title="Copy">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+              </button>
+            </div>
+            <div v-if="sessionFilePath" class="session-info-row">
+              <span class="session-info-label">file</span>
+              <span class="session-info-value session-info-path">{{ sessionFilePath }}</span>
+              <button class="session-info-copy" @click="copyText(sessionFilePath)" title="Copy">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+              </button>
+            </div>
+            <div v-if="sessionFolderPath" class="session-info-row">
+              <span class="session-info-label">folder</span>
+              <span class="session-info-value session-info-path">{{ sessionFolderPath }}</span>
+              <button class="session-info-copy" @click="copyText(sessionFolderPath)" title="Copy">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Toolbar -->
@@ -2846,8 +2906,9 @@ watch(
 }
 
 .session-title-row {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .session-title-display {
@@ -3165,6 +3226,93 @@ watch(
   min-width: 36px;
   text-align: center;
   font-family: var(--font-mono);
+}
+
+.session-info-btn {
+  font-size: 12px;
+  line-height: 1;
+  font-style: normal;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+}
+
+.session-info-btn.active {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.session-info-wrap {
+  position: relative;
+}
+
+.session-info-panel {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  min-width: 320px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.session-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.session-info-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-width: 44px;
+  flex-shrink: 0;
+}
+
+.session-info-value {
+  font-size: 11px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-info-path {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.session-info-copy {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s, background 0.15s;
+}
+
+.session-info-copy:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .toolbar {

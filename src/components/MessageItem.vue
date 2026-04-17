@@ -13,9 +13,17 @@ const emit = defineEmits(['answer-question']);
 const resultExpanded = ref(false);
 const finalResultExpanded = ref(false);
 const copySuccess = ref(false);
+const userContentRef = ref(null);
 
 async function copyMessageContent() {
-  const content = props.message.content || '';
+  let content;
+  if (props.message.type === 'user' && userContentRef.value) {
+    // Use innerText from the rendered DOM — avoids non-breaking spaces and
+    // other contenteditable artifacts that can corrupt pasted format.
+    content = (userContentRef.value.innerText || '').trim();
+  } else {
+    content = props.message.content || '';
+  }
   try {
     await navigator.clipboard.writeText(content);
     copySuccess.value = true;
@@ -231,7 +239,7 @@ function togglePlanExpand() {
   <div class="message" :class="messageType">
     <!-- User message -->
     <div v-if="messageType === 'user'" class="user-message" :class="userPermissionMode ? 'permission-' + userPermissionMode : 'permission-default'">
-      <div class="content markdown-body" v-html="renderedUserContent"></div>
+      <div ref="userContentRef" class="content markdown-body" v-html="renderedUserContent"></div>
       <div class="message-footer">
         <span class="timestamp" v-if="formattedTimestamp" :title="fullTimestamp">{{ formattedTimestamp }}</span>
         <button class="msg-copy-btn" :class="{ copied: copySuccess }" @click="copyMessageContent" title="Copy message">
