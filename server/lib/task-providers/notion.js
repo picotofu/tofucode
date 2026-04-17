@@ -1257,6 +1257,9 @@ export function createNotionProvider(token) {
     async getSelfId() {
       try {
         const me = await api.getMe();
+        // Integration tokens return a bot user — bots cannot be assigned to
+        // people fields, so treat them as no self-user.
+        if (me.type !== 'person') return null;
         return me.id ?? null;
       } catch (err) {
         logger.warn('[Notion] getSelfId error:', err.message);
