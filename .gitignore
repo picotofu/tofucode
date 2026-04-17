@@ -59,6 +59,14 @@ Desktop.ini
 *.temp
 .cache/
 
+# Playwright MCP browser automation
+.playwright-mcp/
+
+# Debug / scratch screenshots
+*.png
+*.jpg
+*.jpeg
+
 # Test coverage
 coverage/
 *.lcov
