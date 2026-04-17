@@ -25,7 +25,7 @@ export const config = {
   models: {
     haiku: process.env.MODEL_HAIKU_SLUG || 'claude-haiku-4-5',
     sonnet: process.env.MODEL_SONNET_SLUG || 'claude-sonnet-4-6',
-    opus: process.env.MODEL_OPUS_SLUG || 'claude-opus-4-6',
+    opus: process.env.MODEL_OPUS_SLUG || 'claude-opus-4-7',
   },
 };
 
