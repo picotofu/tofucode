@@ -114,10 +114,13 @@ const unsubBrowse = onMessage((msg) => {
     tc.set(msg.path, filtered);
     treeChildren.value = tc;
 
-    // Eagerly fetch all subdirectories
-    for (const item of filtered) {
-      if (item.isDirectory) {
-        fetchFolder(item.path);
+    // Eagerly fetch subdirectories only for the primary (non-linked) root
+    const rootObj = treeRoots.value.find((r) => r.path === rootPath);
+    if (!rootObj?.isLinked) {
+      for (const item of filtered) {
+        if (item.isDirectory) {
+          fetchFolder(item.path);
+        }
       }
     }
 
@@ -144,6 +147,14 @@ function toggleFolder(path) {
     ep.delete(path);
   } else {
     ep.add(path);
+    // Fetch on first expand if not yet loaded
+    if (!fetchedPaths.value.has(path)) {
+      const isRoot = treeRoots.value.some((r) => r.path === path);
+      if (isRoot) {
+        loadingRoots.value = new Set([...loadingRoots.value, path]);
+      }
+      fetchFolder(path);
+    }
   }
   expandedPaths.value = ep;
 }
@@ -291,6 +302,7 @@ const initialized = ref(false);
 
 function loadRoots() {
   for (const root of treeRoots.value) {
+    if (root.isLinked) continue; // linked folders are collapsed and loaded lazily on expand
     loadingRoots.value = new Set([...loadingRoots.value, root.path]);
     expandedPaths.value = new Set([...expandedPaths.value, root.path]);
     fetchFolder(root.path);
